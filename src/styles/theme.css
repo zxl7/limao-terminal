@@ -1,0 +1,150 @@
+/**
+ * 设计令牌 —— Tailwind v4 `@theme` 范式，本项目的**唯一样式真源**。
+ *
+ * ## 与 Vue 版的关系
+ *
+ * Vue 版把令牌放在 `tokens.css` 的 `:root`（普通 CSS 变量）。React 版改用
+ * Tailwind v4 的 `@theme`：变量会同时生成 **CSS 变量** 与 **工具类**
+ * （`--color-up` → `text-up` / `bg-up` / `border-up`…），无需再手写 class 映射。
+ *
+ * ## ⚠️ A 股语义色板铁律（不可随意更改）
+ *
+ *   涨 = 红  ｜ 跌 = 绿  ｜ 机会/可买 = 紫  ｜ 标杆龙 = 金  ｜ 退潮预警 = 青绿
+ *   与欧美市场完全相反。
+ *
+ * ## ⚠️ 两套语义必须隔离（本项目最重要的样式约定）
+ *
+ * Skyroc UI 自带一套通用语义色：`primary` / `destructive`(=红) / `success`(=绿)
+ * / `warning` / `info`。它们服务的是**通用 UI 语义**（危险操作、成功提示）。
+ *
+ * 而 A 股语义是**行情语义**（涨跌）。两者的 `红` 含义完全不同：
+ *   · `destructive` = 红 = 「删除/危险」
+ *   · `up`          = 红 = 「上涨/利好」
+ *
+ * 因此**绝不可互相替代**，也绝不可把 `--color-success` 重定义为红（那会让
+ * 删除按钮变成绿色）。规则：
+ *   · 通用 UI 交互（按钮、弹窗、表单校验）→ 用 skyroc 的 `primary`/`destructive`/…
+ *   · 行情涨跌与情绪（价格、晋级率、梯队）→ 用本文件的 `up`/`down`/`rec`/`lead`/`warn`
+ */
+
+/* 1) Tailwind 引擎（含 preflight / theme / utilities 三层）
+   2) Skyroc UI 的 Tailwind 插件 —— 提供 primary/destructive/success 等令牌
+      与 sidebar 调色板，skyroc 组件依赖它们
+   3) @source —— 让 Tailwind 扫描 skyroc 编译产物，生成其组件实际用到的类
+      （若不扫描，`bg-primary` 这类类不会出现在我们的 CSS 里） */
+@import 'tailwindcss';
+@plugin '@skyroc/tailwind-plugin';
+@source '../../node_modules/@skyroc/web-ui/dist';
+
+@theme {
+  /* ── A 股语义色（行情专用 · 禁止用于通用 UI 交互） ── */
+  --color-up: #ee2500; /* 涨 / 改善 / 机会 */
+  --color-up-soft: #ffe9e5;
+  --color-down: #0a8f3c; /* 跌 / 恶化 / 回避 */
+  --color-down-soft: #e3f4ea;
+  --color-rec: #8b5cf6; /* 可买 / AI 推荐介入 */
+  --color-rec-soft: #f1ecfe;
+  --color-lead: #e8940a; /* 涨停标杆龙（标杆，非机会） */
+  --color-lead-soft: #fdf3e0;
+  --color-warn: #0d9488; /* 退潮 / 风险预警 */
+  --color-warn-soft: #dcf1ef; /* 退潮预警底（青绿浅底，与 down-soft 的草绿区分开） */
+  --color-mid: #3b82c4; /* 中性偏弱（情绪分 3–6 的蓝） */
+  --color-mid-soft: #e6f0fa; /* 中性蓝浅底（分歧 / 中性提示） */
+
+  /* ── 中性层 ── */
+  --color-bg: #f2f3f6;
+  --color-card: #ffffff;
+  --color-line: #e7e8ee;
+  --color-line-faint: #f0f1f5; /* 表格行分隔（比 line 更淡，避免密集表格发闷） */
+  --color-line-strong: #d3d5dd;
+  --color-txt: #16161a;
+  --color-sub: #666a76;
+
+  /* ── 深色顶栏 ── */
+  --color-head-bg: #1c2130;
+  --color-head-txt: #eef1f7;
+  /* 顶栏内的次要文字（比 head-txt 暗一档） */
+  --color-head-soft: #9aa4b8;
+  /* ⚠️ A 股语义色在深底上对比度不足，顶栏必须换一套提亮版本。
+        这是刻意的「同一语义、两套载体」，不是冗余 —— 禁止在浅底复用。 */
+  --color-head-up: #ff6b52;
+  --color-head-down: #34d399;
+  --color-head-mid: #7fb4e8;
+  --color-head-warn: #ffb020;
+
+  /* ── 字体 ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 数值专用：等宽 + 表格数字，避免刷新时列宽跳动 */
+  --font-num: 'SF Mono', Menlo, ui-monospace, monospace;
+
+  /* ── 节奏 ── */
+  --radius-sm: 6px;
+  --radius-DEFAULT: 8px;
+
+  /* ── 断点扩展：PC 大屏 ──
+     Tailwind 默认最大只到 2xl(96rem=1536px)，而本系统主力视口是 4K PC
+     （有效 CSS 宽度 1920–3840px）。不补这两档，`3xl:` 会在产物里静默失效 ——
+     布局退回 1536px 断点，4K 下只剩 2–3 列、右侧大片空档，正是「空洞」的根因。 */
+  --breakpoint-3xl: 120rem; /* 1920px */
+  --breakpoint-4xl: 160rem; /* 2560px */
+
+  /* ── PC 工作台骨架尺寸 ──
+     4K 下引入右侧辅助 rail，避免主区之外的大片结构性空白。 */
+  --sidebar-width: 220px;
+  --rail-width: 320px;
+  --rail-width-4xl: 360px;
+  --header-height: 46px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   组合型工具类（原 UnoCSS shortcuts 的等价物）
+   Tailwind v4 的 @utility 会生成真正的工具类，可被 hover:/md: 等变体修饰。
+   ──────────────────────────────────────────────────────────────── */
+
+/** 数值文本：等宽 + 表格数字 */
+@utility num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/** 标准卡片容器 */
+@utility panel {
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-DEFAULT);
+  padding: 0.625rem 0.75rem;
+}
+
+/** 卡片标题行 */
+@utility panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/** 次要说明文字 */
+@utility txt-sub {
+  color: var(--color-sub);
+  font-size: 12px;
+}
+
+/** 行内标签 */
+@utility badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/** 深色顶栏上的数值（需要按语义提亮，因为 --color-up/--color-down 在深底上对比度不足） */
+@utility head-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-head-txt);
+}

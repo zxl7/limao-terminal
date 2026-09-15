@@ -1,0 +1,360 @@
+/**
+ * 数据路由表 —— 开发服务器与后续 serve.py 共享的唯一真源。
+ *
+ * 设计约束（对应「原系统不改造」的决策）：
+ *   1. 全部条目为**只读**映射，指向原系统（狸猫猎手）的落盘文件；
+ *   2. 原系统的 JSON 结构**原样透传**，本层不做任何字段改写或聚合；
+ *   3. 文件缺失时返回 `data_unavailable`，由前端降级渲染。
+ *
+ * 后期若要改造数据结构，只改这一张表 + 后端，前端消费端无需改动。
+ *
+ * ── 路由形态（四种）────────────────────────────────────────────
+ *   ① 单文件          { file }
+ *   ② 目录 + 文件名   { dir, pattern }
+ *   ③ 两层目录        { dir, dirPattern, file }   如 decision_log/<日期>/candidates.json
+ *   ④ 数量截断        { ..., limit }              只取**最新** N 个
+ *
+ * ⚠️ 大文件（>100KB/份）一律用 `limit` 限制历史份数或 `mode: 'latest'`，
+ *    否则一次响应会到 MB 级 —— 前端一次拉全量历史并非本层职责。
+ */
+
+/** 覆写数据根目录的环境变量名（迁移服务器时用） */
+export const DATA_ROOT_ENV = 'LIMAO_DATA_ROOT'
+
+/** 默认数据根目录（相对项目根）—— 原系统所在位置 */
+export const DEFAULT_DATA_ROOT = '../狸猫猎手'
+
+export interface RouteDef {
+  /** 固定文件路径（相对 DATA_ROOT） */
+  file?: string
+  /** 目录（相对 DATA_ROOT），配合 pattern 使用 */
+  dir?: string
+  /** 目录内文件名匹配正则（字符串形式，便于跨语言共享） */
+  pattern?: string
+  /** 两层目录时，**外层目录名**的匹配正则（如 `^\d{4}-\d{2}-\d{2}$`） */
+  dirPattern?: string
+  /** latest = 取文件名倒序最新的一个；all = 全部合并为数组 */
+  mode?: 'latest' | 'all'
+  /** all 模式下只取**最新** N 个（防止历史无限增长撑爆响应） */
+  limit?: number
+  /** 落盘格式。默认 json；`jsonl` 按行解析为数组（原系统账本类文件用） */
+  format?: 'json' | 'jsonl'
+  /** 刷新节拍：intraday=盘中 30s；daily=日频不轮询；manual=仅手动刷新 */
+  cadence?: 'intraday' | 'daily' | 'manual'
+  /** 用途说明 */
+  desc: string
+}
+
+export const ROUTES: Record<string, RouteDef> = {
+  // ══════════════════════════════════════════════════════════════
+  // 一、行情主链路（原 watch.html 已在消费的 4 个）· 盘中实时
+  // ══════════════════════════════════════════════════════════════
+  '/api/market/latest':     { file: 'cache/pulse_snapshots/latest.json',       cadence: 'intraday', desc: '主快照（实时·含梯队/核心标的/板块风险/情绪）' },
+  '/api/market/prev':       { file: 'cache/pulse_snapshots/prev.json',         cadence: 'intraday', desc: '上一版快照（环比对比用）' },
+  '/api/market/auction':    { file: 'cache/pulse_snapshots/auction_live.json', cadence: 'intraday', desc: '竞价实时报价' },
+  '/api/market/signals':    { file: 'cache/short_spirit_signals.json',         cadence: 'intraday', desc: '短线精灵信号' },
+
+  // ══════════════════════════════════════════════════════════════
+  // 二、原 dashboard 内嵌、前端此前取不到的 5 个
+  // ══════════════════════════════════════════════════════════════
+  '/api/market/feedback':   { file: 'cache/feedback_matrix.json',              cadence: 'intraday', desc: '昨日涨停反馈矩阵（晋级率/核按钮/情绪分 12 因子）' },
+  '/api/market/candidates': { file: 'cache/pulse_snapshots/candidates.json',   cadence: 'intraday', desc: '候选池' },
+  '/api/theme/rotation':    { file: 'cache/theme_rotation.json',               cadence: 'intraday', desc: '题材轮动·回流预测·5日资金' },
+  '/api/theme/series':      { file: 'cache/theme_series.json',                 cadence: 'daily',    desc: '题材多日序列（数据堆叠 Tab 数据源）' },
+  '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'daily',    desc: '题材序列' },
+  '/api/flow/history':      { dir: 'cache/sector_flow_history', pattern: '^sector_flow_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily', desc: '板块资金历史（多日合并）' },
+
+  // ══════════════════════════════════════════════════════════════
+  // 三、板块核心票（scripts/board_core.py · 四维加权）
+  //     用途：板块异动先查 core 票动不动 —— 不动而只有杂毛涨 = 假启动
+  // ══════════════════════════════════════════════════════════════
+  '/api/board/core': {
+    dir: 'cache/board_core', pattern: '^board_core_.+\\.json$', mode: 'all', cadence: 'daily',
+    desc: '板块核心票（时效0.25/封板硬度0.20/连板领先0.25/带动参与0.30 四维加权出 core_score）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 四、连板晋级量化（scripts/promo_quant.py · P1-P3 已落地）
+  //     冷启动矩阵：1进2 15.4% / 2进3 34.3% / 3进4 51.6% / 4to5+ 51.7%
+  // ══════════════════════════════════════════════════════════════
+  '/api/promotion/summary': {
+    file: 'cache/promo/promo_summary.json', cadence: 'daily',
+    desc: '晋级率汇总（按 1to2/2to3/3to4/4to5+ 分段：成功率 + 晋级次日溢价均值/中位 + 失败组亏损）',
+  },
+  '/api/promotion/daily': {
+    dir: 'cache/promo', pattern: '^promo_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '每日晋级事件明细（逐票 prev_boards→boards / stage / ok / prem_open1 / prem_close1,2）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 五、股性基因层（scripts/zt_genes.py · 2026-09-09 用户「股性很重要」）
+  //     统计窗口统一近 250 交易日
+  // ══════════════════════════════════════════════════════════════
+  '/api/gene/summary': {
+    file: 'cache/zt_genes/summary.json', cadence: 'daily',
+    desc: '涨停池股性榜（gene_score Top：涨停频率/最高连板/首封时间/炸板率/晋级成功率）',
+  },
+  '/api/gene/detail': {
+    dir: 'cache/zt_genes', pattern: '^gene_\\d{6}\\.json$', mode: 'all', cadence: 'daily',
+    desc: '个股股性档案（涨停次数/最高连板/首封时间/炸板率/晋级成功率 + 次日溢价 + 股性分）',
+  },
+  '/api/gene/hist': {
+    dir: 'cache/zt_genes', pattern: '^hist_\\d{6}\\.json$', mode: 'all', cadence: 'daily',
+    desc: '个股历史涨停基因（新浪不复权日K自算：近250/500日涨停次数/最长连板/晋级率/首板次日溢价）',
+  },
+  '/api/gene/pool': {
+    dir: 'cache/zt_genes', pattern: '^pool_\\d{8}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '涨停基因池（最近一期·逐票 zt_boards/zt_days/zt_times/seal_min/broken/seal_fund_yi）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 六、情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）
+  // ══════════════════════════════════════════════════════════════
+  '/api/emotion/summary5d': {
+    file: 'cache/short_term/summary_5d.json', cadence: 'daily',
+    desc: '5日情绪摘要（含 sentiment_ma3 轨迹 + turn_signal 转折信号 repair/ebb/flat + cycle_hint）',
+  },
+  '/api/emotion/zt-history': {
+    dir: 'cache/zt_history', pattern: '^zt_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily',
+    desc: '盘中涨停时序（按窗口记录题材分布与最高板 · 涨停池历史单一源）',
+  },
+  '/api/emotion/memory': {
+    dir: 'cache', pattern: '^market_memory_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
+    desc: '情绪快照（memory_lib 情绪联动唯一数据源 market_state.sentiment）',
+  },
+  '/api/zt/yesterday': {
+    file: 'cache/yesterday_zt.json', cadence: 'daily',
+    desc: '昨日涨停池（**唯一涨停权威** · record_zt_snapshot 产出）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 七、财富密码决策链（选股 → 竞价 → 净值闭环）
+  // ══════════════════════════════════════════════════════════════
+  '/api/decision/candidates': {
+    dir: 'wealth_code/cache', pattern: '^candidates-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 3, cadence: 'daily',
+    desc: '选股候选存档（含 environment 情绪环境 / real_env 真实环境 / 候选明细）·单份约 100KB 故限 3 期',
+  },
+  '/api/decision/latest': {
+    dir: 'wealth_code/cache', pattern: '^candidates-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '最新一期选股候选（完整字段）',
+  },
+  '/api/decision/auction-history': {
+    dir: 'wealth_code/cache', pattern: '^auction_quotes-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '竞价报价存档（每票竞价涨幅/金额）',
+  },
+  '/api/decision/archive': {
+    dir: 'cache/decision_log', dirPattern: '^\\d{4}-\\d{2}-\\d{2}$', file: 'candidates.json', mode: 'all', limit: 3, cadence: 'daily',
+    desc: '决策黑匣子存档（scripts/archive_decision.py 按日落盘）·单份约 100KB 故限 3 期',
+  },
+  '/api/decision/zt-pool': {
+    dir: 'cache/decision_log', dirPattern: '^\\d{4}-\\d{2}-\\d{2}$', file: 'zt_pool.json', mode: 'latest', cadence: 'daily',
+    desc: '决策时点涨停池明细（ladder 天梯 / top_codes / zt_list 全字段）',
+  },
+  '/api/decision/manifest': {
+    dir: 'cache/decision_log', dirPattern: '^\\d{4}-\\d{2}-\\d{2}$', file: 'manifest.json', mode: 'latest', cadence: 'daily',
+    desc: '存档清单（来源清单 sources / 摘要 summary / 缺口 gaps）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 八、AI 判断平行台账（2026-09-10 用户定 · 两本独立账）
+  //     脚本轨 = wealth_code/cache/account_nav_history.jsonl
+  //     AI  轨 = wealth_code/cache/ai_nav_history.jsonl
+  // ══════════════════════════════════════════════════════════════
+  '/api/ai/view': {
+    dir: 'cache', pattern: '^ai_view_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
+    desc: 'AI 判断（参与/放弃/观察 + 理由 + entry_max_gap）·盘后写、次日竞价卡对照',
+  },
+  '/api/ai/decisions': {
+    file: 'wealth_code/cache/ai_decisions.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: 'AI 判断台账（append-only · reason 必填 · 幂等）',
+  },
+  '/api/ai/nav': {
+    file: 'wealth_code/cache/ai_nav_history.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: 'AI 轨净值台账（首行由当日 15:30 接力卡 settle 落 · 早于该时点为空属正常）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 九、净值与战绩（脚本轨）
+  // ══════════════════════════════════════════════════════════════
+  '/api/account/nav': {
+    file: 'wealth_code/cache/account_nav_history.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: '净值账本（脚本轨 · 口径 open_check.can_enter ∧ next_day.covered）',
+  },
+  '/api/account/metrics': {
+    file: 'wealth_code/cache/account_strategy_metrics.json', cadence: 'daily',
+    desc: '策略指标（胜率/盈亏比等聚合）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十、龙虎榜（资金性质：机构 vs 游资）
+  // ══════════════════════════════════════════════════════════════
+  '/api/lhb/tencent': {
+    dir: 'cache', pattern: '^lhb_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '龙虎榜（腾讯自选股源 · 机构榜 + 游资席位 · 盘后 18:00+ 才披露）',
+  },
+  '/api/lhb/hithink': {
+    dir: 'cache', pattern: '^hithink_lhb_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '同花顺龙虎榜（机构/游资席位交叉校验）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十一、同花顺专业数据（hithink_fetch.py · 盘前/盘后第二权威）
+  // ══════════════════════════════════════════════════════════════
+  '/api/hithink/ladder': {
+    file: 'cache/hithink_ladder.json', cadence: 'daily',
+    desc: '连板天梯 30 日（仅 2 板以上 · 无首板 · 作板数校验与窗口外兜底）',
+  },
+  '/api/hithink/zt': {
+    dir: 'cache', pattern: '^hithink_zt_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '同花顺涨停池（含 reason 涨停原因注入）',
+  },
+  '/api/hithink/zt-diff': {
+    dir: 'cache', pattern: '^hithink_zt_diff_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '涨停池双源校验差异（同花顺 vs 必盈 · 数据质量证据）',
+  },
+  '/api/hithink/auction': {
+    dir: 'cache', pattern: '^hithink_auction_\\d{8}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '竞价风向标 + 快照（同花顺）',
+  },
+  '/api/hithink/anomaly': {
+    dir: 'cache', pattern: '^hithink_anomaly_\\d{8}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '异动原因（同花顺 · 单份 250-300KB 故只取最新一期）',
+  },
+  '/api/hithink/valuation': {
+    dir: 'cache', pattern: '^hithink_valuation_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '同花顺估值（-enrich-candidates --apply 回填候选 · 取最新一期）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十二、机构投研（Gangtise · 机构为主体）
+  // ══════════════════════════════════════════════════════════════
+  '/api/institution/pool': {
+    dir: 'cache', pattern: '^institution_pool_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '机构池（机构关注标的）',
+  },
+  '/api/institution/morning': {
+    file: 'cache/gangtise_morning_full_v5.json', cadence: 'daily',
+    desc: '机构研报·早盘卡（版式 v5 定版样本）',
+  },
+  '/api/institution/evening': {
+    file: 'cache/gangtise_evening_research.json', cadence: 'daily',
+    desc: '机构晚报速览',
+  },
+  '/api/institution/weekend': {
+    file: 'cache/gangtise_weekend_0913.json', cadence: 'manual',
+    desc: '机构周末研究',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十三、题材与消息史
+  // ══════════════════════════════════════════════════════════════
+  '/api/eruption/history': {
+    dir: 'cache/eruption_history', pattern: '^eruption_.+\\.json$', mode: 'all', cadence: 'daily',
+    desc: '题材爆发史（题材/累计涨幅/催化标题/龙头股标记）',
+  },
+  '/api/newsflash/history': {
+    dir: 'cache/newsflash_history', pattern: '^daily_.+\\.json$', mode: 'all', cadence: 'daily',
+    desc: '每日快讯→题材→个股三层映射',
+  },
+  '/api/theme/weekly-map': {
+    file: 'cache/weekly_zt_map.json', cadence: 'daily',
+    desc: '周涨停地图（按周聚合的涨停分布）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十四、载体 / 五日线 / 影子模式
+  // ══════════════════════════════════════════════════════════════
+  '/api/carrier/state': {
+    file: 'cache/carrier_state.json', cadence: 'daily',
+    desc: '载体证伪追踪（昨日载体今日断板 = 证伪迁移 · 盘后链 6.5 步）',
+  },
+  '/api/ma5/status': {
+    file: 'cache/ma5_status.json', cadence: 'daily',
+    desc: '五日线状态（ma5_broken 标注供接力评分用）',
+  },
+  '/api/shadow/relay': {
+    dir: 'cache/shadow', pattern: '^relay_shadow_.+\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '接力权重影子模式（eod_relay 实际入池 vs shadow_ranked 影子排序对照 · 只观察不改产池）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十五、风险监控
+  // ══════════════════════════════════════════════════════════════
+  '/api/risk/watch': {
+    dir: 'cache', pattern: '^risk_watch_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '风险监控快照',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十六、推测回测 + 自我学习（财神-回测）
+  // ══════════════════════════════════════════════════════════════
+  '/api/backtest/report': {
+    dir: 'cache', pattern: '^backtest_report_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '推测回测报告（候选命中率/预期区间命中率/情绪分对齐）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十七、卡片存档（决策过程的可追溯原件）
+  // ══════════════════════════════════════════════════════════════
+  '/api/card/fupan': {
+    dir: 'cache', pattern: '^fupan_card_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '盘后复盘卡存档',
+  },
+  '/api/card/panqian': {
+    dir: 'wealth_code/cache', pattern: '^panqian_card_\\d+\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '盘前预测卡存档',
+  },
+  '/api/card/ambush': {
+    dir: 'wealth_code/cache', pattern: '^ambush_card_\\d+\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '早鸟埋伏卡存档',
+  },
+  '/api/card/lhb': {
+    dir: 'cache', pattern: '^lhb_card_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '龙虎榜速览卡存档（18:20 独立任务）',
+  },
+  '/api/card/verify': {
+    dir: 'cache', pattern: '^verify_card_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
+    desc: '竞价验证卡存档',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十八、盘中脉冲窗口存档（事件层留痕）
+  // ══════════════════════════════════════════════════════════════
+  '/api/pulse/windows': {
+    dir: 'cache/pulse_windows', pattern: '^window_\\d{8}_\\d{4}\\.json$', mode: 'all', limit: 40, cadence: 'daily',
+    desc: '盘中脉冲窗口存档（标题/色标/elements/note · 15min 节拍）',
+  },
+  '/api/pulse/pushed-signals': {
+    dir: 'cache', pattern: '^pushed_signals_\\d+\\.json$', mode: 'all', limit: 5, cadence: 'daily',
+    desc: '推送信号状态（当日文件极小/为空 = 该日事件链零产出的故障信号）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十九、推送审计
+  // ══════════════════════════════════════════════════════════════
+  '/api/audit/log': {
+    file: 'cache/audit.jsonl', format: 'jsonl', cadence: 'intraday',
+    desc: '推送审计日志（append-only · 双推/镜像失败 19001 排查入口）',
+  },
+  '/api/push/dedup': {
+    file: 'cache/push_dedup.json', cadence: 'daily',
+    desc: '推送去重状态（10min 同内容去重）',
+  },
+}
+
+/**
+ * 单文件型路由（供健康检查与新鲜度展示用）。
+ *
+ * ⚠️ 必须排除「两层目录」型（`dirPattern` 型）—— 它们的 `file` 是**相对于日期目录**的
+ *    文件名（如 `candidates.json`），不是相对 DATA_ROOT 的路径。若混入，
+ *    `path.join(dataRoot, 'candidates.json')` 会拼出必然不存在的假路径，
+ *    表现为「体检说没数据、页面其实能拿到」的互相矛盾。
+ */
+export const FILE_ROUTES = Object.entries(ROUTES).filter(([, d]) => d.file && !d.dirPattern)
+
+/** 按刷新节拍分组（前端据此决定哪些源参与轮询） */
+export const ROUTES_BY_CADENCE = {
+  intraday: Object.entries(ROUTES).filter(([, d]) => d.cadence === 'intraday').map(([r]) => r),
+  daily: Object.entries(ROUTES).filter(([, d]) => d.cadence === 'daily').map(([r]) => r),
+  manual: Object.entries(ROUTES).filter(([, d]) => d.cadence === 'manual').map(([r]) => r),
+}

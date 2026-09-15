@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    // vite.config.ts 需要显式 .ts 扩展名（Vite 8 的 native config loader 要求）；
+    // 由于本工程 noEmit，开启此项不会产出非法 JS
+    "allowImportingTsExtensions": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": false,
+
+    "verbatimModuleSyntax": true,
+
+    // 不用 baseUrl（TS 6 已弃用，TS 7 将移除）。
+    // 无 baseUrl 时 paths 相对于本 tsconfig 所在目录解析。
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["vite/client", "node", "vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["src", "tests", "scripts", "vite.config.ts"]
+}

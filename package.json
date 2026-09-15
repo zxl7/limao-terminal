@@ -1,0 +1,54 @@
+{
+  "name": "limao-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "狸猫终端 —— A股情绪核心盯盘终端。React 19 分层架构；原系统（狸猫猎手）只读，不做任何改造",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "oxlint src tests scripts",
+    "lint:fix": "oxlint --fix src tests scripts",
+    "arch": "node scripts/check-boundaries.mjs",
+    "data": "node scripts/check-data-routes.mjs",
+    "data:verbose": "node scripts/check-data-routes.mjs --verbose",
+    "data:json": "node scripts/check-data-routes.mjs --json",
+    "check": "npm run lint && npm run arch && npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "@skyroc/tailwind-plugin": "^1.0.0",
+    "@skyroc/web-ui": "^0.2.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query": "^5.102.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^8.3.1",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^24.13.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.0",
+    "jsdom": "^30.0.1",
+    "oxc-transform-react": "^0.145.0",
+    "oxlint": "^1.83.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.0"
+  }
+}

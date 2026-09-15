@@ -1,0 +1,1948 @@
+/**
+ * 数据契约 —— 原系统（狸猫猎手）落盘 JSON 的 TypeScript 映射。
+ *
+ * ⚠️ 这些接口是**对现有结构的描述，不是设计**。原系统已冻结不做改造，
+ *    因此当原系统字段变化时，本文件是唯一需要同步的地方 —— 编译期即暴露。
+ *
+ * 每个接口的字段均来自对真实落盘文件的实测（2026-09-15 样本），
+ * 可选标记 `?` / `| null` 反映真实可空性，不做乐观假设。
+ */
+
+// ════════════════════════════════════════════════════════════════
+// 通用
+// ════════════════════════════════════════════════════════════════
+
+/** 数据不可用（文件缺失/解析失败）—— 原系统大量空态降级依赖此语义 */
+export interface ApiError {
+  error: 'data_unavailable'
+  route: string
+  target?: string
+  desc?: string
+  message?: string
+}
+
+/** 计数 + 名单（跌停/炸板共用） */
+export interface CountNames {
+  count: number
+  names: string[]
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/latest  &  /api/market/prev   —— MarketSnapshot
+// ════════════════════════════════════════════════════════════════
+
+export interface SentimentDetail {
+  label: string
+  score: number
+  /** 封板率（%） */
+  seal_rate: number
+}
+
+export interface IndexQuote {
+  name: string
+  pct: number
+  price: number
+  /** 成交额（亿元）· 仅 prev 快照携带 */
+  amount_yi?: number
+}
+
+export interface WeakSectors {
+  focus_hits: string[]
+  ld_count: number
+  broken_count: number
+  ld_names: string[]
+  broken_names: string[]
+}
+
+/**
+ * 板块资金流（轻量版 · latest.sector_risk 内）。
+ *
+ * ⚠️ `main_inflow` 在实测中**两种形态都出现过**：早先的脚本写字符串（带单位文案），
+ *    当前脚本写原始数字（如 -382685064）。故类型为联合 —— 不要假设单一形态，
+ *    渲染时必须走 `String()` / 数值判空，不能直接做数值运算。
+ *
+ * ⚠️ 同一数组内**字段并不齐**：`declining` 只有 name/pct/main_inflow/is_focus；
+ *    而 `inflow_top` / `outflow_top` 额外带 `flow_yi`（主力净额亿元）与四档资金
+ *    拆解。故额外字段一律标可选 —— 按必填写会在渲染 `declining` 时拿到 undefined。
+ */
+export interface SectorFlowLite {
+  name: string
+  pct: number
+  main_inflow: string | number
+  is_focus: boolean
+  /** 东财板块代码（仅 inflow_top / outflow_top 携带） */
+  code?: string
+  /** 主力净额（亿元）· 已由脚本换算 */
+  flow_yi?: number
+  /** 四档资金拆解（亿元）· 仅 inflow_top / outflow_top 携带 */
+  super_large_yi?: number
+  large_yi?: number
+  mid_yi?: number
+  small_yi?: number
+  /** 资金数据源时间戳（秒） */
+  source_ts?: number
+}
+
+export interface SectorRisk {
+  /** 弱势板块判定阈值（如 -2.5） */
+  threshold: number
+  declining: SectorFlowLite[]
+  focus_declining: SectorFlowLite[]
+  count: number
+  inflow_top: SectorFlowLite[]
+  outflow_top: SectorFlowLite[]
+  ok: boolean
+}
+
+/** 连板天梯：一组同板数的股票（⚠️ 仅股票名，非对象） */
+export interface LadderGroup {
+  boards: number
+  stocks: string[]
+}
+
+export interface Newsflash {
+  title: string
+  plates: string[]
+  stocks: string[]
+}
+
+/** 盘中异动题材（来自 latest.hot_spots） */
+export interface HotSpotStock {
+  name: string
+  code: string
+  pct: number
+  price: number
+  buyable: boolean
+  is_20cm: boolean
+  /** 连板文案（如 "4天4板"），可为空串 */
+  boards: string
+}
+export interface HotSpot {
+  sector: string
+  stocks: HotSpotStock[]
+}
+
+export interface EmExpectStock {
+  code: string
+  name: string
+  pct: number
+  cap_yi: number
+  /** 是否龙头 */
+  dragon: boolean
+}
+
+export interface EmExpect {
+  name: string
+  themeCode: string
+  pct: number
+  zt: number
+  cum_pct: number
+  title: string
+  stocks: EmExpectStock[]
+}
+
+/** 爆发前夜 · 关注标的 */
+export interface EarlyBuy {
+  name: string
+  code: string
+  pct: number
+  /** ⚠️ 实测 buy 内还带 price / is_20cm / limit_up_days，非仅 name+code+pct */
+  price?: number
+  is_20cm?: boolean
+  limit_up_days?: number
+}
+
+/**
+ * 爆发前夜 · 池内成员。
+ *
+ * ⚠️ **实测是对象数组**（`{name, pct}`），不是字符串数组 ——
+ *    早期类型写的 `string[]` 是错的，直接渲染会抛
+ *    「Objects are not valid as a React child」。
+ */
+export interface EarlyMember {
+  name: string
+  pct: number
+}
+
+export interface EarlyItem {
+  type: string
+  sector: string
+  desc: string
+  buy: EarlyBuy
+  count: number
+  zt_in_sector: number
+  members: EarlyMember[]
+}
+
+/** 辨识度标的 / 可买个股 */
+export interface Leader {
+  sector: string
+  name: string
+  code: string
+  pct: number
+  price: number
+  buyable: boolean
+  is_20cm: boolean
+  /** 连板文案（如 "4天4板"），可为空串 */
+  boards: string
+  limit_up_days: number
+}
+
+/** 退潮/情绪转弱信号 */
+export interface EbbInfo {
+  severity: string
+  signals: string[]
+  max_board: number
+  total_zt: number
+  sentiment_score: number
+  sentiment_label: string
+}
+
+export interface ThemeLeaderDetail {
+  name: string
+  code: string
+  pct: number
+  price: number
+  /** 连板文案（如 "4天4板"） */
+  boards: string
+  turn: number
+  cap_yi: number
+  desc: string
+  /** 封板质量（如 "🔥 秒封板"） */
+  seal: string
+}
+
+export interface ThemeFollower {
+  name: string
+  pct: number
+  turn: number
+}
+
+export interface ThemeZtStock {
+  name: string
+  code: string
+  pct: number
+}
+
+/**
+ * 主线题材 Top。
+ *
+ * ⚠️ `delta` 是**状态枚举字符串**（实测取值 `'new'` / `'ongoing'`），
+ *    **不是**涨停数环比数字。要算环比请用 `zt_count - zt_prev`。
+ *    早期把它当 number 会导致 `delta > 0` 恒为 false —— 题材永远被渲染成「持平」。
+ *
+ * ⚠️ 实测 `leader` 与 `zt_prev` **都可能为 null**：盘面早段（或题材刚建立）
+ *    top5 会有占位条目，除 name/zt_count 外全为空。渲染必须判空。
+ */
+export interface ThemeTop {
+  rank: number
+  name: string
+  desc: string
+  zt_count: number
+  turn_avg: number
+  total_stocks: number
+  leader: ThemeLeaderDetail | null
+  followers: ThemeFollower[]
+  zt_stocks: ThemeZtStock[]
+  diffusion: string
+  risks: string[]
+  positives: string[]
+  /** 题材状态：'new' 新晋 / 'ongoing' 持续 —— 非数字 */
+  delta: string
+  /** 前一交易日该题材涨停数（环比基数）· 早段可能为 null */
+  zt_prev: number | null
+}
+
+export interface DataScope {
+  breadth: string
+  amount: string
+  asof: string
+}
+
+/** 题材增减（新增/升温/持续） */
+export interface SectorDelta {
+  new: string[]
+  surging: string[]
+  ongoing: string[]
+}
+
+/** 盘中异动题材（来自 latest.hot_spots）：结构为 {sector, stocks[]}，非 ThemeTop */
+export interface HotSpotStock {
+  name: string
+  code: string
+  pct: number
+  price: number
+  buyable: boolean
+  is_20cm: boolean
+  /** 连板文案（如 "4天4板"），可为空串 */
+  boards: string
+}
+export interface HotSpot {
+  sector: string
+  stocks: HotSpotStock[]
+}
+
+/** 主快照（latest.json / prev.json 结构一致；盘中早段部分字段为 null） */
+export interface MarketSnapshot {
+  ts: string
+  total_zt: number
+  sentiment: string
+  sentiment_detail: SentimentDetail
+  index: IndexQuote[]
+  limit_down: CountNames
+  broken: CountNames
+  weak_sectors: WeakSectors
+  sector_risk: SectorRisk
+  ladder: LadderGroup[]
+  newsflash: Newsflash[]
+  em_expect: EmExpect[]
+  early: EarlyItem[]
+  leaders: Leader[]
+  rising: unknown[]
+  hot_spots: HotSpot[]
+  /** 两市成交额（亿元）· 盘前/早段可能为 null */
+  market: number | null
+  breadth: { up: number | null; down: number | null; flat: number | null }
+  data_scope: DataScope
+  /**
+   * 退潮/情绪转弱检测。
+   *
+   * ⚠️ **可能为 null**（脚本 `detect_ebb` 在加权总分 < 3 时 `return None`），
+   *    即「无预警」是一个合法的正常态，不是数据缺失。渲染必须判空。
+   */
+  ebb: EbbInfo | null
+  top5: ThemeTop[]
+  sector_delta: SectorDelta
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/auction   —— 竞价实时报价
+// ════════════════════════════════════════════════════════════════
+
+export interface AuctionLive {
+  /** 形如 "09:29:14" */
+  ts: string
+  /** 股票代码(6位) → 竞价涨幅% */
+  quotes: Record<string, number>
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/signals   —— 短线精灵
+// ════════════════════════════════════════════════════════════════
+
+export interface SignalThresholds {
+  min_pct: number
+  min_market_cap_yi: number
+  amount_morning_yi: number
+  amount_afternoon_yi: number
+}
+
+export interface ShortSpiritSignal {
+  name: string
+  code: string
+  sector: string
+  market_cap_yi: number
+  amount_yi: number
+  pct: number
+  /** 信号类型（如 "涨停"） */
+  type: string
+  tags: string[]
+  /** 板块共振度 */
+  resonance: number
+  /** 资金净流入（亿元） */
+  flow_yi: number
+  /** 强度评分 */
+  strength: number
+  reason: string
+}
+
+export interface ShortSpiritSignals {
+  ts: string
+  session: 'morning' | 'afternoon' | string
+  thresholds: SignalThresholds
+  pool_total: number
+  after_filter: number
+  signals: ShortSpiritSignal[]
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/feedback   —— 昨日涨停反馈矩阵
+// ════════════════════════════════════════════════════════════════
+
+export interface PromoteItem {
+  name: string
+  code: string
+  prev_boards: number
+  pct: number
+}
+
+export interface TrendHistoryItem {
+  /** 交易日 */
+  date: string
+  /** promote rate 晋级率 */
+  pr: number
+  /** avg pct 均涨幅 */
+  ap: number
+}
+
+export interface FeedbackTrend {
+  promote_downtrend: boolean
+  avg_pct_weak: boolean
+  /** 防御等级 */
+  defense_level: number
+  history: TrendHistoryItem[]
+  /** 晋级率动态阀门（前 10 交易日截尾均值，缺失时回退 25） */
+  promotion_gate_10d: number
+}
+
+/**
+ * 核按钮（昨涨停/昨连板今日大幅下挫）· `feedback_matrix.nuke_list` 元素。
+ *
+ * ⚠️ 该字段长期被标为 `unknown[]` 而无人渲染 —— 实测每条都带**均线破位信息**
+ *    （`break_ma5` / `break_ma10` / `breakdown`），这正是「核按钮」里最该看的
+ *    一栏：跌停 + 同时跌破 5/10 日线 = 结构性走坏，与单纯跌停不是一回事。
+ */
+export interface NukeItem {
+  name: string
+  code: string
+  pct: number
+  price: number
+  /** 昨日板数（1 = 昨首板，3 = 昨 3 板） */
+  prev_boards: number
+  /** 标签（"昨涨停" / "昨连板"） */
+  tag: string
+  ma5: number
+  ma10: number
+  break_ma5: boolean
+  break_ma10: boolean
+  /** 是否已跌破关键支撑 */
+  breakdown: boolean
+}
+
+export interface FeedbackMatrix {
+  generated_ts: string
+  date: string
+  prev_date: string
+  prev_zt_count: number
+  now_zt_count: number
+  promote_count: number
+  /** 晋级率（%） */
+  promote_rate: number
+  lb_prev_count: number
+  lb_promote_count: number
+  /** 连板晋级率（%） */
+  lb_promote_rate: number
+  avg_pct: number
+  quote_fail_count: number
+  /** 上涨占比（%） */
+  up_rate: number
+  strong_count: number
+  /** 核按钮数量（≥3 视为恶化） */
+  nuke_count: number
+  break_count: number
+  market_missing: boolean
+  /** 核按钮明细（带均线破位信息）· 实测条数 ≤ nuke_count */
+  nuke_list: NukeItem[]
+  big_loss_count: number
+  broken_rate: number
+  prev_max_boards: number
+  now_max_boards: number
+  max_trend: number
+  zt_expand: number
+  idx_avg: number
+  market_amount_yi: number
+  breadth: { up: number; down: number }
+  promote_list: PromoteItem[]
+  sentiment_score: number
+  sentiment_label: string
+  regulatory_pressure: number
+  trend: FeedbackTrend
+  /** 原系统异常态标记（存在时该文件不可用） */
+  error?: string
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/candidates   —— 候选池
+// ════════════════════════════════════════════════════════════════
+
+export interface Candidate {
+  name: string
+  code: string
+  pct: number
+  sector: string
+  is_20cm: boolean
+  boards: number
+  /** 是否已封板 */
+  sealed: boolean
+  buyable: boolean
+  price: number
+  turnover: number | null
+  reason: string
+}
+
+export interface CandidatesFile {
+  generated_at: string
+  /** 阶段（如 "intraday"） */
+  phase: string
+  count: number
+  candidates: Candidate[]
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/decision/*   —— 财富密码每日决策档案
+//
+// ⚠️ 曾把 `candidates-<日期>.json` 误当成「候选池」（沿用 CandidatesFile）。
+//    实测其 schema 为 `wealth_code_candidates_v1`，是**当日完整决策档案**：
+//    情绪环境 + 真实盘面 + 接力池 + 观察池 + 早鸟埋伏 + 诊断计数 + 全局旁白。
+//    两者唯一的共同点只是文件名里有 candidates。
+// ════════════════════════════════════════════════════════════════
+
+/** 决策时点的情绪环境（选股脚本用的输入，与 feedback_matrix 同源） */
+export interface DossierEnvironment {
+  sentiment_score: number
+  sentiment_label: string
+  promote_rate: number
+  nuke_count: number
+  broken_rate: number
+  break_count: number
+  up_rate: number
+  avg_pct: number
+  now_zt_count: number
+  regime: string
+  /** 决策时点的东财题材预期榜（与 real_env.em_expect 同源，此处为脚本口径） */
+  em_expect: EmExpect[]
+}
+
+/** 决策时点的真实盘面反馈（与脚本 environment 的对照项，用于发现脚本失真） */
+export interface DossierFeedback {
+  sentiment_score: number
+  nuke_count: number
+  break_count: number
+  broken_rate: number
+  promote_rate: number
+  up_rate: number
+  avg_pct: number
+  [k: string]: unknown
+}
+
+/** 板块级热点：板块名 + 该板块领涨标的（结构同 Leader） */
+export interface DossierHotSpot {
+  sector: string
+  stocks: Leader[]
+}
+
+/**
+ * 决策时点的真实盘面（指数 / 涨跌 / 板块风险），用于核对脚本环境是否失真。
+ *
+ * ⚠️ 这里的 `feedback` 是**独立于 `environment` 的第二套情绪读数**：
+ *    `environment` 由选股脚本自己算，`feedback` 取自盘中快照。两者不一致
+ *    恰恰是「脚本环境失真」的证据 —— 故并列保留，不可只留一套。
+ */
+export interface DossierRealEnv {
+  ts: string
+  indices: IndexQuote[]
+  avg_index_pct: number
+  sentiment: string
+  sentiment_score: number
+  total_zt: number
+  market?: number | null
+  breadth?: { up: number | null; down: number | null; flat: number | null }
+  /** 炸板池（家数 + 名单） */
+  broken?: CountNames
+  /** 跌停池（家数 + 名单） */
+  limit_down?: CountNames
+  /** 弱势板块名单（含跌停/炸板构成） */
+  weak_sectors?: WeakSectors
+  /** 板块级风险：跌幅榜 / 资金流出榜 */
+  sector_risk?: SectorRisk
+  /** 决策时点的东财题材预期榜 */
+  em_expect?: EmExpect[]
+  /** 决策时点的板块级热点（板块 → 领涨标的） */
+  hot_spots?: DossierHotSpot[]
+  /** 决策时点的爆发前夜形态 */
+  early?: EarlyItem[]
+  /** 真实盘面情绪读数（收盘反馈口径） */
+  feedback?: DossierFeedback
+  [k: string]: unknown
+}
+
+/** 龙头三要素诊断（带领性 / 突破性 / 唯一性）—— 原系统龙头战法打分卡 */
+export interface DragonDiagnosis {
+  /** 带领性：几颗星 + 星级文案 */
+  leadership: { stars: number; text: string }
+  /** 突破性 */
+  breakthrough: { stars: number; text: string }
+  /** 唯一性 */
+  uniqueness: { stars: number; text: string }
+  /** 三要素综合分（如 4.0） */
+  composite: number
+  /** 身份判定，如「准龙头」 */
+  identity: string
+}
+
+/**
+ * 期望区间 —— 决定「竞价涨到多少算超预期」。
+ *
+ * ## ⚠️ 三个区间字段都是**二元数组** `[下沿, 上沿]`，不是标量
+ *
+ * 实测 `expected_range = [0.0, 2.0]`。这一点极易踩坑：若按字符串渲染，
+ * React 会把数组子元素**无分隔符拼接**成 `"02"` —— 不报错、不抛异常，
+ * 只是静默显示一个错误数字。必须显式按 `[低, 高]` 格式化。
+ *
+ * ## 展示优先用 `expected_text`
+ *
+ * `expected_text` / `super_text` / `low_text` 是脚本**已排好版的完整买入条件原文**
+ * （含板块身份、高开预期、量能门槛）。原系统卡片直接展示这段文字，而不是
+ * 让前端二次拼装 —— 二次拼装会丢掉量能条件等关键约束。故本视图优先渲染原文，
+ * 数值区间仅作为紧凑列的辅助展示。
+ */
+export interface DossierExpectation {
+  /** 预期开盘涨幅区间 `[下沿, 上沿]`（%）；部分归档为 null */
+  expected_range: number[] | null
+  /** 超预期门槛涨幅（%） */
+  super_gap_min: number | null
+  /** 竞价成交额下限（亿） */
+  auction_amount_min_yi: number
+  /** 竞价成交额超预期线（亿） */
+  auction_amount_super_yi: number
+  /** 竞价量能相对昨日成交的区间 `[低, 高]`（%，如 [4, 8]） */
+  auction_amount_range: number[]
+  /** 竞价量能比区间 `[低, 高]`（小数，如 [0.035, 0.085]） */
+  amount_ratio: number[]
+  /** 爆量成交额线（亿） */
+  auction_boom_yi: number
+  /** 量能形态标签，如「🔺爆量高开」 */
+  boom_label: string
+  /** 高开强度档位（weak / mid / strong） */
+  gap_strength: string
+  /** 高开强度中文提示 */
+  gap_strength_hint: string
+  /** 封板形态，如「放量板」 */
+  seal_form: string
+  /** 该股炸板次数（用于形态判定） */
+  seal_zbc: number
+  /** 板块地位（dragon / follower / lone） */
+  sector_tier: string
+  /** 板块情绪（low / mid / high） */
+  sector_sentiment: string
+  /** 计划买入条件原文（脚本排版，直接展示） */
+  expected_text: string
+  /** 超预期买入条件原文 */
+  super_text: string
+  /** 不及预期放弃条件原文 */
+  low_text: string
+  /** 情绪阶段，如「分歧」 */
+  phase: string
+  /** 阶段说明（含情绪分与核按钮数） */
+  phase_note: string
+  /** 题材阶段 */
+  theme_phase: string
+  /** 置信度 0–1 */
+  confidence: number
+  /** 龙头三要素诊断 */
+  dragon_diagnosis: DragonDiagnosis
+  /** 脚本生成的该股预期摘要（含情绪/形态/板块/龙头/东财预期） */
+  ai_note: string
+  /** 该预期是否由 AI 覆写 */
+  is_ai: boolean
+  /** 不可交易标记（如一字板无法买入） */
+  non_tradeable?: boolean
+  /** AI 覆写了脚本结论 */
+  ai_override?: boolean
+  /** 量价形态四维（部分归档携带） */
+  vpa_path?: string
+  vpa_path_label?: string
+  vpa_broken_tier?: string
+  vpa_seal_speed?: string
+  vpa_turnover_tier?: string
+  [k: string]: unknown
+}
+
+/**
+ * 接力池 / 观察池个股。
+ *
+ * ⚠️ 真实字段有 70 余个，此处**只声明会被渲染的核心项**，其余经索引签名透传。
+ *    刻意不做全量映射：原系统仍在演进该结构，全量声明会让「字段增删」
+ *    误报成契约破坏，而实际并不影响展示。
+ */
+export interface DossierStock {
+  code: string
+  name: string
+  /** 东财题材名 */
+  theme: string
+  /** 总分（驱动排名） */
+  score: number
+  ign_score: number
+  exp_score: number
+  lead_score: number
+  cap_score: number
+  raw_score: number
+  themeTier: number
+  /** 命中标签，如 ['带动板块', '先发'] */
+  tags: string[]
+  /** ⚠️ 实测为 null（该字段在部分阶段未回填），不是缺失 */
+  price: number | null
+  pct: number
+  boards: number
+  /** 换手率 */
+  hs: number
+  /** 炸板次数 */
+  zbc: number
+  /** 首封时间 '094048' */
+  fbt: string
+  /** 封单（亿） */
+  seal_amt: number
+  /** 流通市值（亿） */
+  lt_mktcap: number
+  zsz_yi: number
+  /** 成交额（亿） */
+  cje_yi: number
+  sector: string
+  /** 主轴题材（⚠️ 可能与本行 `theme` 不同轴，按真实主轴判断） */
+  core_theme: string
+  core_theme_logic: string
+  core_theme_heat: string
+  /** 梯队健康度分 */
+  ladder_health: number
+  ladder_has_complete: boolean
+  /** 梯队等级 A/B/C/D */
+  ladder_grade: string
+  is_sector_dragon: boolean
+  sector_mates_cnt: number
+  theme_mates_cnt: number
+  theme_name: string
+  theme_is_lone: boolean
+  theme_has_sector_effect: boolean
+  sector_is_lone: boolean
+  /** 带动家数 */
+  carry_cnt: number
+  carry_time: string
+  carry_score: number
+  /** 历史同高度接力成功概率（0–1） */
+  history_relay_prob: number
+  history_relay_samples: number
+  history_relay_stock_samples: number
+  history_relay_factor: number
+  history_relay_note: string
+  is_capacity_core: boolean
+  style_tag: string
+  is_20cm: boolean
+  is_st: boolean
+  is_one_word: boolean
+  expectation: DossierExpectation
+  /** 逐维打分面板（中文键） */
+  dim_panel: Record<string, unknown>
+  quant_dims: Record<string, number | null>
+  /** 该股当日点评（分段文本） */
+  narrative?: string
+  /** 主力资金（亿元，当日 / 5日 / 10日 / 20日） */
+  main_flow_yi: number
+  main_flow_5d_yi: number
+  main_flow_10d_yi: number
+  main_flow_20d_yi: number
+  /** 筹码：获利比例 / 平均成本 / 90% 集中度 */
+  chip_profit_rate: number
+  chip_avg_cost: number
+  chip_conc90: number
+  relay_rank?: number
+  watch_rank?: number
+  bucket?: string
+  bucket_label?: string
+  watch_group?: string
+  [k: string]: unknown
+}
+
+/** 选股诊断计数 —— 回答「为什么只选出这几只」 */
+export interface DossierDiagnostics {
+  scored: number
+  strict_pool: number
+  height_breakout_eligible: number
+  high_mark_eligible: number
+  core_eligible: number
+  one_to_two_eligible: number
+  relay_count: number
+  watch_count: number
+  selection_mode: string
+  mean_raw_score: number
+  early_buy_hits: number
+  early_buy_signals: Array<{ code: string; type: string }>
+  weak2strong_hits: number
+  weak2strong_codes: string[]
+  tx_enriched: number
+  regulatory_enriched: number
+  excluded_low_turnover: number
+  excluded_688: number
+  data_source: string
+  pulse_ts: string
+  /** 历史同高度接力概率统计的覆盖情况 */
+  historical_relay?: {
+    enabled: boolean
+    history_days: number
+    candidates_with_history: number
+    [k: string]: unknown
+  }
+  /** 环境分量得分（部分归档携带） */
+  env_component?: number
+  /** 剔除一字板家数（部分归档携带） */
+  excluded_one_word?: number
+  /** 剔除 ST 家数（部分归档携带） */
+  excluded_st?: number
+  /** 该次决策的 regime（部分归档携带，与顶层 `regime` 冗余留痕） */
+  regime?: string
+  /** 强板块持续性名单（部分归档携带） */
+  strong_sector_persistent?: string[]
+  /** 因「强板块外在野」被扣分的家数（部分归档携带） */
+  strong_sector_outside_penalized?: number
+  /** 当日定调核对命中数（部分归档携带） */
+  daily_verdict_matched?: number
+  /** 定调来源（部分归档携带） */
+  daily_verdict_source?: string
+  [k: string]: unknown
+}
+
+/**
+ * 财富密码每日决策档案（`wealth_code_candidates_v1`）。
+ * 这是财富密码选股链的**单一产出物**，也是「当时凭什么这么选」的唯一原件。
+ */
+export interface DecisionDossier {
+  schema: string
+  date: string
+  generated_at_bj: string
+  regime: string
+  environment: DossierEnvironment
+  real_env: DossierRealEnv
+  ai_env: Record<string, unknown>
+  data_source: string
+  /** 接力池（可执行） */
+  relay: DossierStock[]
+  /** 观察池（待确认） */
+  watch: DossierStock[]
+  /** 早鸟埋伏层 */
+  early_ambush: EarlyItem[]
+  diagnostics: DossierDiagnostics
+  /** 全局旁白（账户 + 盘面 + 结论，分段文本） */
+  global_narrative: string
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/theme/rotation   —— 题材轮动 / 回流预测 / 5日资金
+// ════════════════════════════════════════════════════════════════
+
+export interface PoolStock {
+  code: string
+  name: string
+  /** 是否龙头 */
+  dragon: boolean
+  pct: number
+  cap_yi: number
+  /** 板块归属："main" = 主板 */
+  board: string
+  from_zt: boolean
+  risk: string
+}
+
+export interface ConfidenceFactors {
+  catalyst: boolean
+  market: boolean | null
+  /** 资金因子（如 "inflow_rising"） */
+  capital: string
+  /** 阶段因子（如 "boom"） */
+  phase: string
+}
+
+/** 回流候选题材 */
+export interface RotationCandidate {
+  theme: string
+  phase: string
+  /**
+   * 爆发日。⚠️ 实测存在 null（该题材在本窗口内未完成一次完整爆发）——
+   * 与空串语义不同：空串 = 有字段但未填，null = 该日无记录。
+   */
+  boom_day: string | null
+  cooled_days: number
+  catalyst: string
+  catalyst_fresh: boolean
+  confidence: number
+  confidence_factors: ConfidenceFactors
+  trigger: string
+  watch_pool: PoolStock[]
+  main_board_pool: PoolStock[]
+  board_mix: { main: number; cyb: number }
+  pool_note: string
+  flow_trend: string
+  flow_vals: (number | null)[]
+  /** ⚠️ 同花顺口径资金，早于该口径上线日期的归档为 null */
+  tx_10d_yi: number | null
+  tx_5d_yi: number | null
+  /** ⚠️ 爆发日涨停数 / 爆发涨幅，未爆发时为 null */
+  boom_zt: number | null
+  boom_pct: number | null
+  zt_series: (number | null)[]
+  zt_dir: string
+  zt_filled: Record<string, number>
+  zt_valid_days: number
+  today_hot: boolean
+}
+
+export interface SectorZtTrend {
+  theme: string
+  zt_series: (number | null)[]
+  latest: number
+  delta: number
+  /** 方向（rising / flat / falling） */
+  dir: string
+  zt_filled: Record<string, number>
+}
+
+/** 板块资金（完整版 · 比 latest.sector_risk 的轻量版字段更全） */
+export interface SectorFlowFull {
+  name: string
+  code: string
+  pct: number
+  main_inflow: number
+  flow_yi: number
+  is_focus: boolean
+  super_large_yi: number
+  large_yi: number
+  mid_yi: number
+  small_yi: number
+  source_ts: number
+}
+
+export interface Flow5DItem {
+  name: string
+  /** 区间累计净额（亿元） */
+  total_yi: number
+  days: number
+  inflow_days: number
+  last_yi: number
+  trend: string
+}
+
+export interface AvoidanceItem {
+  name: string
+  total_5d_yi: number
+  last_yi: number
+  inflow_days: number
+  trigger: string
+  tier: string
+  stance: string
+  upgrade_hint: string
+}
+
+export interface RotationMarketContext {
+  sentiment_score: number
+  nuke_count: number
+  promote_rate: number
+  outflow_top: SectorFlowFull[]
+  inflow_top: SectorFlowFull[]
+  zt_count_today: number
+}
+
+export interface RotationData {
+  /** 数据日期（收盘日，可能早于当前交易日） */
+  date: string
+  generated_ts: string
+  data_days: string[]
+  candidates: RotationCandidate[]
+  sector_zt_trends: SectorZtTrend[]
+  market_context: RotationMarketContext
+  flow_5d: {
+    inflow_top: Flow5DItem[]
+    outflow_top: Flow5DItem[]
+    data_days: string[]
+  }
+  avoidance_sweep: AvoidanceItem[]
+  data_meta: {
+    zt_source: string
+    flow_source: string
+    window: string
+    aligned_days: number
+    zt_filled_themes: number
+  }
+  note: string
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/theme/series   —— 题材多日序列（数据堆叠）
+// ════════════════════════════════════════════════════════════════
+
+export interface SeriesDailyDetail {
+  total: number
+  max_boards: number
+  count_20cm: number | null
+  boards_2plus: number | null
+  boards_4plus: number | null
+  sentiment: number
+  seal_rate: number
+  broken: number
+}
+
+export interface SeriesLeader {
+  name: string
+  code: string
+  boards: number
+  pct: number
+}
+
+export interface SeriesTableRow {
+  theme: string
+  values: (number | null)[]
+  delta: number
+  delta_str: string
+  trend: string
+  leader_today: SeriesLeader | null
+}
+
+export interface ThemeSeries {
+  generated_ts: string
+  dates: string[]
+  daily_totals: number[]
+  max_boards: number[]
+  daily_details: SeriesDailyDetail[]
+  /** 题材名 → 5 日涨停数序列 */
+  themes: Record<string, (number | null)[]>
+  /** 题材名 → 5 日龙头序列 */
+  theme_leaders: Record<string, (SeriesLeader | null)[]>
+  theme_labels: string[]
+  table_rows: SeriesTableRow[]
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/theme/sequence
+// ════════════════════════════════════════════════════════════════
+
+export interface ThemeSequence {
+  date: string
+  themes: string[]
+  updated: string
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/flow/history   —— 板块资金历史（多日合并）
+// ════════════════════════════════════════════════════════════════
+
+export interface FlowHistoryDay {
+  /** 源文件名（含日期） */
+  file: string
+  data: Record<string, unknown> | null
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/health
+// ════════════════════════════════════════════════════════════════
+
+export interface HealthFile {
+  route: string
+  file: string | undefined
+  desc: string
+  exists: boolean
+  mtime: string | null
+  age_sec: number | null
+  size: number
+}
+
+export interface HealthPayload {
+  data_root: string
+  ts: string
+  files: HealthFile[]
+}
+
+// ════════════════════════════════════════════════════════════════
+// 以下为「原系统已落盘、前端此前从未展示」的数据维度
+//
+// ⚠️ 全部字段**逐项对照真实落盘文件实测**得出，不得凭命名推测。
+//    复核方法：node scripts/check-data-routes.mjs --verbose
+//
+// ⚠️ 原系统存在两套日期命名：`YYYYMMDD`（较新脚本）与 `YYYY-MM-DD`（较早脚本）。
+//    路由表已用 `\d{4}-?\d{2}-?\d{2}` 兼容两者，前端不要假设单一格式。
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * 目录型路由的统一外壳 —— 一个数据源 = 一组按日期/代码命名的文件。
+ *
+ * 返回形如 `[{ file: 'board_core_饲料.json', data: {...} }, ...]`。
+ * 单份文件损坏时 `data` 为 null（不连累其余条目）。
+ */
+export interface DatedFile<T> {
+  file: string
+  data: T | null
+}
+
+// ── 涨停池快照（cache/yesterday_zt.json 与 decision_log/<日期>/zt_pool.json 同构）──
+
+/**
+ * 连板天梯。
+ *
+ * ⚠️ 值是**股票名数组**（`string[]`），不是对象数组 —— 要拿板数只能读 key，
+ *    或从 `top_codes` 反查。这是原系统最容易误判的一处。
+ */
+export interface ZtPoolLadder {
+  [boards: string]: string[]
+}
+
+export interface ZtPoolTopCode {
+  name: string
+  code: string
+  boards: number
+}
+
+export interface ZtPoolStock {
+  code: string
+  name: string
+  pct: number
+  price: number
+  boards: number
+  /** 首封时间，形如 '092500' */
+  fbt: string
+  /** 炸板次数 */
+  zbc: number
+  /** 换手率 */
+  hs: number
+  sector: string
+  /** 封板描述文案，如 '🔥 秒封板' */
+  seal: string
+  /** 成交额（亿） */
+  cje_yi: number
+  /** 总市值（亿） */
+  zsz_yi: number
+}
+
+export interface ZtPoolSnapshot {
+  date: string
+  date_raw: string
+  generated_ts: string
+  zt_count: number
+  tc: number
+  max_boards: number
+  ladder: ZtPoolLadder
+  top_codes: ZtPoolTopCode[]
+  /** 仅 decision_log 的 zt_pool.json 带全量明细；yesterday_zt.json 不带 */
+  zt_list?: ZtPoolStock[]
+}
+
+// ── 板块核心票（scripts/board_core.py）──
+//
+// 用途（中枢原文）：板块异动先查 core 票动不动 —— 不动而只有杂毛涨 = 假启动。
+// 四维权重：时效 0.25 / 封板硬度 0.20 / 连板领先 0.25 / 带动+参与 0.30
+
+export interface BoardCoreStock {
+  code: string
+  name: string
+  /** 近 window 日内参与天数 */
+  join_days: number
+  total_days: number
+  join_rate: number
+  /** 平均封板次序（越小越早） */
+  avg_order: number
+  seal_score: number
+  strength_score: number
+  /** 平均封单资金（亿） */
+  fund_avg_yi: number
+  broken_avg: number
+  lead_score: number
+  drive_score: number
+  /** 四维加权总分 */
+  core_score: number
+}
+
+export interface BoardCoreFile {
+  board: string
+  days: number
+  top: BoardCoreStock[]
+  ts: string
+}
+
+// ── 连板晋级量化（scripts/promo_quant.py · 冷启动矩阵 1进2 15.4% / 2进3 34.3% / 3进4 51.6% / 4to5+ 51.7%）──
+
+export interface PromoSummaryRow {
+  /** '1to2' | '2to3' | '3to4' | '4to5+' */
+  stage: string
+  /** 样本数 */
+  n: number
+  ok: number
+  fail: number
+  /** 成功率 % */
+  succ_rate: number
+  /** 有竞价溢价数据的样本数 */
+  n_prem: number
+  prem_open_avg: number | null
+  prem_open_med: number | null
+  prem_close_avg: number | null
+  prem_close_med: number | null
+  /** 失败组的次日开盘均值（负值 = 亏损） */
+  fail_open_avg: number | null
+  fail_open_med: number | null
+}
+
+export interface PromoSummary {
+  filter: { stage: string | null; board: string | null; start: string | null; end: string | null }
+  date_range: string
+  rows: PromoSummaryRow[]
+  ts: string
+}
+
+/** 单条晋级事件（逐票） */
+export interface PromoEvent {
+  date: string
+  prev_date: string
+  code: string
+  name: string
+  /** 前一交易日板数 */
+  prev_boards: number
+  /** 当日板数（0 = 断板） */
+  boards: number
+  /** 晋级阶段，如 '3to4' */
+  stage: string
+  /** 是否晋级成功 */
+  ok: boolean
+  sector: string
+  seal_min: number | null
+  broken: number | null
+  seal_fund_yi: number | null
+  /** 次日竞价开盘涨幅 */
+  prem_open1: number | null
+  prem_close1: number | null
+  prem_close2: number | null
+  prem_ok: boolean
+}
+
+export interface PromoDaily {
+  date: string
+  prev_date: string
+  events: PromoEvent[]
+}
+
+// ── 股性基因层（scripts/zt_genes.py · 统计窗口统一近 250 交易日）──
+
+/** gene_{code}.json —— 个股股性档案 */
+export interface GeneProfile {
+  code: string
+  name: string
+  industry: string
+  /** 涨停次数 */
+  zt_n: number
+  /** 最高连板 */
+  max_lbc: number
+  /** 平均首封时间（分钟数，越小越早） */
+  seal_avg_min: number | null
+  /** 炸板率 */
+  broken_rate: number | null
+  /** 晋级成功率 */
+  promo_rate: number | null
+  prem_open_avg: number | null
+  prem_close_avg: number | null
+  hi_open_zt_ratio: number | null
+  low_open_zt_ratio: number | null
+  /** 股性分 0-100 */
+  gene_score: number
+}
+
+/** hist_{code}.json —— 历史涨停基因（新浪不复权日K自算，1500 根） */
+export interface GeneHistory {
+  code: string
+  first_day: string
+  last_day: string
+  zt_total: number
+  /** 近 250 日涨停次数 */
+  zt_250: number
+  /** 近 500 日涨停次数 */
+  zt_500: number
+  max_boards_hist: number
+  /** 连板序列 */
+  board_seq: number[]
+  promo_rate_hist: number | null
+  prem_open_hist: number | null
+  prem_close_hist: number | null
+  first_prem_open_hist: number | null
+  /** 样本 K 线根数 */
+  sample_n: number
+}
+
+export interface GeneSummaryItem {
+  code: string
+  name: string
+  industry: string
+  gene_score: number
+  zt_n: number
+  max_lbc: number
+  promo_rate: number | null
+  prem_close_avg: number | null
+  broken_rate: number | null
+  zt_boards: number
+  seal_min: number | null
+}
+
+export interface GeneSummary {
+  date: string
+  count: number
+  top: GeneSummaryItem[]
+}
+
+export interface GenePoolItem {
+  code: string
+  name: string
+  zt_boards: number
+  zt_days: number
+  zt_times: number
+  seal_min: number | null
+  last_seal_min: number | null
+  broken: number | null
+  seal_fund_yi: number | null
+  pct: number
+  /** 换手率 */
+  hs: number
+  industry: string
+}
+
+export interface GenePoolFile {
+  date: string
+  pool: GenePoolItem[]
+  ts: string
+}
+
+// ── 情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）──
+
+export interface EmotionDay {
+  date: string
+  sentiment_score: number
+  sentiment_label: string
+  /** ⚠️ 盘前可能为 null */
+  zt_count: number | null
+  promote_rate: number
+  nuke_count: number
+  /** ⚠️ 盘前可能为 null */
+  max_boards: number | null
+  /** 是否冰点种子日 */
+  seed: boolean
+  main_themes: string[]
+}
+
+/** 3 日窗转折信号 —— `ebb_warn` = 假修复，`repair_warn` = 修复前兆 */
+export interface EmotionTurnSignal {
+  /** 'repair' | 'ebb' | 'flat' */
+  dir: string
+  label: string
+  ma3_last: number
+  sentiment_seq_last3: number[]
+  /** 当日 vs 3日窗的背离描述 */
+  divergence: string
+}
+
+export interface EmotionTrajectory {
+  sentiment_seq: number[]
+  promote_seq: number[]
+  nuke_seq: number[]
+  zt_seq: (number | null)[]
+  /** 3 日移动均（拐点确认用，噪声最少、滞后 1 日） */
+  sentiment_ma3: number[]
+  ma3_window: number
+  turn_signal: EmotionTurnSignal
+}
+
+export interface EmotionNewsBlock {
+  date: string
+  count: number
+  titles: string[]
+}
+
+export interface EmotionSummary5D {
+  generated_ts: string
+  window_days: number
+  days: EmotionDay[]
+  trajectory: EmotionTrajectory
+  /** 周期提示，如「修复/升温（近3日回升）」 */
+  cycle_hint: string
+  news: EmotionNewsBlock[]
+  rotation: Record<string, unknown>
+  cycle_why: Record<string, unknown>
+  summary10: Record<string, unknown>
+}
+
+/** 盘中涨停时序的单个窗口 */
+export interface ZtIntradayPoint {
+  /** 窗口标签，如 '09:00' */
+  window: string
+  /** 快照时间戳文案 */
+  ts: string
+  /** 板块 → 家数 */
+  themes: Record<string, number>
+  total: number
+  max_boards: number
+}
+
+/**
+ * 盘中涨停时序。
+ *
+ * ⚠️ **实测 `cache/zt_history/` 里存在两套形态**（归档脚本迭代导致）：
+ *   · 新形态：带 `intraday_points`（逐窗口盘中点）+ `intraday_only` 标记
+ *   · 旧形态：与 `ZtPoolSnapshot` 同构 —— 有 `zt_count` / `ladder` / `top_codes` /
+ *     `zt_list`，但**完全没有 `intraday_points`**
+ *
+ * 因此下方字段全部为可选：调用方必须先判 `intraday_points` 是否存在，
+ * 不能假设「这是时序文件就一定有点」。旧形态虽然画不出节奏图，
+ * 但带来了 `zt_list` 全量明细 —— 反而比新形态信息更多。
+ */
+export interface ZtHistoryDay {
+  date: string
+  date_raw?: string
+  generated_ts?: string
+  /** true = 该文件仅有盘中点、无盘后 zt_list（当日归档残缺） */
+  intraday_only?: boolean
+  /** ⚠️ 旧形态归档没有此字段 */
+  intraday_points?: ZtIntradayPoint[]
+  /** 以下为旧形态（= 涨停池快照）字段 */
+  zt_count?: number
+  tc?: number
+  max_boards?: number
+  ladder?: ZtPoolLadder
+  top_codes?: ZtPoolTopCode[]
+  zt_list?: ZtPoolStock[]
+}
+
+/** 情绪快照（memory_lib 情绪联动唯一数据源） */
+export interface MarketMemoryState {
+  sentiment: string
+  total_zt: number
+  sentiment_change_at: string
+  dominant_sector: string
+  index_trend: string
+}
+
+export interface MarketMemoryTop5 {
+  rank: number
+  name: string
+  desc: string
+}
+
+export interface MarketMemory {
+  date: string
+  updated_at: string
+  market_state: MarketMemoryState
+  pushed_topics: string[]
+  event_log: unknown[]
+  last_push_by_task: Record<string, string>
+  prev_top5: MarketMemoryTop5[]
+}
+
+// ── AI 判断平行台账（两本独立账：脚本轨 account_nav_history / AI 轨 ai_nav_history）──
+
+export interface AiViewItem {
+  /** 'participate' | 'watch' | 'skip' */
+  view: string
+  reason: string
+  factors: Record<string, unknown>
+  /** AI 自定高开上限。⚠️ 生效值恒取用户纪律 5%（见 ai_caliber.USER_ENTRY_MAX_GAP_PCT） */
+  entry_max_gap: number
+}
+
+export interface AiViewFile {
+  date: string
+  decision_date: string
+  /** code → 判断 */
+  views: Record<string, AiViewItem>
+}
+
+export interface AiDecisionEntry {
+  decision_date: string
+  code: string
+  name: string
+  reason: string
+  factors: Record<string, unknown>
+  entry_max_gap: number
+  position: number
+  /** 'participate' | 'watch' | 'skip' */
+  view: string
+  source: string
+  ts: string
+  settled: boolean
+}
+
+export interface AiNavStock {
+  code: string
+  name: string
+  auction_price: number
+  close: number
+  return_pct: number
+  reason: string
+}
+
+export interface AiNavEntry {
+  trade_date: string
+  recommendation_date: string
+  strategy: string
+  stock_count: number
+  avg_return_pct: number
+  /** 净值，起点 1.0 */
+  nav: number
+  stocks: AiNavStock[]
+  skipped: unknown[]
+  decided: number
+}
+
+export interface AccountNavStock {
+  code: string
+  name: string
+  [k: string]: unknown
+}
+
+export interface AccountNavEntry {
+  trade_date: string
+  recommendation_date: string
+  strategy: string
+  /** 口径标记：'ai' | 'mechanical_fallback' */
+  caliber?: string
+  note?: string
+  stock_count: number
+  avg_return_pct: number
+  nav: number
+  codes: string[]
+  names: string[]
+  stocks: AccountNavStock[]
+}
+
+export interface StrategyMetricsRecord {
+  recommendation_date: string
+  trade_date: string
+  sample_count: number
+  tradable_count: number
+  metrics: Record<string, number | null>
+}
+
+export interface StrategyMetricsFile {
+  schema: string
+  generated_at_bj: string
+  records: StrategyMetricsRecord[]
+  latest_recommendation_date: string
+  latest_trade_date: string
+}
+
+// ── 决策黑匣子存档清单 ──
+
+export interface DecisionManifestSource {
+  role: string
+  src: string
+  dst: string
+  bytes: number
+  sha256: string
+}
+
+export interface DecisionManifest {
+  date: string
+  schema: string
+  archived_at: string
+  sources: DecisionManifestSource[]
+  summary: Record<string, unknown>
+  /** 存档缺口（该日缺了哪些来源） */
+  gaps: unknown[]
+}
+
+// ── 龙虎榜（资金性质：机构 vs 游资）──
+
+export interface LhbInstitutionItem {
+  code: string
+  name: string
+  days_on_board: string
+  /** 机构买入（亿） */
+  inst_buy_yi: number
+  net_yi: number
+}
+
+export interface LhbHotmoneySeat {
+  seat: string
+  /** ⚠️ **对象数组**（`{code, name}`）—— 早期类型写的 `string[]` 是错的 */
+  stocks: LhbHotmoneyStock[]
+  amount_yi: number
+}
+
+export interface LhbHotmoneyStock {
+  code: string
+  name: string
+}
+
+export interface LhbTencentFile {
+  date: string
+  institution: LhbInstitutionItem[]
+  hotmoney: LhbHotmoneySeat[]
+  generated_ts: string
+}
+
+export interface HithinkLhbConcept {
+  name: string
+}
+
+export interface HithinkLhbOrg {
+  code: string
+  name: string
+  org_net_yi: number
+  net_yi: number
+  /** ⚠️ **对象数组**（`{name}`），不是字符串数组 */
+  concepts: HithinkLhbConcept[]
+}
+
+export interface HithinkLhbHotmoney {
+  seat: string
+  buy_yi: number
+  /** ⚠️ **对象数组**（`{code, name}`），不是字符串数组 */
+  stocks: LhbHotmoneyStock[]
+}
+
+export interface HithinkLhbFile {
+  source: string
+  date: string
+  generated_ts: string
+  stock_count: number
+  org_top5: HithinkLhbOrg[]
+  hotmoney_top5: HithinkLhbHotmoney[]
+  stocks: Array<Record<string, unknown>>
+}
+
+// ── 同花顺专业数据（scripts/hithink_fetch.py · 盘前/盘后第二权威）──
+
+export interface HithinkZtItem {
+  code: string
+  name: string
+  boards: number
+  /** 首封时间，如 '09:25' */
+  fbt: string
+  /** 封单（亿） */
+  seal_yi: number
+  pct: number
+  /** 涨停原因（必盈注入） */
+  reason: string
+  is_st: boolean
+}
+
+export interface HithinkZtFile {
+  source: string
+  date: string
+  generated_ts: string
+  total: number
+  zt_count: number
+  excluded_688: number
+  excluded_st: number
+  items: HithinkZtItem[]
+  items_raw: Array<Record<string, unknown>>
+}
+
+export interface HithinkLadderWindow {
+  length: number
+  date_list: string[]
+  /** 各板高的家数上限 */
+  board_caps: Record<string, number>
+}
+
+export interface HithinkLadderItem {
+  date: string
+  boards: Record<string, unknown>
+}
+
+export interface HithinkLadderFile {
+  source: string
+  generated_ts: string
+  window: HithinkLadderWindow
+  items: HithinkLadderItem[]
+}
+
+export interface HithinkAuctionBenchmark {
+  thscode: string
+  ticker: string
+  name: string
+  auction_pct: number
+  tags: string[]
+}
+
+export interface HithinkAuctionFile {
+  source: string
+  date: string
+  generated_ts: string
+  benchmark: HithinkAuctionBenchmark[]
+}
+
+/** 同花顺异动原因（单份 250-300KB，路由只取最新一期） */
+export interface HithinkAnomalyFile {
+  source: string
+  date: string
+  generated_ts: string
+  items: Array<Record<string, unknown>>
+  [k: string]: unknown
+}
+
+export interface HithinkValuationFile {
+  source: string
+  date: string
+  items: Array<Record<string, unknown>>
+  [k: string]: unknown
+}
+
+// ── 机构投研 ──
+
+export interface InstitutionPoolItem {
+  code: string
+  name: string
+  /** 机构关注逻辑（一句话） */
+  theme: string
+}
+
+export interface InstitutionPoolFile {
+  date: string
+  count: number
+  items: InstitutionPoolItem[]
+}
+
+// ── 题材与消息史 ──
+
+export interface EruptionStock {
+  code: string
+  name: string
+  pct: number
+  /** 市值（亿） */
+  cap_yi: number
+  /** 是否龙头 */
+  dragon: boolean
+}
+
+export interface EruptionTheme {
+  name: string
+  themeCode: string
+  zt: number
+  pct: number
+  /** 区间累计涨幅 */
+  cum_pct: number
+  /** 催化标题 —— 这是题材的「为什么」 */
+  title: string
+  stocks: EruptionStock[]
+}
+
+export interface EruptionDay {
+  date: string
+  generated_ts: string
+  themes: EruptionTheme[]
+}
+
+/** 单条快讯及其题材/个股映射 */
+export interface NewsflashHistoryItem {
+  title: string
+  plates: string[]
+  stocks: string[]
+}
+
+export interface NewsflashHistoryDay {
+  date: string
+  generated_ts: string
+  newsflash: NewsflashHistoryItem[]
+}
+
+export interface WeeklyZtMapEntry {
+  name: string
+  max_boards: number
+  /** 本周涨停日 */
+  dates: string[]
+  reasons: string[]
+}
+
+export interface WeeklyZtMap {
+  /** 日期 → 当日涨停家数 */
+  day_totals: Record<string, number>
+  /** code → 该股本周涨停轨迹 */
+  map: Record<string, WeeklyZtMapEntry>
+}
+
+// ── 载体证伪 / 五日线 / 影子模式 ──
+
+export interface CarrierItem {
+  name: string
+  code: string
+  boards: number
+  zbc: number
+  sector: string
+  fbt: string
+  /** 当日是否确认（封板质量 + 带动性） */
+  confirmed?: boolean
+  /** 带动家数 */
+  carry_cnt?: number
+  /** 今日断板（证伪迁移） */
+  dead?: boolean
+}
+
+export interface CarrierState {
+  date: string
+  prev_date: string
+  carriers_today: CarrierItem[]
+  carriers_dead: CarrierItem[]
+  /** 迁移叙述，如「瑞尔特(4板·家居用品)承接资金 → 老载体(6家)证伪迁移」 */
+  carrier_migration: string
+}
+
+export interface Ma5Item {
+  code: string
+  name: string
+  price: number
+  ma5: number
+  above_ma5: boolean
+  /** 相对 MA5 的偏离 % */
+  pct_vs_ma5: number
+  closes: number[]
+  checked_at: string
+}
+
+export interface Ma5Status {
+  ts: string
+  items: Ma5Item[]
+  total: number
+  above_count: number
+  broken_count: number
+  broken_list: Ma5Item[]
+}
+
+export interface RelayEodItem {
+  code: string
+  name: string
+  theme: string
+  boards: number
+  /** 分档，null = 未分档 */
+  band: string | null
+  /** 是否通过入池闸门 */
+  pass: boolean
+  exclude_reason: string | null
+  score_eod: number
+}
+
+export interface RelayShadowRanked {
+  code: string
+  name: string
+  theme: string
+  boards: number
+  score: number
+  /** 分档，如 '不入池' */
+  band: string
+}
+
+export interface RelayShadowEnvDigest {
+  regime: string
+  sentiment_score: number
+  sentiment_label: string
+  promote_rate: number
+  nuke_count: number
+  now_zt_count: number
+  max_boards: number
+}
+
+/** 接力权重影子模式（只观察·不改产池）—— 实际入池 vs 影子排序对照 */
+export interface RelayShadow {
+  date: string
+  generated_ts: string
+  source_file: string
+  env_digest: RelayShadowEnvDigest
+  mode: string
+  eod_relay: RelayEodItem[]
+  shadow_ranked: RelayShadowRanked[]
+}
+
+// ── 风险监控 ──
+
+export interface RiskWatchItem {
+  code: string
+  name: string
+  boards: number
+  sector: string
+  checked: boolean
+  risk_labels: string[]
+  pledge_pct: number | null
+  notice_count: number
+  notices: Array<Record<string, unknown>>
+}
+
+export interface RiskWatchFile {
+  date: string
+  generated_ts: string
+  /** 口径说明，如「涨停池板数 Top8（高标风险面）」 */
+  scope: string
+  items: RiskWatchItem[]
+}
+
+// ── 推测回测报告（三类指标唯一口径：候选命中 / 区间命中 / 情绪对齐）──
+
+export interface BacktestMetricBlock {
+  available: boolean
+  /** 不可用时说明原因（如样本不足） */
+  reason?: string
+  evaluable?: number
+  hit_count?: number
+  hit_rate?: number | null
+  rows?: Array<Record<string, unknown>>
+}
+
+export interface BacktestReport {
+  schema: string
+  generated_at: string
+  /** 结算日 */
+  settle_date: string
+  /** 推荐日 */
+  rec_date: string
+  metrics: {
+    candidate_hit: BacktestMetricBlock
+    range_hit: BacktestMetricBlock
+    sentiment_align: BacktestMetricBlock
+  }
+  summary: {
+    candidate_hit_rate: number | null
+    range_hit_rate: number | null
+    sentiment_diff: number | null
+  }
+}
+
+// ── 卡片存档（决策过程的可追溯原件）──
+
+export interface CardArchiveFile {
+  /** 各卡结构不同，此处保留宽松形状；渲染时按实际字段取用 */
+  title?: string
+  [k: string]: unknown
+}
+
+// ── 盘中脉冲窗口存档 ──
+
+export interface PulseWindowElement {
+  /** 飞书元素类型，如 'div' */
+  tag: string
+  /** 元素内容（div 时为对象） */
+  text: Record<string, unknown> | string
+}
+
+export interface PulseWindow {
+  /** 卡标题，含窗口时间与题材 */
+  title: string
+  /** 色标：'red' | 'grey' 等 */
+  color: string
+  elements: PulseWindowElement[]
+  /** 页脚说明 */
+  note: string
+}
+
+// ── 推送状态与审计 ──
+
+/** 当日推送信号状态。⚠️ 文件极小/为空 = 该日事件链零产出的故障信号 */
+export interface PushedSignals {
+  zt_codes: string[]
+  /** code → 推送时间戳（限频用） */
+  surge_codes: Record<string, string>
+  nf_titles: string[]
+  sector_pushed: string[]
+  strong_codes: string[]
+  charge_codes: string[]
+}
+
+/** 推送审计条目。字段随 event 类型变化，故保留宽松形状 */
+export interface AuditEntry {
+  ts: string
+  /** 'push' | 'config' 等 */
+  event: string
+  module?: string
+  action?: string
+  rule?: string
+  target?: string
+  before?: unknown
+  after?: unknown
+  snapshot?: string
+  [k: string]: unknown
+}
