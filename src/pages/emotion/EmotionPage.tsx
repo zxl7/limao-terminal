@@ -209,8 +209,13 @@ export function Component() {
       </Card>
 
       {/* ── 情绪轨迹图：把「方向」画出来，而不是只给一个水平值 ── */}
-      <Card
-        title="📈 情绪轨迹"
+      {/* 主工作区 = 情绪轨迹 + 接力质量 + 收盘涨停（图表为主，需要横向宽度）；
+          辅助区 = 分层明细 + 窗口内快讯（纵向堆叠的日期块，窄栏即可）。
+          ⛔ 旧版 6 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="轨迹与接力" dot="bg-lead" className="xl:w-[58%]">
+          <Card
+            title="📈 情绪轨迹"
         extra={
           <span className="text-sub text-[11.5px]">
             <Icon name="info" size={12} className="inline align-[-2px] mr-1" />
@@ -326,8 +331,11 @@ export function Component() {
       </Card>
 
       {/* ── 纪律层：5 日逐日 + 盘中时序 ── */}
-      <Card
-        title="📅 分层明细"
+        </Zone>
+
+        <Zone label="分层与快讯" dot="bg-mid" className="xl:w-[42%]">
+          <Card
+            title="📅 分层明细"
         extra={
           <SegTabs
             items={[
@@ -523,6 +531,8 @@ export function Component() {
           </div>
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

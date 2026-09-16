@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { HithinkLhbFile, LhbTencentFile } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n2 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -66,8 +66,12 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card
-        title="🏦 龙虎榜"
+      {/* 概览窄栏（口径与总览） + 明细宽栏（机构/游资榜单，多列需横向空间）。
+          ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
+      <ZoneRow>
+        <Zone label="总览" dot="bg-rec" className="xl:w-[34%]">
+          <Card
+            title="🏦 龙虎榜"
         extra={
           <CardBadge tone={instNetSum >= 0 ? 'up' : 'down'}>
             机构合计净买 {n2(instNetSum)} 亿
@@ -86,9 +90,11 @@ export function Component() {
           机构净买为**正**表示加仓，为**负**表示减仓。
         </p>
       </Card>
+        </Zone>
 
-      <Card
-        title="明细"
+        <Zone label="榜单明细" dot="bg-lead" className="xl:w-[66%]">
+          <Card
+            title="明细"
         extra={
           <SegTabs
             items={[
@@ -282,6 +288,8 @@ export function Component() {
           </p>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

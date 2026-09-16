@@ -107,19 +107,26 @@
   font-variant-numeric: tabular-nums;
 }
 
-/** 标准卡片容器 */
+/** 标准卡片容器 —— 全站唯一的面板样式来源。
+ *  ⚠️ 阴影刻意做到「刚好看得见」：主区底色是 #f2f3f6，卡片是纯白，
+ *     1px 边框已能分区；再加阴影只是让卡片轻微"浮"起，建立层次。
+ *     阴影一旦加重，密集模式下 20+ 张卡会互相争夺注意力 —— 那是装饰，不是设计。 */
 @utility panel {
   background: var(--color-card);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-DEFAULT);
   padding: 0.625rem 0.75rem;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
 }
 
-/** 卡片标题行 */
+/** 卡片标题行 —— 下加细底线，让「标题 / 内容」在长卡片里有明确分界。
+ *  用 `line-faint` 而非 `line`：分界线必须弱于卡片边框，否则两层线打架。 */
 @utility panel-title {
   font-size: 14px;
   font-weight: 600;
+  padding-bottom: 6px;
   margin-bottom: 8px;
+  border-bottom: 1px solid var(--color-line-faint);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -147,4 +154,40 @@
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   color: var(--color-head-txt);
+}
+
+/* ────────────────────────────────────────────────────────────────
+   PC 滚动条 —— 本系统大量使用「卡内滚动」（长表格 / 长名单 / 侧栏），
+   而 macOS 默认滚动条在 4K 且非滚动状态下完全隐藏，用户看不出
+   「这里还有内容」。故显式给一条细窄、悬停加深的滚动条。
+   仅作用于 WebKit（Chromium/Safari），Firefox 走 scrollbar-width。
+   ──────────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sub);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }

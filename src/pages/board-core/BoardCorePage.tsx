@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { BoardCoreFile, BoardCoreStock } from '@/shared/api'
 import { analyticsQueries } from '@/features/analytics'
-import { BarChart, Card, CardBadge, EmptyState, Icon, Radar, type RadarAxis } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, Radar, Zone, ZoneRow, type RadarAxis } from '@/shared/ui'
 import { cn, isNum } from '@/shared/lib'
 
 /**
@@ -153,8 +153,12 @@ export function Component() {
   return (
     <div className="flex flex-col gap-3">
       {/* ── 视图层：形状（怎么算出来的）+ 分布（今天强票多不多）── */}
-      <Card
-        title="🧭 核心度结构"
+      {/* 维度说明（窄·读法解释） + 板块核心票（宽表·多列，给最大横向空间）。
+          ⛔ 旧版两张卡等宽纵向平铺：雷达/维度卡右侧大片空白，核心票表又挤在半屏。 */}
+      <ZoneRow>
+        <Zone label="维度说明" dot="bg-mid" className="xl:w-[36%]">
+          <Card
+            title="🧭 核心度结构"
         extra={
           <CardBadge tone={dist.strong > 0 ? 'up' : 'neutral'}>
             核心度 ≥60 的票 {dist.strong}/{dist.total}
@@ -209,8 +213,11 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="🏆 板块核心票"
+        </Zone>
+
+        <Zone label="板块核心票" dot="bg-lead" className="xl:w-[64%]">
+          <Card
+            title="🏆 板块核心票"
         extra={
           <span className="flex items-center gap-2">
             {ts && <span className="text-sub text-[11px] num">{ts.slice(0, 10)}</span>}
@@ -372,6 +379,8 @@ export function Component() {
           </div>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

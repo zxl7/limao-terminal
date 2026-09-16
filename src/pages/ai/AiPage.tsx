@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { AiDecisionEntry, AiViewFile, AiViewItem } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n2, pct } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -93,8 +93,12 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card
-        title="🤖 AI 独立台账"
+      {/* 概览窄栏（两轨口径提示） + 明细宽栏（逐笔判断记录，多列需横向空间）。
+          ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
+      <ZoneRow>
+        <Zone label="台账总览" dot="bg-rec" className="xl:w-[34%]">
+          <Card
+            title="🤖 AI 独立台账"
         extra={
           <CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>
             AI 轨净值 {lastNav ? n2(lastNav.nav) : '—'}
@@ -121,9 +125,11 @@ export function Component() {
           脚本轨见「交易战绩」。净值首行由当日 15:30 结算落盘，此前为空属正常时序。
         </p>
       </Card>
+        </Zone>
 
-      <Card
-        title="判断明细"
+        <Zone label="判断明细" dot="bg-lead" className="xl:w-[66%]">
+          <Card
+            title="判断明细"
         extra={
           <div className="flex items-center gap-2">
             {viewFiles.length > 1 && (
@@ -308,6 +314,8 @@ export function Component() {
           />
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

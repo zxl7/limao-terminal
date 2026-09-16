@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { BacktestMetricBlock, BacktestReport } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n1 } from '@/features/analytics'
-import { BarChart, Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, LineChart, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -113,6 +113,11 @@ export function Component() {
         )}
       </Card>
 
+      {/* 主工作区 = 指标明细 + 指标走势（当期的核心读数与跨期方向）；
+          辅助区 = 历史期次（归档表，次要）。
+          ⛔ 旧版四块纵向平铺，4K 下每块右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="指标与走势" dot="bg-lead" className="xl:w-[64%]">
       {latest && (
         <Card
           title="指标明细"
@@ -220,6 +225,9 @@ export function Component() {
         </Card>
       )}
 
+        </Zone>
+
+        <Zone label="历史期次" dot="bg-mid" className="xl:w-[36%]">
       {reports.length > 1 && (
         <Card title="历史期次" extra={<CardBadge>{reports.length} 期</CardBadge>}>
           <DataTable
@@ -273,6 +281,8 @@ export function Component() {
           />
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

@@ -41,7 +41,9 @@ const nOrNull = z.number().nullable()
 
 /** 计数器 + 名单（跌停/炸板） */
 const CountNames = z.object({
-  count: n.optional(),
+  // ⚠️ 必须 nullable：盘前/早段跌停与炸板计数为 null 是合法态（数据未产出），
+  // 只用 `.optional()` 会把「今天真是 0 家」与「尚未统计」混为一谈。
+  count: nOrNull.optional(),
   names: z.array(s).optional(),
 })
 
@@ -52,7 +54,8 @@ const CountNames = z.object({
 const SentimentDetail = z.object({
   label: s.optional(),
   score: n.optional(),
-  seal_rate: n.optional(),
+  // ⚠️ 必须 nullable：早段封板率未统计时为 null（与「0%」是两回事）
+  seal_rate: nOrNull.optional(),
 })
 
 const IndexQuote = z.object({
@@ -234,7 +237,7 @@ export const MarketSnapshotSchema = z.object({
     .object({ up: nOrNull.optional(), down: nOrNull.optional(), flat: nOrNull.optional() })
     .optional(),
   data_scope: z.object({ breadth: s.optional(), amount: s.optional(), asof: s.optional() }).optional(),
-  ebb: EbbInfo.optional(),
+  ebb: EbbInfo.nullable().optional(),
   top5: z.array(ThemeTop).optional(),
   sector_delta: z
     .object({ new: z.array(s).optional(), surging: z.array(s).optional(), ongoing: z.array(s).optional() })

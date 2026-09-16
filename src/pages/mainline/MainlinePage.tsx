@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, Card, CardBadge, EmptyState, Icon } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /** 环比 = 当日涨停数 − 昨日涨停数（⚠️ 不能用 `delta`，它是状态枚举） */
@@ -105,8 +105,12 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card
-        title="🎯 主线题材"
+      {/* 主工作区 = 主线题材（可展开的题材列表，内容最重）；辅助区 = 涨停家数对比 + 展开详情。
+          ⛔ 旧版三块纵向平铺，4K 下主线列表右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="主线题材" dot="bg-lead" className="xl:w-[62%]">
+          <Card
+            title="🎯 主线题材"
         extra={<CardBadge>{snap.data?.data_scope?.asof ?? snap.data?.ts?.slice(11, 19) ?? '—'}</CardBadge>}
       >
         {top5.length === 0 ? (
@@ -184,9 +188,12 @@ export function Component() {
         )}
       </Card>
 
-      {/* ── 环比视角：列表看「多少」，这张看「扩还是缩」 ── */}
-      <Card
-        title="📊 题材涨停家数 · 今日 vs 昨日"
+        </Zone>
+
+        <Zone label="环比与详情" dot="bg-up" className="xl:w-[38%]">
+          {/* ── 环比视角：列表看「多少」，这张看「扩还是缩」 ── */}
+          <Card
+            title="📊 题材涨停家数 · 今日 vs 昨日"
         extra={<CardBadge tone="warn">长度=今日家数 · 颜色=环比方向 · 空心=昨日</CardBadge>}
       >
         {ztBars.length ? (
@@ -342,6 +349,8 @@ export function Component() {
           </p>
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

@@ -60,12 +60,14 @@ export function DataTable<T>({
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[12.5px]">
         <thead>
-          <tr className="border-b border-line">
+          <tr className="border-b border-line bg-line-faint">
             {columns.map((c) => (
               <th
                 key={c.label}
                 className={cn(
-                  'font-normal text-sub py-1.5 px-2 whitespace-nowrap',
+                  // 表头 ≠ 数据行：浅底 + medium 字重把它钉成视觉锚点。
+                  // 密集宽表里没有这一层，观众会横着串行读错列。
+                  'font-medium text-sub py-1.5 px-2 whitespace-nowrap',
                   c.num ? 'text-right' : 'text-left',
                   c.className,
                 )}
@@ -79,7 +81,11 @@ export function DataTable<T>({
           {rows.map((row, i) => (
             <tr
               key={rowKey?.(row, i) ?? i}
-              className={cn('border-b border-line-faint', rowClass?.(row, i))}
+              className={cn(
+                // hover 高亮：多列宽表横向扫读时，行背景是最便宜的「防串行」手段
+                'border-b border-line-faint transition-colors hover:bg-line-faint',
+                rowClass?.(row, i),
+              )}
             >
               {columns.map((c) => (
                 <td

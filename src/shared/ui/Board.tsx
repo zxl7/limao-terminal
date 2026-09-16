@@ -131,11 +131,15 @@ export function Zone({
 }) {
   return (
     <section className={cn('flex flex-col gap-2.5 min-w-0', className)}>
-      <div className="flex items-center gap-1.5 px-0.5 pt-0.5">
-        <span className={cn('w-1 h-1 rounded-full flex-none', dot)} aria-hidden />
-        <span className="text-[10.5px] font-semibold tracking-[0.14em] text-sub uppercase">
+      {/* 分区头 = 短色条 + 标签 + 延伸细线。
+          色条宽度 3px 而非 1px 圆点：在 4K 下圆点几乎看不见，「这一栏是什么」
+          就退化成一行灰色小字。延伸线把标签变成「区域标题」，一眼可辨栏界。 */}
+      <div className="flex items-center gap-2 px-0.5 pt-0.5">
+        <span className={cn('w-[3px] h-3.5 rounded-[2px] flex-none', dot)} aria-hidden />
+        <span className="text-[11px] font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
           {label}
         </span>
+        <span className="flex-1 h-px bg-line min-w-2" aria-hidden />
       </div>
       {children}
     </section>

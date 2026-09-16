@@ -13,7 +13,7 @@ import {
   n1,
   pct,
 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -115,8 +115,12 @@ export function Component() {
         </p>
       </Card>
 
-      {gaps.length > 0 && (
-        <Card title="存档缺口（该日缺失的来源）" extra={<CardBadge tone="warn">{gaps.length}</CardBadge>}>
+      {/* 辅助区 = 存档缺口（警示清单，窄栏即可）；主工作区 = 存档明细（多 tab 档案，占最大面积）。
+          ⛔ 旧版纵向平铺：缺口卡独占一整行，明细表又被压到下方。 */}
+      <ZoneRow>
+        <Zone label="存档缺口" dot="bg-warn" className="xl:w-[32%]">
+          {gaps.length > 0 && (
+            <Card title="存档缺口（该日缺失的来源）" extra={<CardBadge tone="warn">{gaps.length}</CardBadge>}>
           <ul className="text-[12.5px] leading-relaxed text-warn">
             {gaps.map((g, i) => (
               // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
@@ -127,9 +131,11 @@ export function Component() {
           </ul>
         </Card>
       )}
+        </Zone>
 
-      <Card
-        title="存档明细"
+        <Zone label="存档明细" dot="bg-lead" className="xl:w-[68%]">
+          <Card
+            title="存档明细"
         extra={
           <SegTabs
             items={[
@@ -327,6 +333,8 @@ export function Component() {
           </>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

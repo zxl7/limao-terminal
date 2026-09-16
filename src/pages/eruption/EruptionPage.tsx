@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { EruptionDay, NewsflashHistoryDay } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n1, pct } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -83,8 +83,12 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card
-        title="💥 题材爆发史"
+      {/* 概览窄栏（窗口与总览） + 明细宽栏（题材爆发逐日记录，多列需横向空间）。
+          ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
+      <ZoneRow>
+        <Zone label="爆发总览" dot="bg-up" className="xl:w-[34%]">
+          <Card
+            title="💥 题材爆发史"
         extra={<CardBadge>{days.length} 日归档 · 最新 {active?.date ?? '—'}</CardBadge>}
       >
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
@@ -103,9 +107,11 @@ export function Component() {
           催化标题为原系统抓取的原始文案，本页不做改写。
         </p>
       </Card>
+        </Zone>
 
-      <Card
-        title="明细"
+        <Zone label="爆发明细" dot="bg-lead" className="xl:w-[66%]">
+          <Card
+            title="明细"
         extra={
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -263,6 +269,8 @@ export function Component() {
           </>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

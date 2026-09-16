@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { GeneHistory, GeneProfile } from '@/shared/api'
 import { analyticsQueries, n1, pct, tone } from '@/features/analytics'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -126,8 +126,12 @@ export function Component() {
   return (
     <div className="flex flex-col gap-3">
       {/* ── 概览层：先看「谁最活」与「整体活不活」，再落到逐票表 ── */}
-      <Card
-        title="🧬 股性概览"
+      {/* 概览窄栏（Top15 条形 + 分布柱，两图并排） + 逐票基因宽栏（多列宽表，含搜索/排序）。
+          ⛔ 旧版两张卡纵向平铺，4K 下概览卡右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="股性概览" dot="bg-up" className="xl:w-[44%]">
+          <Card
+            title="🧬 股性概览"
         extra={
           <CardBadge tone={dist.max != null && dist.max >= 50 ? 'up' : 'neutral'}>
             {rows.length} 只 · 股性分 {dist.min == null ? '—' : n1(dist.min)} ~ {dist.max == null ? '—' : n1(dist.max)}
@@ -171,8 +175,11 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="🧬 股性基因"
+        </Zone>
+
+        <Zone label="逐票基因" dot="bg-lead" className="xl:w-[56%]">
+          <Card
+            title="🧬 股性基因"
       extra={
         <CardBadge tone="neutral">
           {filtered.length}/{rows.length} 只 · 含长周期 {withHist}
@@ -282,6 +289,8 @@ export function Component() {
         </div>
       )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

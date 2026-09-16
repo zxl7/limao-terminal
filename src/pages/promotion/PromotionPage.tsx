@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { PromoDaily, PromoEvent, PromoSummaryRow } from '@/shared/api'
 import { analyticsQueries, SegTabs, n1, pct, tone } from '@/features/analytics'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, maLine } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -111,8 +111,12 @@ export function Component() {
   return (
     <div className="flex flex-col gap-3">
       {/* ── 趋势层：先看周期位置，再看分段统计 ── */}
-      <Card
-        title="📈 逐日晋级率"
+      {/* 两卡都是内容主体（趋势图 + 分档量化表），PC 下并排而非上下铺满。
+          ⛔ 旧版纵向平铺：4K 下每张卡右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="逐日晋级率" dot="bg-lead" className="xl:w-[50%]">
+          <Card
+            title="📈 逐日晋级率"
         extra={
           <CardBadge tone="warn">
             {trend.counts.length} 个交易日 · 虚线 = 本页自算 10 日均值
@@ -154,8 +158,11 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="📐 连板晋级量化"
+        </Zone>
+
+        <Zone label="晋级量化" dot="bg-up" className="xl:w-[50%]">
+          <Card
+            title="📐 连板晋级量化"
         extra={
           <span className="flex items-center gap-2">
             {summary.data?.ts && (
@@ -184,6 +191,8 @@ export function Component() {
           />
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

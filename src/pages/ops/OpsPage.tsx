@@ -13,7 +13,7 @@ import {
   type ArchiveCard,
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -142,8 +142,12 @@ export function Component() {
         </p>
       </Card>
 
-      {failures.length > 0 && (
-        <Card title="推送失败（含 19001 客户群失效）" extra={<CardBadge tone="down">{failures.length}</CardBadge>}>
+      {/* 辅助区 = 推送失败（警示清单，窄栏即可）；主工作区 = 审计明细（多 tab，占最大面积）。
+          ⛔ 旧版纵向平铺：失败卡独占一整行，明细表又被压到下方。 */}
+      <ZoneRow>
+        <Zone label="推送失败" dot="bg-down" className="xl:w-[34%]">
+          {failures.length > 0 && (
+            <Card title="推送失败（含 19001 客户群失效）" extra={<CardBadge tone="down">{failures.length}</CardBadge>}>
           <DataTable
             rows={failures}
             rowKey={(_r, i) => String(i)}
@@ -167,9 +171,11 @@ export function Component() {
           </p>
         </Card>
       )}
+        </Zone>
 
-      <Card
-        title="明细"
+        <Zone label="审计明细" dot="bg-lead" className="xl:w-[66%]">
+          <Card
+            title="明细"
         extra={
           <SegTabs
             items={[
@@ -281,6 +287,8 @@ export function Component() {
           </div>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

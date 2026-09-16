@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { RotationCandidate } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -114,6 +114,11 @@ export function Component() {
         {!rot.isLoading && !d && <EmptyState text="回流数据未生成" hint="cache/rotation.json 缺失" />}
       </Card>
 
+      {/* 主工作区 = 信号排序 + 未启动/已启动清单（介入决策主链，含宽表）；
+          辅助区 = 观察池与主板池全量（核对用底表，次要）。
+          ⛔ 旧版 5 块纵向平铺，4K 下每块右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="介入清单" dot="bg-rec" className="xl:w-[62%]">
       {/* ── 排序视图：把「介入清单」从宽表里提出来 ── */}
       {all.length > 0 && (
         <Card
@@ -234,7 +239,9 @@ export function Component() {
           ]}
         />
       </Card>
+        </Zone>
 
+        <Zone label="池全量底表" dot="bg-mid" className="xl:w-[38%]">
       {all.length > 0 && (
         <Card title="观察池与主板池全量" extra={<CardBadge>按题材归属核对</CardBadge>}>
           <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5 mb-2">
@@ -274,6 +281,8 @@ export function Component() {
           </div>
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

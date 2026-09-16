@@ -11,7 +11,7 @@ import {
   Tag,
   type ArchiveCard,
 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 
 /**
  * 机构投研 —— 数据源三类，视角完全不同：
@@ -118,8 +118,12 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="明细"
+      {/* 主工作区 = 机关注点明细（宽表·多列）；辅助区 = 机构池历史（归档，次要）。
+          ⛔ 旧版三张卡等宽纵向平铺：4K 下每张右侧大片空白，且主次不分。 */}
+      <ZoneRow>
+        <Zone label="机关注点" dot="bg-rec" className="xl:w-[64%]">
+          <Card
+            title="明细"
         extra={
           <div className="flex flex-wrap items-center gap-2">
             {tab === 'pool' && (
@@ -192,8 +196,11 @@ export function Component() {
         )}
       </Card>
 
-      {poolFiles.length > 1 && (
-        <Card title="机构池历史" extra={<CardBadge>{poolFiles.length} 期</CardBadge>}>
+        </Zone>
+
+        <Zone label="机构池归档" dot="bg-mid" className="xl:w-[36%]">
+          {poolFiles.length > 1 && (
+            <Card title="机构池历史" extra={<CardBadge>{poolFiles.length} 期</CardBadge>}>
           <DataTable
             rows={poolFiles}
             rowKey={(f) => f.date}
@@ -216,6 +223,8 @@ export function Component() {
           />
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

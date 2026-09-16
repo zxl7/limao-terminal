@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { SeriesTableRow } from '@/shared/api'
 import { StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, type HeatRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, Zone, ZoneRow, type HeatRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -98,6 +98,10 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 窗口热力宽栏（双图 + 色块矩阵，横轴列多需宽度） + 数据堆叠窄栏（逐题材表格）。
+          ⛔ 旧版两卡纵向平铺，4K 下各自右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="窗口热力" dot="bg-lead" className="xl:w-[58%]">
       {/* ── 形态层：整个窗口的脉搏 + 色块矩阵（看形状，不比精确值）── */}
       {heat && pulse && (
         <Card
@@ -166,9 +170,11 @@ export function Component() {
           </p>
         </Card>
       )}
+        </Zone>
 
-      <Card
-        title="🧱 数据堆叠（题材 × N 日涨停）"
+        <Zone label="数据堆叠" dot="bg-up" className="xl:w-[42%]">
+          <Card
+            title="🧱 数据堆叠（题材 × N 日涨停）"
         extra={<CardBadge tone={lastDetail && lastDetail.sentiment >= 6 ? 'up' : 'neutral'}>
           {lastDetail ? `最新日情绪 ${n1(lastDetail.sentiment)}` : '—'}
         </CardBadge>}
@@ -236,6 +242,8 @@ export function Component() {
           </div>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }
