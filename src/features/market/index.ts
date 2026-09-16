@@ -11,7 +11,6 @@
 export { marketQueries } from './api/queries'
 
 // 展示组件
-export { MoodBar } from './components/MoodBar'
 export { EbbBanner } from './components/EbbBanner'
 export { FeedbackCard } from './components/FeedbackCard'
 export { LadderCard } from './components/LadderCard'

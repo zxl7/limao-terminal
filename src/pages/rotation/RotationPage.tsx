@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { PoolStock, RotationCandidate, SectorFlowFull } from '@/shared/api'
 import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline } from '@/shared/ui'
+import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -123,8 +123,13 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="明细"
+      {/* 主工作区 = 轮动明细（回流候选 / 涨停趋势 / 5日资金 / 规避，四 tab 内容最重）；
+          辅助区 = 当日板块资金进出榜（单日快照，次要）。
+          ⛔ 旧版 3 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="轮动明细" dot="bg-lead" className="xl:w-[62%]">
+          <Card
+            title="明细"
         extra={
           <SegTabs
             items={[
@@ -318,7 +323,10 @@ export function Component() {
         )}
       </Card>
 
-      <Card title="当日板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
+        </Zone>
+
+        <Zone label="当日资金" dot="bg-up" className="xl:w-[38%]">
+          <Card title="当日板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
         {todayDuel.length > 0 && (
           <div className="mb-3">
             <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
@@ -338,6 +346,8 @@ export function Component() {
           <FlowSide title="净流出" rows={mc?.outflow_top ?? []} />
         </div>
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

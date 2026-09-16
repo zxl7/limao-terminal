@@ -49,9 +49,12 @@ function renderShell() {
 describe('AppShell 导航渲染', () => {
   it('段名标签按「实时 → 盘面 → 题材 → 决策 → 数据」出现', () => {
     renderShell()
-    const labels = screen
-      .getAllByText(GROUP_LABELS)
-      .map((el) => (el.textContent ?? '').trim())
+    // 必须限定在「主导航」（PC 侧栏）内：AppShell 同时渲染了窄屏回退的
+    // 「顶部导航」，全屏 getAllByText 会把两套导航的段名一起匹配进来。
+    const nav = screen.getByRole('navigation', { name: '主导航' })
+    const labels = Array.from(nav.querySelectorAll('span'))
+      .filter((s) => GROUP_LABELS.test((s.textContent ?? '').trim()))
+      .map((s) => (s.textContent ?? '').trim())
     expect(labels).toEqual(['实时', '盘面', '题材', '决策', '数据'])
   })
 
@@ -66,20 +69,24 @@ describe('AppShell 导航渲染', () => {
 
   it('「实时」段名用强调色 + 呼吸点，与后续历史段在视觉上可区分', () => {
     renderShell()
-    const live = screen.getAllByText(GROUP_LABELS).find((el) => el.textContent?.trim() === '实时')!
-    // 强调色：A 股语义的「优先」用 up 色（红）
-    expect(live.className).toContain('text-up')
+    const nav = screen.getByRole('navigation', { name: '主导航' })
+    const groupSpans = Array.from(nav.querySelectorAll('span')).filter((s) =>
+      GROUP_LABELS.test((s.textContent ?? '').trim()),
+    )
+    const live = groupSpans.find((el) => (el.textContent ?? '').trim() === '实时')!
+    // 强调色：侧栏是深底，必须用深底专用红 `text-head-up`；
+    // 浅底用的 `text-up` 在 #1c2130 上对比度不足，属双套色（见 theme.css）
+    expect(live.className).toContain('text-head-up')
 
     // 呼吸点：仅实时段有，且必须是装饰性元素（aria-hidden，不干扰读屏）
-    const nav = screen.getByRole('navigation', { name: '主导航' })
     const dots = Array.from(nav.querySelectorAll('.animate-pulse'))
     expect(dots.length, '实时段缺少实时指示呼吸点').toBe(1)
     expect(dots[0].getAttribute('aria-hidden')).toBe('true')
 
     // 历史段不得带呼吸点与强调色
     for (const g of ['盘面', '题材', '决策', '数据']) {
-      const el = screen.getAllByText(GROUP_LABELS).find((x) => x.textContent?.trim() === g)!
-      expect(el.className, `${g} 段不应使用实时强调色`).not.toContain('text-up')
+      const el = groupSpans.find((x) => (x.textContent ?? '').trim() === g)!
+      expect(el.className, `${g} 段不应使用实时强调色`).not.toContain('text-head-up')
     }
   })
 

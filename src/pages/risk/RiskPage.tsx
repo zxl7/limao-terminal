@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { RiskWatchFile } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -81,8 +81,12 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="明细"
+      {/* 风险明细是宽表（8 列），给它最大横向空间；历史期次是次要归档，收进辅助区。
+          ⛔ 旧版两者等宽纵向平铺：明细表在 4K 下右侧大片空，历史期次又独占一整行。 */}
+      <ZoneRow>
+        <Zone label="风险明细" dot="bg-warn" className="xl:w-[68%]">
+          <Card
+            title="明细"
         extra={
           <button
             type="button"
@@ -171,8 +175,11 @@ export function Component() {
         />
       </Card>
 
-      {files.length > 1 && (
-        <Card title="历史期次" extra={<CardBadge>{files.length} 期</CardBadge>}>
+        </Zone>
+
+        <Zone label="归档" dot="bg-mid" className="xl:w-[32%]">
+          {files.length > 1 && (
+            <Card title="历史期次" extra={<CardBadge>{files.length} 期</CardBadge>}>
           <DataTable
             rows={files}
             rowKey={(f) => f.date}
@@ -188,6 +195,8 @@ export function Component() {
           />
         </Card>
       )}
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

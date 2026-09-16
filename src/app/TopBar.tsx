@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { marketQueries } from '@/features/market'
-import { bjTimeString, fmtPct, sentimentClass, sessionName, upcls } from '@/shared/lib'
+import { marketQueries, sentimentLabelTone, type Tone } from '@/features/market'
+import { bjTimeString, cn, fmtPct, sessionName, sortLadderDesc, upcls } from '@/shared/lib'
 import { useContractIssues, useNow } from '@/shared/hooks'
 import { APP_CONFIG } from '@/shared/config'
 
 /**
- * 顶栏 —— 全局盘面状态条。
+ * 顶栏 —— 全局盘面状态 header，**盘中情绪维度的唯一载体**。
  *
- * ## 为什么它属于 app 层而不是 features/market
+ * ## 为什么情绪指挥条在这里而不是盘中页
  *
- * 顶栏是**外壳的一部分**：只要应用还在运行，它就存在。它聚合的是「跨页面的全局
- * 状态」（指数、情绪、数据新鲜度、契约健康度），而不是某一个业务页的数据视图。
- * 把它放进 features 会造成 `features → app` 的反向依赖。
+ * 原盘中页顶部有一整块 `MoodBar` 指挥条（情绪分 + 三大指数 + 涨停/跌停/炸板/
+ * 封板率/最高板/涨跌家数/成交额）。它占掉首屏一整行，且与全局顶栏**重复展示**
+ * 指数与情绪分。现在这些数据维度全部收进顶栏：盘中页只留三栏工作内容，
+ * 顶栏 `sticky` 常驻，保证任何滚动位置都能看到盘面定性。
  *
  * ## 三个设计要点
  *
@@ -23,19 +24,36 @@ import { APP_CONFIG } from '@/shared/config'
  *
  * 3. **`useNow` 与查新解耦**。时钟 1s 一跳，数据 30s 一轮；把时钟塞进 query 会让
  *    整条数据链路每秒重算一次。两者各自独立。
+ *
+ * ## ⚠️ 情绪分判色口径（此前用错，已修正）
+ *
+ * `sentiment_detail.score` 是**有符号加权和（实测 −4…+6）**，不是 0–10 情绪分。
+ * 因此**不能**用 `sentimentClass()` 判色 —— 它按 0–10 阈值（≥6 红 / ≤2 绿）判定，
+ * 对 −4…+6 的快照分会系统性误判。必须按**定性 label** 走 `sentimentLabelTone()`。
  */
+
+/** 缺数据一律 `—`（不是 0）：0 是「真的没有」，`—` 是「没有样本」 */
+const DASH = '—'
+
 export function TopBar() {
   const { data } = useQuery(marketQueries.latest())
   const issues = useContractIssues()
   const now = useNow(APP_CONFIG.clockTickMs)
 
   const indexes = data?.index ?? []
-  const updatedText = data?.data_scope?.asof || (data ? bjTimeString(new Date(data.ts)) : '—')
+  const updatedText = data?.data_scope?.asof || (data ? bjTimeString(new Date(data.ts)) : DASH)
   const contractCount = issues.size
+
+  const sd = data?.sentiment_detail
+  const tone = sentimentLabelTone(sd?.label ?? data?.sentiment)
+  const ladder = sortLadderDesc(data?.ladder ?? [])
+  const maxBoards = ladder[0]?.boards ?? null
+  const breadth = data?.breadth ?? { up: null, down: null, flat: null }
+  const ebb = data?.ebb
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center gap-5 px-4 h-[46px] flex-none text-head-txt"
+      className="sticky top-0 z-30 flex items-center gap-4 px-4 h-[46px] flex-none text-head-txt"
       style={{ background: 'linear-gradient(90deg, #1c2130, #283049)' }}
     >
       {/* 品牌 —— 仅窄屏显示（≥lg 时品牌在左侧栏，避免重复） */}
@@ -49,36 +67,91 @@ export function TopBar() {
         <span>狸猫终端</span>
       </div>
 
-      {/* 指数 */}
-      <div className="flex gap-[18px] flex-1 min-w-0 overflow-hidden">
+      {/* 三大指数：价 + 涨幅（指数判断「权重还是题材行情」的第一手依据） */}
+      <div className="flex items-center gap-4 flex-none">
         {indexes.map((x) => (
-          <div key={x.name} className="flex items-center gap-1.5 whitespace-nowrap">
-            <span className="text-head-soft text-xs">{x.name}</span>
-            <b className={`head-num text-[15px] ${headTone(x.pct)}`}>{fmtPct(x.pct)}</b>
+          <div key={x.name} className="flex flex-col leading-tight whitespace-nowrap">
+            <span className="text-[10px] text-head-soft">{x.name}</span>
+            <span className="flex items-baseline gap-1.5">
+              <b className="head-num text-[13px] text-head-txt">{x.price ?? DASH}</b>
+              <b className={cn('head-num text-[11px]', headTone(x.pct))}>{fmtPct(x.pct)}</b>
+            </span>
           </div>
         ))}
         {indexes.length === 0 && <span className="text-head-soft text-xs">指数加载中…</span>}
       </div>
 
-      {/* 情绪 */}
-      {data?.sentiment_detail?.score != null && (
-        <div className="flex items-center gap-1.5 px-4 whitespace-nowrap border-x border-white/15">
-          <span className="text-head-soft text-xs">情绪</span>
-          <b className={`head-num text-[15px] ${headSemantic(sentimentClass(data.sentiment_detail.score))}`}>
-            {data.sentiment_detail.score}
-          </b>
-          <span className="text-head-soft text-xs">{data.sentiment_detail.label}</span>
-        </div>
+      <span className="w-px h-6 bg-white/15 flex-none" aria-hidden />
+
+      {/* 快照情绪：定性 + 分数（按 label 判色） */}
+      <div className="flex items-center gap-1.5 flex-none whitespace-nowrap">
+        <span className="text-[10px] text-head-soft">快照情绪</span>
+        <b className={cn('head-num text-[15px]', headFromTone(tone))}>{sd?.score ?? DASH}</b>
+        <span className="text-[11px] text-head-soft">{sd?.label ?? data?.sentiment ?? DASH}</span>
+      </div>
+
+      <span className="w-px h-6 bg-white/15 flex-none" aria-hidden />
+
+      {/* 极值 / 广度 / 量能 —— 盘中页原指挥条的数据维度，全部上移到 header */}
+      <div className="flex items-center gap-4 min-w-0 overflow-hidden">
+        <HeadKpi label="涨停" value={data?.total_zt ?? DASH} unit="只" tone={headFromTone('up')} />
+        <HeadKpi
+          label="跌停"
+          value={data?.limit_down?.count ?? DASH}
+          unit="只"
+          tone={headFromTone('down')}
+        />
+        <HeadKpi
+          label="炸板"
+          value={data?.broken?.count ?? DASH}
+          unit="只"
+          tone={headFromTone('down')}
+        />
+        <HeadKpi
+          label="封板率"
+          value={sd?.seal_rate != null ? sd.seal_rate.toFixed(1) : DASH}
+          unit="%"
+          tone={sd?.seal_rate != null && sd.seal_rate < 55 ? headFromTone('down') : 'text-head-txt'}
+        />
+        <HeadKpi
+          label="最高板"
+          value={maxBoards ?? DASH}
+          unit="板"
+          tone={headFromTone('up')}
+          className="hidden 2xl:flex"
+        />
+        <HeadKpi
+          label="上涨家数"
+          value={breadth.up ?? DASH}
+          unit="家"
+          tone={headFromTone('up')}
+          className="hidden 2xl:flex"
+        />
+        <HeadKpi
+          label="成交额"
+          value={data?.market != null ? data.market.toFixed(0) : DASH}
+          unit="亿"
+          tone="text-head-txt"
+          className="hidden 2xl:flex"
+        />
+      </div>
+
+      {/* 退潮预警 —— 决策权重最高的一条，常驻可见 */}
+      {ebb && (
+        <span className="flex-none whitespace-nowrap text-[11px] font-semibold text-head-warn">
+          {ebb.severity}
+        </span>
       )}
 
       {/* 时钟 + 健康度 */}
-      <div className="flex items-center gap-2.5 text-xs whitespace-nowrap">
+      <div className="flex items-center gap-2.5 text-xs whitespace-nowrap ml-auto flex-none">
         <span className="text-head-soft">{sessionName(now)}</span>
         <span className="head-num">{bjTimeString(now)}</span>
         <span
-          className={`w-2 h-2 rounded-full ${
-            isStale(data?.ts) ? 'bg-head-soft' : 'bg-head-down shadow-[0_0_6px_#34d399]'
-          }`}
+          className={cn(
+            'w-2 h-2 rounded-full',
+            isStale(data?.ts) ? 'bg-head-soft' : 'bg-head-down shadow-[0_0_6px_#34d399]',
+          )}
           title={isStale(data?.ts) ? '数据已超过陈旧阈值' : '数据新鲜'}
         />
         <span className="text-head-soft">{updatedText}</span>
@@ -95,6 +168,31 @@ export function TopBar() {
         )}
       </div>
     </header>
+  )
+}
+
+/** 顶栏 KPI：标签在上、数值在下（深底用小号字，数值等宽） */
+function HeadKpi({
+  label,
+  value,
+  unit,
+  tone,
+  className,
+}: {
+  label: string
+  value: string | number
+  unit?: string
+  tone: string
+  className?: string
+}) {
+  return (
+    <div className={cn('flex-col leading-tight whitespace-nowrap', className || 'flex')}>
+      <span className="text-[10px] text-head-soft">{label}</span>
+      <span className={cn('head-num text-[13px]', tone)}>
+        {value}
+        {unit && <span className="text-[10px] text-head-soft ml-0.5">{unit}</span>}
+      </span>
+    </div>
   )
 }
 
@@ -123,5 +221,19 @@ function headTone(v: number | null | undefined): string {
 function headSemantic(s: '' | 'up' | 'down' | 'mid' | 'flat'): string {
   if (s === 'up') return 'text-head-up'
   if (s === 'down') return 'text-head-down'
+  return 'text-head-mid'
+}
+
+/**
+ * 域内 Tone（来自 `sentimentLabelTone`）→ 顶栏色。
+ *
+ * ⚠️ 这里刻意**不走** `sentimentClass()`：快照情绪分是有符号加权和（−4…+6），
+ *    而 `sentimentClass()` 按 0–10 分阈值判定，两者口径不同。定性 label 才是
+ *    判色的正确依据。
+ */
+function headFromTone(t: Tone): string {
+  if (t === 'up') return 'text-head-up'
+  if (t === 'down') return 'text-head-down'
+  if (t === 'warn') return 'text-head-warn'
   return 'text-head-mid'
 }

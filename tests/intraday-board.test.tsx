@@ -126,29 +126,31 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(css, '缺少 --breakpoint-4xl —— 4xl: 前缀的类全部静默失效').toContain('--breakpoint-4xl')
   })
 
-  it('指挥条与预警通栏位于顶部，不挤进任一列', async () => {
+  it('三栏主体位于首屏，情绪通栏不再占用盘中页首行', async () => {
     const c = await renderIntraday()
     const root = c.firstElementChild as HTMLElement
     expect(root.className, '根容器应是纵向 flex（通栏由 flex 自然铺满）').toContain('flex-col')
-    const first = root.firstElementChild as HTMLElement
-    expect(first.textContent ?? '', '首个通栏应为指挥条 MoodBar').toContain('快照情绪')
+    // 情绪指挥条已上移顶栏 header，盘中页首屏主体应直接是三栏工作内容
+    const zones = root.querySelector('.intraday-zones') as HTMLElement | null
+    expect(zones, '首屏缺少三栏分区 —— 工作内容不是首屏主体').toBeTruthy()
   })
 })
 
 describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
-  it('首屏指挥条渲染三大指数与七项极值/广度 KPI', async () => {
+  it('指挥条维度已上移顶栏：盘中页不重复渲染情绪 KPI 与指数', async () => {
+    // 「这些维度必须上屏」的覆盖已迁移到 tests/topbar-header.test.tsx（载体 = 顶栏）。
+    // 这里锁的是迁移后的**新不变量**：同一维度不应在顶栏与盘中页各显示一次。
     const c = await renderIntraday()
     const text = c.textContent ?? ''
 
-    for (const label of ['快照情绪', '涨停', '跌停', '炸板', '封板率', '最高板', '上涨家数', '两市成交额']) {
-      expect(text, `指挥条缺少「${label}」KPI`).toContain(label)
-    }
+    // 「快照情绪」是指挥条专属定性标签，现已归顶栏 header；盘中页再出现即为重复
+    expect(text, '盘中页仍在渲染「快照情绪」—— 该维度已上移顶栏 header').not.toContain('快照情绪')
 
-    // 指数：只要有数据就必须逐个上屏（名称来自真实落盘，不写死具体指数）
+    // 三大指数同理，只在顶栏出现一次
     const snap = readSnapshot()
     const idx = (snap?.index as { name: string }[] | undefined) ?? []
     for (const ix of idx) {
-      expect(text, `指数「${ix.name}」未渲染 —— index 字段又丢了`).toContain(ix.name)
+      expect(text, `盘中页仍渲染指数「${ix.name}」—— 指数维度已上移顶栏`).not.toContain(ix.name)
     }
   })
 
@@ -225,14 +227,14 @@ describe('盘中实时页 · 数据卫生', () => {
     expect(text, '页面出现 688/689 代码').not.toMatch(/\b68[89]\d{3}\b/)
   })
 
-  it('缺失数据渲染为 —，而不是 0', async () => {
+  it('广度/量能维度已上移顶栏：盘中页不再承载这些 KPI', async () => {
+    // 「缺失数据显示 — 而不是 0」的强覆盖已迁移到 tests/topbar-header.test.tsx
+    // —— 那里用**构造的缺失样本**验证，不再依赖真实数据恰好缺失。
+    // 这里锁的是迁移后的新不变量：这些维度只应出现在顶栏。
     const c = await renderIntraday()
-    const snap = readSnapshot()
-    // 广度与成交额在盘中早段实测为 null —— 此时必须显示占位符而非 0
-    const breadth = snap?.breadth as { up: number | null } | undefined
-    if (breadth?.up == null) {
-      const text = c.textContent ?? ''
-      expect(text, '广度缺失时未显示 — 占位').toContain('—')
+    const text = c.textContent ?? ''
+    for (const label of ['封板率', '上涨家数']) {
+      expect(text, `盘中页仍渲染「${label}」—— 该 KPI 已上移顶栏 header`).not.toContain(label)
     }
   })
 })

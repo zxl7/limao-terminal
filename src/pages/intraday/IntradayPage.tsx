@@ -1,20 +1,5 @@
-import {
-  AmbushCard,
-  EbbBanner,
-  ExpectCard,
-  ExtremeCard,
-  FeedbackCard,
-  LadderCard,
-  LeadersCard,
-  MoodBar,
-  SectorDeltaCard,
-  SectorFlowCard,
-  SignalsCard,
-  ThemeTopCard,
-  marketQueries,
-} from "@/features/market"
-import { cn } from "@/shared/lib"
-import type { ReactNode } from "react"
+import { AmbushCard, EbbBanner, ExpectCard, ExtremeCard, FeedbackCard, LadderCard, LeadersCard, SectorDeltaCard, SectorFlowCard, SignalsCard, ThemeTopCard, marketQueries } from "@/features/market"
+import { Zone, ZoneRow } from "@/shared/ui"
 import { queryClient } from "@/shared/api"
 
 /**
@@ -25,24 +10,6 @@ import { queryClient } from "@/shared/api"
 export async function loader() {
   await queryClient.ensureQueryData(marketQueries.latest())
   return null
-}
-
-/**
- * 实时页三栏之一：机会 / 主工作 / 风险辅助。
- *
- * 极简语义标签（色点 + 小字）表达「这一栏的用途」，不与卡片标题重复；
- * 栏内纵向堆叠卡片，且栏本身 `min-w-0` 防内容溢出。
- */
-function Zone({ label, dot, className, children }: { label: string; dot: string; className?: string; children: ReactNode }) {
-  return (
-    <section className={cn("flex flex-col gap-2.5 min-w-0", className)}>
-      <div className="flex items-center gap-1.5 px-0.5 pt-0.5">
-        <span className={cn("w-1 h-1 rounded-full flex-none", dot)} aria-hidden />
-        <span className="text-[10.5px] font-semibold tracking-[0.14em] text-sub uppercase">{label}</span>
-      </div>
-      {children}
-    </section>
-  )
 }
 
 /**
@@ -61,21 +28,20 @@ function Zone({ label, dot, className, children }: { label: string; dot: string;
  *   └────────────┴──────────────┴────────────────┘
  *
  * 各栏内部纵向堆叠（不被同网格最高卡拉高），主要数据（核心标的 / 资金）占最大面积。
- * 顶部 MoodBar / EbbBanner 通栏（由外层 flex 自然铺满），下方补充区（前瞻信息）独立两栏。
+ * 情绪维度（情绪分 / 指数 / 涨停·跌停·炸板·封板率 / 最高板 / 涨跌家数 / 成交额）
+ * 已上移全局顶栏 header，本页顶部只保留 EbbBanner 退潮预警通栏（有预警才渲染）。
  */
 export function Component() {
   return (
     <div className="flex flex-col gap-3">
-      {/* ── 顶部情绪 header：上移至顶栏下方、sticky 常驻，不占主区卡片位 ──
-          贴在 TopBar(46px) 正下方，全宽（抵消 main 的 padding）、不透明底盖住
-          滚动内容；三栏与前瞻区站位完全不变。 */}
-      <div className="sticky top-[46px] z-20 -mx-4 lg:-mx-5 -mt-3 px-4 lg:px-5 pt-3 pb-3 bg-bg border-b border-line">
-        <MoodBar header />
-        <EbbBanner header />
-      </div>
+      {/* 退潮预警通栏 —— 层级高于所有卡片（有预警才渲染，无预警不占位）。
+          其余情绪维度（情绪分 / 三大指数 / 涨停·跌停·炸板·封板率 / 最高板 /
+          涨跌家数 / 成交额）已全部上移到全局顶栏 header，本页不再重复渲染
+          指挥条，避免与顶栏重复并让首屏三栏直接可见。 */}
+      <EbbBanner />
 
       {/* 任务导向三栏分区：机会 20% / 主工作 50% / 风险 30% */}
-      <div className="intraday-zones flex gap-3 xl:flex-row xl:items-start">
+      <ZoneRow className="intraday-zones">
         <Zone label="机会" dot="bg-up" className="xl:w-[20%]">
           <AmbushCard />
           <ThemeTopCard />
@@ -92,7 +58,7 @@ export function Component() {
           <LadderCard />
           <ExtremeCard />
         </Zone>
-      </div>
+      </ZoneRow>
 
       {/* 前瞻信息补充区：两栏等宽，不挤占主区 */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">

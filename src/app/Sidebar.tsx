@@ -100,7 +100,7 @@ export function Sidebar() {
       </div>
 
       {/* 分组导航（可滚动） */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
+      <nav aria-label="主导航" className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
         {grouped.map(([group, items]) => {
           const live = group === '实时'
           return (
@@ -113,7 +113,14 @@ export function Sidebar() {
                   />
                 )}
                 <GroupIcon group={group} />
-                <span className="text-[10.5px] font-semibold tracking-[0.12em] text-head-soft uppercase">
+                {/* 实时段用深底强调红 text-head-up（不是浅底 text-up ——
+                    深底上 --color-up 对比度不足），与历史段拉开层级 */}
+                <span
+                  className={cn(
+                    'text-[10.5px] font-semibold tracking-[0.12em] uppercase',
+                    live ? 'text-head-up' : 'text-head-soft',
+                  )}
+                >
                   {group}
                 </span>
               </div>
@@ -155,7 +162,7 @@ export function TopNavFallback() {
   return (
     <nav
       className="lg:hidden flex items-stretch gap-1 px-3 pt-2 bg-bg flex-none overflow-x-auto border-b border-line"
-      aria-label="主导航"
+      aria-label="顶部导航"
     >
       {TABS.map((t, i) => {
         const isGroupStart = i === 0 || TABS[i - 1].group !== t.group

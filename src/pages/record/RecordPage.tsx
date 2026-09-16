@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { MarketSnapshot } from '@/shared/api'
 import { DataTable, StatPair, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { useContractIssues } from '@/shared/hooks'
 
 /**
@@ -87,7 +87,12 @@ export function Component() {
         </p>
       </Card>
 
-      <Card title="快照环比（latest ↔ prev）" extra={<CardBadge>{changed} 项变化</CardBadge>}>
+      {/* 主工作区 = 快照环比（latest ↔ prev 逐字段对照，列多需要宽表）；
+          辅助区 = 契约守卫 + 文件新鲜度（诊断类，次要）。
+          ⛔ 旧版 4 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="快照环比" dot="bg-lead" className="xl:w-[58%]">
+          <Card title="快照环比（latest ↔ prev）" extra={<CardBadge>{changed} 项变化</CardBadge>}>
         {!cur || !old ? (
           <EmptyState
             text={latest.isLoading || prev.isLoading ? '加载中…' : '双快照不全'}
@@ -136,8 +141,11 @@ export function Component() {
         )}
       </Card>
 
-      <Card
-        title="契约守卫（结构不符 → 记录但数据照用）"
+        </Zone>
+
+        <Zone label="契约与新鲜度" dot="bg-warn" className="xl:w-[42%]">
+          <Card
+            title="契约守卫（结构不符 → 记录但数据照用）"
         extra={<CardBadge tone={issues.size ? 'warn' : 'up'}>{issues.size ? `${issues.size} 个路由` : '全部符合'}</CardBadge>}
       >
         {issues.size === 0 ? (
@@ -199,6 +207,8 @@ export function Component() {
           />
         </div>
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

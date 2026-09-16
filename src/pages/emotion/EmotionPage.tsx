@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { EmotionDay, ZtHistoryDay, ZtIntradayPoint } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n1, rate } from '@/features/analytics'
-import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, maLine } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn, sentimentClass } from '@/shared/lib'
 
 /**

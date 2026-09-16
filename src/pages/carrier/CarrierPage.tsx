@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { CarrierItem } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, fmtFbt, n1, pct } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -83,7 +83,11 @@ export function Component() {
         )}
       </Card>
 
-      <Card title="今日确认载体" extra={<CardBadge tone="up">带动家数降序</CardBadge>}>
+      {/* 主工作区 = 今日确认载体（宽表·按带动家数排序）；辅助区 = 证伪与 MA5 防线。
+          ⛔ 旧版三张表等宽纵向平铺：4K 下每张表右侧大片空白，且主次不分。 */}
+      <ZoneRow>
+        <Zone label="确认载体" dot="bg-up" className="xl:w-[60%]">
+          <Card title="今日确认载体" extra={<CardBadge tone="up">带动家数降序</CardBadge>}>
         <DataTable<CarrierItem>
           rows={today}
           rowKey={(r) => r.code}
@@ -130,8 +134,11 @@ export function Component() {
         </p>
       </Card>
 
-      {dead.length > 0 && (
-        <Card title="今日证伪（资金迁移来源）" extra={<CardBadge tone="down">{dead.length} 家</CardBadge>}>
+        </Zone>
+
+        <Zone label="证伪与防线" dot="bg-down" className="xl:w-[40%]">
+          {dead.length > 0 && (
+            <Card title="今日证伪（资金迁移来源）" extra={<CardBadge tone="down">{dead.length} 家</CardBadge>}>
           <DataTable<CarrierItem>
             rows={dead}
             rowKey={(r) => r.code}
@@ -216,6 +223,8 @@ export function Component() {
         )}
         {m?.ts && <p className="text-sub text-[11px] mt-1.5">检查于 {m.ts}</p>}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

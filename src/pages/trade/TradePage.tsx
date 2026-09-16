@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { AccountNavEntry } from '@/shared/api'
 import { analyticsQueries, DataTable, Tag, n1, n2, pct } from '@/features/analytics'
-import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Zone, ZoneRow } from '@/shared/ui'
 import { cn, drawdownSeries, maxDrawdownOf } from '@/shared/lib'
 
 /**
@@ -155,9 +155,14 @@ export function Component() {
         </p>
       </Card>
 
-      {/* ── 净值曲线 + 回撤曲线（分轴）── */}
-      <Card
-        title="📉 净值与回撤"
+      {/* 主工作区 = 净值走势 + 收益分布 + 结算流水（宽表·多列，需要最大横向空间）；
+          辅助区 = 候选样本 vs 可成交（诊断用，次要）。
+          ⛔ 旧版 5 张卡等宽纵向平铺：4K 下每张右侧大片空白，且主次不分。 */}
+      <ZoneRow>
+        <Zone label="净值与流水" dot="bg-lead" className="xl:w-[62%]">
+          {/* ── 净值曲线 + 回撤曲线（分轴）── */}
+          <Card
+            title="📉 净值与回撤"
         extra={
           <CardBadge tone={navChart.tone === 'up' ? 'up' : navChart.tone === 'down' ? 'down' : 'neutral'}>
             {rows.length} 个结算日
@@ -322,7 +327,10 @@ export function Component() {
         )}
       </Card>
 
-      <Card title="候选样本 vs 可成交" extra={<CardBadge tone="warn">错过率 = 策略迭代关键输入</CardBadge>}>
+        </Zone>
+
+        <Zone label="候选诊断" dot="bg-warn" className="xl:w-[38%]">
+          <Card title="候选样本 vs 可成交" extra={<CardBadge tone="warn">错过率 = 策略迭代关键输入</CardBadge>}>
         <DataTable
           rows={mRows.slice(0, 30)}
           rowKey={(r) => r.trade_date}
@@ -351,6 +359,8 @@ export function Component() {
           <p className="text-sub text-[11px] mt-1.5">仅显示最近 30 行（共 {mRows.length} 行）</p>
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

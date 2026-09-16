@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { marketQueries } from '@/features/market'
-import { Card } from '@/shared/ui/Card'
-import { isStarMarket } from '@/shared/lib/semantic'
-import { fmtPct, upcls } from '@/shared/lib'
+import { Card } from '@/shared/ui'
+import { fmtPct, isStarMarket, upcls } from '@/shared/lib'
 import type { Leader, HotSpot } from '@/shared/api'
 
 /**

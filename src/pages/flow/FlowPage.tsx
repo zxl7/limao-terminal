@@ -13,6 +13,8 @@ import {
   HeatMatrix,
   Icon,
   Sparkline,
+  Zone,
+  ZoneRow,
   type HeatRow,
 } from '@/shared/ui'
 import { cn } from '@/shared/lib'
@@ -225,8 +227,13 @@ export function Component() {
         </p>
       </Card>
 
-      <Card
-        title="板块资金"
+      {/* 主工作区 = 板块资金（当日对决 + 5日累计 + 逐日原始档，内容最多、列最宽）；
+          辅助区 = 跨日资金矩阵 + 板块资金轨迹（趋势类，次要）。
+          ⛔ 旧版 4 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
+      <ZoneRow>
+        <Zone label="板块资金" dot="bg-lead" className="xl:w-[62%]">
+          <Card
+            title="板块资金"
         extra={
           <SegTabs
             items={[
@@ -411,9 +418,12 @@ export function Component() {
         )}
       </Card>
 
-      {/* ── 跨日资金矩阵：单日榜看不到的「持续性」全在这一张里 ── */}
-      <Card
-        title="🧊 跨日资金矩阵"
+        </Zone>
+
+        <Zone label="跨日与轨迹" dot="bg-mid" className="xl:w-[38%]">
+          {/* ── 跨日资金矩阵：单日榜看不到的「持续性」全在这一张里 ── */}
+          <Card
+            title="🧊 跨日资金矩阵"
         extra={
           <CardBadge tone="warn">
             行=板块 · 列=交易日 · 序 = {WINDOW} 日资金动静前 {ROWS_MAX}
@@ -495,6 +505,8 @@ export function Component() {
           <EmptyState text="轨迹需要至少 2 个逐日档" />
         )}
       </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
 }

@@ -6,7 +6,7 @@
  */
 export { Card, CardBadge } from './Card'
 export { EmptyState, StagePlaceholder } from './EmptyState'
-export { Board, BoardItem, BoardWide } from './Board'
+export { Board, BoardItem, BoardWide, Zone, ZoneRow } from './Board'
 export { Kpi, KpiStrip } from './Kpi'
 export { TONE_BG_SOFT, TONE_CLASS, toneClass, toneSoft, type ToneToken } from './tone'
 

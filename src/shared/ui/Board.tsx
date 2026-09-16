@@ -84,3 +84,60 @@ export function BoardItem({
 export function BoardWide({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('col-span-full min-w-0', className)}>{children}</div>
 }
+
+/**
+ * ZoneRow —— **任务导向分区容器**（PC 桌面布局的主工作区骨架）。
+ *
+ * ## 与 `Board` 的分工（两者解决不同的问题，不可互相替代）
+ *
+ * `Board` 是**等权网格**：所有卡片同一优先级，适合「并列卡片很多、没有明显主次」
+ * 的页面。`ZoneRow` 是**主次分区**：每一栏有语义（主工作区 / 辅助区 / 风险区），
+ * 宽度按重要性分配，适合需要引导视线的页面 —— 盘中实时页用的就是这一层。
+ *
+ * ## 两个不可省的细节
+ *
+ * 1. **`xl:items-start`**：默认 `stretch` 会把最短的一栏拉到与最高栏等高，
+ *    栏内于是出现一整块空白 —— 空洞只是从「页级」被搬到了「栏级」。
+ * 2. **各栏内部独立纵向堆叠**：栏与栏之间不共享网格行高，最长的一栏不会把
+ *    旁边的栏拖出空白。这正是「任务导向分区」相对「等权网格」的核心收益。
+ *
+ * `<xl` 退化为纵向单栏（窄屏不强塞多栏），`xl`(≥1280px) 起横向分栏。
+ */
+export function ZoneRow({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('flex  gap-3 xl:flex-row xl:items-start xl:gap-3', className)}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Zone —— 分区中的一栏。
+ *
+ * 顶部的语义标签（色点 + 小字）只表达「这一栏是干什么的」，**不与卡片标题重复**；
+ * 栏内纵向堆叠，`min-w-0` 防长内容溢出。宽度由 `className` 给（如 `xl:w-[50%]`），
+ * 页面侧不写断点字面量以外的魔法数字。
+ */
+export function Zone({
+  label,
+  dot = 'bg-mid',
+  className,
+  children,
+}: {
+  label: string
+  dot?: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <section className={cn('flex flex-col gap-2.5 min-w-0', className)}>
+      <div className="flex items-center gap-1.5 px-0.5 pt-0.5">
+        <span className={cn('w-1 h-1 rounded-full flex-none', dot)} aria-hidden />
+        <span className="text-[10.5px] font-semibold tracking-[0.14em] text-sub uppercase">
+          {label}
+        </span>
+      </div>
+      {children}
+    </section>
+  )
+}
