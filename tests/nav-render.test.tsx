@@ -90,10 +90,16 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 21 个 Tab（含实时段 7 个）', () => {
+  it('导航渲染出全部 26 个 Tab（含实时段 8 个）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
-    expect(links.length).toBe(21)
+    expect(links.length).toBe(26)
+    // 实时段前缀连续 —— 新增的 /timeline 必须落在最前 8 个之内，不得漂到历史段
+    const realtimeTo = ['/', '/timeline', '/rotation', '/mainline', '/reflow', '/flow', '/record', '/ops']
+    const actual = Array.from(links)
+      .slice(0, realtimeTo.length)
+      .map((a) => a.getAttribute('href'))
+    expect(actual).toEqual(realtimeTo)
   })
 })

@@ -244,6 +244,13 @@ export const analyticsQueries = {
       queryFn: api.hithinkAnomaly,
       staleTime: DAILY_STALE,
     }),
+  /** 同花顺估值（code → pe/pb/ps/pcf） */
+  hithinkValuation: () =>
+    queryOptions({
+      queryKey: ['hithink', 'valuation'] as const,
+      queryFn: api.hithinkValuation,
+      staleTime: DAILY_STALE,
+    }),
 
   // ══════════════ 资金流向历史 ══════════════
   /**
@@ -362,6 +369,9 @@ export const analyticsQueries = {
     queryOptions({ queryKey: ['card', 'ambush'] as const, queryFn: api.cardAmbush, staleTime: DAILY_STALE }),
   cardLhb: () =>
     queryOptions({ queryKey: ['card', 'lhb'] as const, queryFn: api.cardLhb, staleTime: DAILY_STALE }),
+  /** 财富密码混合卡（竞价验证卡 + 盘后候选卡混存 · 页面按 title 前缀分组） */
+  cardMixed: () =>
+    queryOptions({ queryKey: ['card', 'mixed'] as const, queryFn: api.cardMixed, staleTime: DAILY_STALE }),
 
   // ══════════════ 盘中脉冲存档 ══════════════
   pulseWindows: () =>
@@ -384,5 +394,74 @@ export const analyticsQueries = {
       queryFn: api.auditLog,
       refetchInterval: 120_000,
       staleTime: 60_000,
+    }),
+  /** 推送去重状态（同内容 10min 去重 · 与 auditLog 同页消费） */
+  pushDedup: () =>
+    queryOptions({
+      queryKey: ['push', 'dedup'] as const,
+      queryFn: api.pushDedup,
+      staleTime: DAILY_STALE,
+    }),
+
+  // ══════════════ 系统台账与运维 ══════════════
+  /** 自动化任务台账（原始 YAML 文本） */
+  systemTasks: () =>
+    queryOptions({
+      queryKey: ['system', 'tasks'] as const,
+      queryFn: api.systemTasks,
+      staleTime: DAILY_STALE,
+    }),
+  /** 自学习阈值配置 */
+  systemLearning: () =>
+    queryOptions({
+      queryKey: ['system', 'learning'] as const,
+      queryFn: api.systemLearning,
+      staleTime: DAILY_STALE,
+    }),
+  /** 短线精灵阈值配置 */
+  systemShortSpirit: () =>
+    queryOptions({
+      queryKey: ['system', 'short-spirit'] as const,
+      queryFn: api.systemShortSpirit,
+      staleTime: DAILY_STALE,
+    }),
+  /** 策略规则配置（3 份） */
+  systemRules: () =>
+    queryOptions({
+      queryKey: ['system', 'rules'] as const,
+      queryFn: api.systemRules,
+      staleTime: DAILY_STALE,
+    }),
+  /**
+   * 盘中引擎状态（4 件）—— ⚠️ 这几件是**盘中**30s 级刷新的，
+   * 与同页其余日频配置不同，故单独给 intraday 节拍。
+   */
+  systemEngine: () =>
+    queryOptions({
+      queryKey: ['system', 'engine'] as const,
+      queryFn: api.systemEngine,
+      refetchInterval: 60_000,
+      staleTime: 30_000,
+    }),
+  /** 系统备份快照（白名单） */
+  systemBackups: () =>
+    queryOptions({
+      queryKey: ['system', 'backups'] as const,
+      queryFn: api.systemBackups,
+      staleTime: DAILY_STALE,
+    }),
+  /** 决策存档索引（黑匣子总目录） */
+  systemArchiveIndex: () =>
+    queryOptions({
+      queryKey: ['system', 'archive-index'] as const,
+      queryFn: api.systemArchiveIndex,
+      staleTime: DAILY_STALE,
+    }),
+  /** 晋级量化回测报告 */
+  promoBacktest: () =>
+    queryOptions({
+      queryKey: ['promo', 'backtest'] as const,
+      queryFn: api.promoBacktest,
+      staleTime: DAILY_STALE,
     }),
 } as const

@@ -96,6 +96,14 @@ export const marketQueries = {
       staleTime: 300_000,
     }),
 
+  /** 题材序列（当日题材词表 · 日频） */
+  sequence: () =>
+    queryOptions({
+      queryKey: ['theme', 'sequence'] as const,
+      queryFn: api.sequence,
+      staleTime: 300_000,
+    }),
+
   /** 数据新鲜度体检 */
   health: () =>
     queryOptions({

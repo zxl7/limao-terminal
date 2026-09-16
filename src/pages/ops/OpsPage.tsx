@@ -40,6 +40,7 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.pulseWindows())
   await queryClient.ensureQueryData(analyticsQueries.pulsePushedSignals())
   await queryClient.ensureQueryData(analyticsQueries.auditLog())
+  await queryClient.ensureQueryData(analyticsQueries.pushDedup())
   return null
 }
 
@@ -47,8 +48,24 @@ export function Component() {
   const windows = useQuery(analyticsQueries.pulseWindows())
   const signals = useQuery(analyticsQueries.pulsePushedSignals())
   const audit = useQuery(analyticsQueries.auditLog())
+  const dedup = useQuery(analyticsQueries.pushDedup())
   const health = useQuery(marketQueries.health())
   const [tab, setTab] = useState<'pulse' | 'signals' | 'audit'>('pulse')
+
+  /**
+   * 推送去重状态（`cache/push_dedup.json`）—— 结构是 `{内容hash: unix秒}`。
+   * 排查「同一张卡推了两遍」时：这里**没有**记录 = 去重未生效（而非去重挡住了）。
+   */
+  const dedupRows = useMemo(() => {
+    const raw = (dedup.data ?? {}) as Record<string, unknown>
+    return Object.entries(raw)
+      .filter(([, ts]) => typeof ts === 'number')
+      .map(([hash, ts]) => ({
+        hash,
+        at: new Date((ts as number) * 1000).toLocaleString('zh-CN', { hour12: false }),
+      }))
+      .sort((a, b) => b.at.localeCompare(a.at))
+  }, [dedup.data])
 
   /** 脉冲卡：日期倒序，同一日期内含多张卡 */
   const pulseDays = useMemo(
@@ -171,6 +188,29 @@ export function Component() {
           </p>
         </Card>
       )}
+
+          {/* 推送去重 —— 排查「重复推送」的第二入口（第一入口是上面的审计日志） */}
+          <Card title="推送去重" extra={<CardBadge>{dedupRows.length} 条</CardBadge>}>
+            {dedupRows.length ? (
+              <ul className="space-y-1">
+                {dedupRows.map((r) => (
+                  <li
+                    key={r.hash}
+                    className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
+                  >
+                    <span className="num text-[11.5px] text-sub">{r.hash.slice(0, 10)}…</span>
+                    <span className="num text-[11.5px] text-txt">{r.at}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState text="暂无去重记录" />
+            )}
+            <p className="text-sub text-[11px] leading-relaxed mt-1.5">
+              同内容 10min 内不重复推送 —— 若发现重复卡而此处**无**对应记录，
+              说明去重未生效（而非被它挡住）。
+            </p>
+          </Card>
         </Zone>
 
         <Zone label="审计明细" dot="bg-lead" className="xl:w-[66%]">

@@ -30,6 +30,8 @@ export const router = createBrowserRouter([
     children: [
       // ── 盘面定性 ──
       { index: true, lazy: () => import('@/pages/intraday/IntradayPage') },
+      // 日内炒作时间轴 —— 盘中产物（zt_history/audit 盘中持续写），不过要等收盘才有完整 zt_list
+      { path: 'timeline', lazy: () => import('@/pages/timeline/TimelinePage') },
       { path: 'emotion', lazy: () => import('@/pages/emotion/EmotionPage') },
       { path: 'board-core', lazy: () => import('@/pages/board-core/BoardCorePage') },
       { path: 'promotion', lazy: () => import('@/pages/promotion/PromotionPage') },
@@ -44,17 +46,21 @@ export const router = createBrowserRouter([
       { path: 'lhb', lazy: () => import('@/pages/lhb/LhbPage') },
       { path: 'carrier', lazy: () => import('@/pages/carrier/CarrierPage') },
       { path: 'risk', lazy: () => import('@/pages/risk/RiskPage') },
+      { path: 'hithink', lazy: () => import('@/pages/hithink/HithinkPage') },
 
       // ── 决策与战绩 ──
       { path: 'ai', lazy: () => import('@/pages/ai/AiPage') },
       { path: 'trade', lazy: () => import('@/pages/trade/TradePage') },
       { path: 'backtest', lazy: () => import('@/pages/backtest/BacktestPage') },
       { path: 'institution', lazy: () => import('@/pages/institution/InstitutionPage') },
+      { path: 'auction', lazy: () => import('@/pages/auction/AuctionPage') },
 
       // ── 数据与运维 ──
       { path: 'record', lazy: () => import('@/pages/record/RecordPage') },
       { path: 'stack', lazy: () => import('@/pages/stack/StackPage') },
       { path: 'archive', lazy: () => import('@/pages/archive/ArchivePage') },
+      { path: 'cards', lazy: () => import('@/pages/cards/CardsPage') },
+      { path: 'system', lazy: () => import('@/pages/system/SystemPage') },
       { path: 'ops', lazy: () => import('@/pages/ops/OpsPage') },
     ],
   },

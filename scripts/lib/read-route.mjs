@@ -91,7 +91,19 @@ export function readRoute(dataRoot, def) {
   if (def.file) {
     const raw = fs.readFileSync(path.join(dataRoot, def.file), 'utf-8')
     // JSONL（账本类 append-only）按行解析为数组，否则常规 JSON 解析
-    return def.format === 'jsonl' ? parseJsonl(raw, def.limit) : JSON.parse(raw)
+    if (def.format === 'jsonl') return parseJsonl(raw, def.limit)
+    /**
+     * `text` = **原样返回字符串**，不在本层解析。
+     *
+     * 用途：YAML 等 JSON 之外的格式（如 `config/tasks.yaml` 任务台账）。
+     * 为什么不在本层解析成对象：本项目的依赖是刻意收敛的（无 yaml 包），
+     * 而为了一个结构高度规整的配置文件引入 YAML 解析器不划算；
+     * 且中间件统一走 `JSON.stringify`，返回字符串会被序列化成 JSON 字符串，
+     * 前端 `res.json()` 拿到的就是原文 —— 语义无损。
+     * 解析职责交给消费方，并**只解析它需要的子集**。
+     */
+    if (def.format === 'text') return raw
+    return JSON.parse(raw)
   }
 
   // ── 形态 ②：目录 + 文件名 glob ──

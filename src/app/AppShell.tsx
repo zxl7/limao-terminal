@@ -64,6 +64,7 @@ interface TabDef {
 export const TABS: readonly TabDef[] = [
   // ── 段1 · 实时（cadence=intraday）· 按短线交易优先级 ──
   { to: '/', label: '盘中实时', end: true, group: '实时' },
+  { to: '/timeline', label: '日内时间轴', group: '实时' },
   { to: '/rotation', label: '题材轮动', group: '实时' },
   { to: '/mainline', label: '主线题材', group: '实时' },
   { to: '/reflow', label: '题材回流', group: '实时' },
@@ -82,16 +83,20 @@ export const TABS: readonly TabDef[] = [
   { to: '/lhb', label: '龙虎榜', group: '题材' },
   { to: '/carrier', label: '载体追踪', group: '题材' },
   { to: '/risk', label: '风险监控', group: '题材' },
+  { to: '/hithink', label: '同花顺数据', group: '题材' },
 
   // ── 段4 · 决策与战绩（日频）──
   { to: '/ai', label: 'AI台账', group: '决策' },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
+  { to: '/auction', label: '竞价决策', group: '决策' },
 
   // ── 段5 · 数据与运维（日频）──
   { to: '/stack', label: '数据堆叠', group: '数据' },
   { to: '/archive', label: '决策存档', group: '数据' },
+  { to: '/cards', label: '卡片原文', group: '数据' },
+  { to: '/system', label: '系统台账', group: '数据' },
 ] as const
 
 export function AppShell() {

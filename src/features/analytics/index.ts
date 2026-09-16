@@ -15,11 +15,56 @@ export { analyticsQueries } from './api/queries'
 // 展示原语（分析域通用表格与指标行）
 export { DataTable, StatPair, Tag, SegTabs, type Column } from './components/Table'
 
+// 时间轴分钟槽卡片（固定宽卡 + 固定 CSS grid · 与 React 无关，可单测）
+export { TimelineSlotCard, SLOT_WIDTH, SLOT_GAP } from './components/TimelineSlotCard'
+
 // 飞书卡片存档阅读器（复盘/盘前/机构/脉冲卡共用）
 export { CardArchiveView, cardDate, type ArchiveCard } from './components/CardArchiveView'
 
 // 财富密码每日决策档案（`wealth_code_candidates_v1`）
 export { DossierView } from './components/DossierView'
+
+// 自动化任务台账解析（`config/tasks.yaml` 原文 → 条目 · 只解析所需子集）
+export { parseTaskLedger } from './lib/task-ledger'
+
+// 日内时间轴的纯计算内核（板块聚类 + 严格时序 · 与 React 无关，可单测）
+export {
+  buildTimeline,
+  buildTimelineSlots,
+  BURST_MIN_STOCKS,
+  BURST_WINDOW_MIN,
+  clockMin,
+  cumulativeByMarks,
+  fbtMin,
+  MARK_LABELS,
+  MARKS,
+  minToClock,
+  SHAPE_META,
+  timelineNodeKey,
+  type EventNode,
+  type PushNode,
+  type SectorNode,
+  type SectorShape,
+  type SingleNode,
+  type TimelineNode,
+  type TimelineSlot,
+  type TimelineSlotSector,
+} from './lib/timeline'
+
+// 题材级爆发内核（解析原系统 event_log 的题材结论 · 纯函数，可单测）
+export {
+  buildThemeBursts,
+  normName,
+  normTheme,
+  parseThemeEvents,
+  sameTheme,
+  type StockThemeTag,
+  type ThemeBurst,
+  type ThemeBurstResult,
+  type ThemeEvent,
+  type ThemeEventKind,
+  type ThemeRisk,
+} from './lib/theme-burst'
 
 // 数值格式化（null 一律渲染为「—」；二元区间必须走 range，禁止直接渲染数组）
 export {

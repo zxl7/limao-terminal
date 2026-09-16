@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { SeriesTableRow } from '@/shared/api'
-import { StatPair, Tag, n1 } from '@/features/analytics'
+import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, Zone, ZoneRow, type HeatRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
@@ -32,6 +32,7 @@ import { cn } from '@/shared/lib'
 
 export function Component() {
   const series = useQuery(marketQueries.series())
+  const weekly = useQuery(analyticsQueries.weeklyZtMap())
   const d = series.data
   const [onlyRising, setOnlyRising] = useState(false)
 
@@ -42,6 +43,36 @@ export function Component() {
   }, [d?.table_rows, onlyRising])
 
   const lastDetail = d?.daily_details?.at(-1)
+
+  /**
+   * 周涨停地图（`cache/weekly_zt_map.json`）—— **个股 × 本周交易日**的涨停轨迹。
+   *
+   * 与上方「题材 × 日」矩阵的分工：那个看**题材**有没有升温，
+   * 这个看**个股**有没有持续性（同一只票连着几天封板 = 真实强度）；
+   * 一天封完就熄火的是脉冲，不是强度。
+   *
+   * ⚠️ 编码诚实性：原始数据只给 `dates`（哪几天涨停）与 `max_boards`（**本周**最高板），
+   *    **没有逐日板数**。故格子只表达「当日是否涨停」（1/0 二元），
+   *    绝不拿周最高板去填每一天 —— 那会把「周三首板、周五 3 板」
+   *    渲染成「三天都是 3 板」。周最高板只放行尾注。
+   */
+  const wk = weekly.data
+  const wkView = useMemo(() => {
+    const days = Object.keys(wk?.day_totals ?? {}).sort()
+    const all = Object.entries(wk?.map ?? {}).map(([code, e]) => ({ code, e }))
+    const sorted = all.sort(
+      (a, b) => b.e.dates.length - a.e.dates.length || b.e.max_boards - a.e.max_boards,
+    )
+    const wkRows: HeatRow[] = sorted.slice(0, 40).map(({ code, e }) => ({
+      label: e.name,
+      sub: code,
+      values: days.map((day) => (e.dates.includes(day) ? 1 : 0)),
+      note: `${e.dates.length} 天 · 最高 ${e.max_boards} 板`,
+    }))
+    /** 持续性最强的一批（涨停日 ≥3）—— 一天涨停只是脉冲，三天以上才算强度 */
+    const persistent = sorted.filter((x) => x.e.dates.length >= 3)
+    return { days, rows: wkRows, persistent, total: all.length }
+  }, [wk])
 
   /**
    * 热力矩阵 —— 把「题材 × 日」的涨停家数从数字矩阵变成色块矩阵。
@@ -244,8 +275,126 @@ export function Component() {
       </Card>
         </Zone>
       </ZoneRow>
+
+      {/* ── 个股视角：一周之内谁在「持续」涨停 ──
+          上方整页是「题材 × 日」维度（哪条线在升温）；这一行换成
+          「个股 × 日」维度，回答另一个问题：升温是**一群票轮流涨停**，
+          还是**同一批票连着涨停**。后者才是真强度。 */}
+      <ZoneRow>
+        <Zone label="周涨停地图 · 个股 × 交易日" dot="bg-up" className="xl:w-[68%]">
+          <Card
+            title="🗓 周涨停地图"
+            extra={
+              <CardBadge>
+                {wk ? `${wkView.days.length} 个交易日 · ${wkView.total} 只` : '—'}
+              </CardBadge>
+            }
+          >
+            {!wk || wkView.rows.length === 0 ? (
+              <EmptyState text="周涨停地图未落盘（cache/weekly_zt_map.json 缺失）" />
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  {wkView.days.map((day) => (
+                    <StatPair
+                      key={day}
+                      label={`${day.slice(4, 6)}-${day.slice(6, 8)} 涨停`}
+                      value={wk.day_totals?.[day] ?? '—'}
+                      tone="up"
+                    />
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <HeatMatrix
+                    rows={wkView.rows}
+                    cols={wkView.days.map((x) => `${x.slice(4, 6)}-${x.slice(6, 8)}`)}
+                    max={1}
+                    format={wkCell}
+                    labelWidth={150}
+                    cellW={34}
+                    cellH={20}
+                  />
+                </div>
+                <div className="text-sub text-[11px]">
+                  按本周涨停天数降序取前 40 只 · 格子只表示「当日是否涨停」，
+                  板数见行尾（原数据无逐日板数）
+                </div>
+              </div>
+            )}
+          </Card>
+        </Zone>
+
+        <Zone label="持续性最强 · 涨停日 ≥3" dot="bg-rec" className="xl:w-[32%]">
+          <Card title="🔥 持续涨停票" extra={<CardBadge>{wkView.persistent.length} 只</CardBadge>}>
+            {wkView.persistent.length === 0 ? (
+              <EmptyState text="本周无涨停 ≥3 天的个股" />
+            ) : (
+              <div className="max-h-[560px] overflow-y-auto">
+                <DataTable
+                  dense
+                  rows={wkView.persistent}
+                  rowKey={(r) => r.code}
+                  columns={[
+                    {
+                      label: '名称',
+                      cell: (r) => (
+                        <span className="text-txt">
+                          {r.e.name}
+                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                        </span>
+                      ),
+                    },
+                    {
+                      label: '涨停天数',
+                      num: true,
+                      className: 'whitespace-nowrap',
+                      cell: (r) => (
+                        <span className="num font-semibold text-up">{r.e.dates.length}</span>
+                      ),
+                    },
+                    {
+                      label: '最高板',
+                      num: true,
+                      cell: (r) => <span className="num">{r.e.max_boards}</span>,
+                    },
+                    {
+                      label: '涨停日',
+                      className: 'whitespace-nowrap',
+                      cell: (r) => (
+                        <span className="num text-sub">
+                          {r.e.dates.map((x) => `${x.slice(4, 6)}-${x.slice(6, 8)}`).join(' ')}
+                        </span>
+                      ),
+                    },
+                    {
+                      label: '原因',
+                      className: 'max-w-[280px] truncate',
+                      cell: (r) => (
+                        <span className="text-sub text-[11.5px]">{r.e.reasons?.[0] || '—'}</span>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
+}
+
+/**
+ * 周地图格值文本 —— **必须提到模块作用域**。
+ *
+ * `HeatMatrix` 会把单元格 memo 化；写在 JSX 里传内联箭头函数，每次渲染都换引用，
+ * 等于让 memo 白做（40 行 × 5 列 = 200 次无谓重算）。
+ *
+ * 二元编码：`1` = 当日涨停 → 实心点；`0` = 当日未涨停 → **留空而不是印「0」**，
+ * 否则整张图 90% 是 0，图案被数字淹没。
+ */
+function wkCell(v: number | null | undefined): string {
+  return v === 1 ? '●' : ''
 }
 
 function MatrixRow({

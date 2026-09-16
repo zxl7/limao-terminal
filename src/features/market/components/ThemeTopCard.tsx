@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { cn, fmtPct } from '@/shared/lib'
+import { cn, fmtPct, isStarMarket } from '@/shared/lib'
 import { Card, EmptyState } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
@@ -52,6 +52,19 @@ export function ThemeTopCard() {
             const delta = DELTA_LABEL[t.delta] ?? t.delta
             // ⚠️ 只有拿到环比基数时才显示 —— zt_prev 为 null 表示「无基数」，不是 0
             const chg = t.zt_prev == null ? null : t.zt_count - t.zt_prev
+            /**
+             * ⛔ 科创板（688/689）无交易权限，必须剔除。
+             *
+             * ⚠️ `followers` **只有 name 没有 code**（实测 2026-09-16），无法直接判板块；
+             *    故用**同题材 `zt_stocks`（有 code）** 建立 688 名称集合来过滤 ——
+             *    这是字段缺失下唯一可靠的做法（按名称猜前缀会误伤）。
+             *    `leader` 自带 code，直接判即可。
+             */
+            const starNames = new Set(
+              (t.zt_stocks ?? []).filter((s) => isStarMarket(s.code)).map((s) => s.name),
+            )
+            const followers = (t.followers ?? []).filter((f) => !starNames.has(f.name))
+            const leader = t.leader && !isStarMarket(t.leader.code) ? t.leader : null
             return (
               <div
                 key={`${rank}-${t.name}`}
@@ -99,20 +112,20 @@ export function ThemeTopCard() {
                 </div>
 
                 {/* 龙头 —— 主线里的「辨识度」载体，没有它这条线就只是一堆涨停 */}
-                {t.leader ? (
+                {leader ? (
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-1">
                     <span className="text-[10.5px] text-sub flex-none">龙头</span>
-                    <span className="text-[12.5px] font-semibold text-lead">{t.leader.name}</span>
-                    <span className="num text-[11px] text-sub">{t.leader.code}</span>
-                    <span className={cn('num text-[12.5px] font-semibold', pctTone(t.leader.pct))}>
-                      {fmtPct(t.leader.pct)}
+                    <span className="text-[12.5px] font-semibold text-lead">{leader.name}</span>
+                    <span className="num text-[11px] text-sub">{leader.code}</span>
+                    <span className={cn('num text-[12.5px] font-semibold', pctTone(leader.pct))}>
+                      {fmtPct(leader.pct)}
                     </span>
-                    {t.leader.seal && <span className="badge bg-lead-soft text-lead">{t.leader.seal}</span>}
-                    {t.leader.cap_yi != null && (
-                      <span className="num text-[11px] text-sub">{t.leader.cap_yi} 亿</span>
+                    {leader.seal && <span className="badge bg-lead-soft text-lead">{leader.seal}</span>}
+                    {leader.cap_yi != null && (
+                      <span className="num text-[11px] text-sub">{leader.cap_yi} 亿</span>
                     )}
-                    {t.leader.turn != null && (
-                      <span className="num text-[11px] text-sub">换手 {t.leader.turn}%</span>
+                    {leader.turn != null && (
+                      <span className="num text-[11px] text-sub">换手 {leader.turn}%</span>
                     )}
                   </div>
                 ) : (
@@ -120,10 +133,10 @@ export function ThemeTopCard() {
                 )}
 
                 {/* 跟随 —— 只有龙头没有跟随 = 孤票，不是主线 */}
-                {t.followers && t.followers.length > 0 && (
+                {followers.length > 0 && (
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-0.5">
                     <span className="text-[10.5px] text-sub flex-none">跟随</span>
-                    {t.followers.map((f) => (
+                    {followers.map((f) => (
                       <span key={f.name} className="text-[11.5px] text-txt">
                         {f.name}
                         <span className={cn('num ml-1', pctTone(f.pct))}>{fmtPct(f.pct)}</span>

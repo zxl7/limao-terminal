@@ -71,6 +71,7 @@ function installDataFetch() {
  */
 const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['intraday', () => import('@/pages/intraday/IntradayPage')],
+  ['timeline', () => import('@/pages/timeline/TimelinePage')],
   ['emotion', () => import('@/pages/emotion/EmotionPage')],
   ['board-core', () => import('@/pages/board-core/BoardCorePage')],
   ['promotion', () => import('@/pages/promotion/PromotionPage')],
@@ -83,13 +84,17 @@ const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['lhb', () => import('@/pages/lhb/LhbPage')],
   ['carrier', () => import('@/pages/carrier/CarrierPage')],
   ['risk', () => import('@/pages/risk/RiskPage')],
+  ['hithink', () => import('@/pages/hithink/HithinkPage')],
   ['ai', () => import('@/pages/ai/AiPage')],
   ['trade', () => import('@/pages/trade/TradePage')],
   ['backtest', () => import('@/pages/backtest/BacktestPage')],
   ['institution', () => import('@/pages/institution/InstitutionPage')],
+  ['auction', () => import('@/pages/auction/AuctionPage')],
   ['record', () => import('@/pages/record/RecordPage')],
   ['stack', () => import('@/pages/stack/StackPage')],
   ['archive', () => import('@/pages/archive/ArchivePage')],
+  ['cards', () => import('@/pages/cards/CardsPage')],
+  ['system', () => import('@/pages/system/SystemPage')],
   ['ops', () => import('@/pages/ops/OpsPage')],
 ]
 

@@ -111,7 +111,7 @@ const EmExpectStock = z.object({
   code: s.optional(),
   name: s.optional(),
   pct: n.optional(),
-  cap_yi: n.optional(),
+  cap_yi: nOrNull.optional(),
   dragon: b.optional(),
 })
 
@@ -152,7 +152,7 @@ const ThemeLeaderDetail = z.object({
   price: n.optional(),
   boards: s.optional(),
   turn: n.optional(),
-  cap_yi: n.optional(),
+  cap_yi: nOrNull.optional(),
   desc: s.optional(),
   seal: s.optional(),
 })
@@ -254,7 +254,7 @@ export const ShortSpiritSignalsSchema = z.object({
   thresholds: z
     .object({
       min_pct: n.optional(),
-      min_market_cap_yi: n.optional(),
+      min_market_cap_yi: nOrNull.optional(),
       amount_morning_yi: n.optional(),
       amount_afternoon_yi: n.optional(),
     })
@@ -267,7 +267,7 @@ export const ShortSpiritSignalsSchema = z.object({
         name: s.optional(),
         code: s.optional(),
         sector: s.optional(),
-        market_cap_yi: n.optional(),
+        market_cap_yi: nOrNull.optional(),
         amount_yi: n.optional(),
         pct: n.optional(),
         type: s.optional(),
@@ -381,7 +381,7 @@ const PoolStock = z.object({
   name: s.optional(),
   dragon: b.optional(),
   pct: n.optional(),
-  cap_yi: n.optional(),
+  cap_yi: nOrNull.optional(),
   board: s.optional(),
   from_zt: b.optional(),
   risk: s.optional(),
@@ -751,7 +751,12 @@ const DecisionDossierSchema = z.object({
     })
     .catchall(z.unknown())
     .optional(),
-  global_narrative: s.optional(),
+  /**
+   * ⚠️ 必须 `.nullable()`：`decision_log/<日期>/candidates.json` 的**旧归档**里
+   * 该字段实测为 `null`（旁白是后加的，早于它的归档没有内容）。
+   * 只写 `.optional()` 会让「旧归档」被误判为结构不符。
+   */
+  global_narrative: s.nullable().optional(),
 })
 
 // ════════════════════════════════════════════════════════════════

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
-import type { GeneHistory, GeneProfile } from '@/shared/api'
-import { analyticsQueries, n1, pct, tone } from '@/features/analytics'
+import type { GeneHistory, GenePoolFile, GeneProfile, GeneSummary } from '@/shared/api'
+import { analyticsQueries, DataTable, n1, pct, rate, tone } from '@/features/analytics'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
@@ -27,6 +27,8 @@ import { cn } from '@/shared/lib'
 export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.geneDetail())
   await queryClient.ensureQueryData(analyticsQueries.geneHist())
+  await queryClient.ensureQueryData(analyticsQueries.geneSummary())
+  await queryClient.ensureQueryData(analyticsQueries.genePool())
   return null
 }
 
@@ -39,8 +41,15 @@ interface GeneRow {
 export function Component() {
   const detail = useQuery(analyticsQueries.geneDetail())
   const hist = useQuery(analyticsQueries.geneHist())
+  const geneTop = useQuery(analyticsQueries.geneSummary())
+  const genePoolQ = useQuery(analyticsQueries.genePool())
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'gene' | 'zt250' | 'promo'>('gene')
+
+  /** 股性榜（近 250 交易日统计的 Top · `summary.json`） */
+  const gs: GeneSummary | undefined = geneTop.data
+  /** 今日涨停基因池（`pool_<日期>.json` · 最近一期） */
+  const pool: GenePoolFile | null | undefined = genePoolQ.data
 
   const rows = useMemo<GeneRow[]>(() => {
     const hmap = new Map<string, GeneHistory>()
@@ -291,6 +300,179 @@ export function Component() {
       </Card>
         </Zone>
       </ZoneRow>
+
+      {/* ── 榜单与当日池（两种时间尺度）──
+          上方是「逐票历史档案」，这一行补两类**榜单视角**：
+            · 股性榜   —— 近 250 交易日统计出的**静态股性排名**（谁反复涨停、谁封得早）
+            · 涨停基因池 —— **当日**这批涨停票的基因快照（板数 / N天N板 / 封单资金）
+          差别在时间尺度：榜回答「这只票一贯如何」，池回答「今天这批是谁」。 */}
+      <ZoneRow>
+        <Zone label="股性榜 · 近 250 交易日" dot="bg-rec" className="xl:w-[46%]">
+          <Card
+            title="🏅 股性榜"
+            extra={<CardBadge>{gs ? `${gs.date} · ${gs.count} 只` : '—'}</CardBadge>}
+          >
+            {!gs || gs.top.length === 0 ? (
+              <EmptyState text="股性榜未落盘（scripts/zt_genes.py 未运行）" />
+            ) : (
+              <div className="max-h-[480px] overflow-y-auto">
+                <DataTable
+                  dense
+                  rows={gs.top}
+                  rowKey={(r) => r.code}
+                  columns={[
+                    {
+                      label: '名称',
+                      cell: (r) => (
+                        <span className="text-txt">
+                          {r.name}
+                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                        </span>
+                      ),
+                    },
+                    { label: '行业', cell: (r) => <span className="text-sub">{r.industry || '—'}</span> },
+                    {
+                      label: '股性分',
+                      num: true,
+                      cell: (r) => (
+                        <span
+                          className={cn(
+                            'num font-semibold',
+                            r.gene_score >= 50
+                              ? 'text-up'
+                              : r.gene_score >= 30
+                                ? 'text-mid'
+                                : 'text-sub',
+                          )}
+                        >
+                          {n1(r.gene_score)}
+                        </span>
+                      ),
+                    },
+                    { label: '涨停', num: true, cell: (r) => <span className="num">{r.zt_n}</span> },
+                    { label: '最高板', num: true, cell: (r) => <span className="num">{r.max_lbc}</span> },
+                    {
+                      label: '晋级率',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{rate(r.promo_rate)}</span>,
+                    },
+                    {
+                      // ⚠️ 字段名叫 rate 但**不是百分比**：源码为 broken_sum / zt_n
+                      //   （每次涨停的平均炸板次数），实测出现 1.67 > 1。
+                      //   渲染成 % 会输出「1.7%」这种量级错误，故标「均值·次」。
+                      label: '炸板均值',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{n1(r.broken_rate)}</span>,
+                      className: 'whitespace-nowrap',
+                    },
+                    {
+                      label: '首封',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{minToClock(r.seal_min)}</span>,
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </Card>
+        </Zone>
+
+        <Zone label="当日涨停基因池 · 最近一期" dot="bg-up" className="xl:w-[54%]">
+          <Card
+            title="🧬 涨停基因池"
+            extra={<CardBadge>{pool ? `${pool.date} · ${pool.pool.length} 只` : '—'}</CardBadge>}
+          >
+            {!pool || pool.pool.length === 0 ? (
+              <EmptyState text="涨停基因池未落盘（pool_<日期>.json 缺失）" />
+            ) : (
+              <div className="max-h-[480px] overflow-y-auto">
+                <DataTable
+                  dense
+                  rows={pool.pool}
+                  rowKey={(r) => r.code}
+                  columns={[
+                    {
+                      label: '名称',
+                      cell: (r) => (
+                        <span className="text-txt">
+                          {r.name}
+                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                        </span>
+                      ),
+                    },
+                    { label: '行业', cell: (r) => <span className="text-sub">{r.industry || '—'}</span> },
+                    {
+                      label: '板数',
+                      num: true,
+                      cell: (r) => (
+                        <span className="num font-semibold text-up">{r.zt_boards}</span>
+                      ),
+                    },
+                    {
+                      label: 'N天N板',
+                      num: true,
+                      cell: (r) => (
+                        <span className="num text-sub">
+                          {r.zt_days}天{r.zt_times}板
+                        </span>
+                      ),
+                      className: 'whitespace-nowrap',
+                    },
+                    {
+                      label: '首封',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{minToClock(r.seal_min)}</span>,
+                    },
+                    {
+                      label: '末封',
+                      num: true,
+                      cell: (r) => (
+                        <span className="num text-sub">{minToClock(r.last_seal_min)}</span>
+                      ),
+                    },
+                    {
+                      label: '炸板',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{r.broken ?? '—'}</span>,
+                    },
+                    {
+                      label: '封单(亿)',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{n1(r.seal_fund_yi)}</span>,
+                      className: 'whitespace-nowrap',
+                    },
+                    {
+                      label: '涨幅',
+                      num: true,
+                      cell: (r) => <span className={cn('num', tone(r.pct))}>{pct(r.pct)}</span>,
+                    },
+                    {
+                      label: '换手',
+                      num: true,
+                      cell: (r) => <span className="num text-sub">{rate(r.hs)}</span>,
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </Card>
+        </Zone>
+      </ZoneRow>
     </div>
   )
+}
+
+/**
+ * 首/末封时间（**自 00:00 起算的分钟数**）→ `HH:MM`。
+ *
+ * ⚠️ 语义取自源码而非猜测：`scripts/zt_genes.py` 中
+ *    `seal_min = _hhmm_to_min(fbt)`，把 `fbt='092500'` 转成 565（=9×60+25）。
+ *    所以它是**一天内的绝对时刻、越小越早**，不是「封了多久」的时长 ——
+ *    当成时长会把 09:25 首封读成「封了 9 小时」。
+ */
+function minToClock(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '—'
+  const h = Math.floor(v / 60)
+  const m = Math.round(v % 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }

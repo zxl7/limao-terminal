@@ -106,22 +106,6 @@ export interface Newsflash {
   stocks: string[]
 }
 
-/** 盘中异动题材（来自 latest.hot_spots） */
-export interface HotSpotStock {
-  name: string
-  code: string
-  pct: number
-  price: number
-  buyable: boolean
-  is_20cm: boolean
-  /** 连板文案（如 "4天4板"），可为空串 */
-  boards: string
-}
-export interface HotSpot {
-  sector: string
-  stocks: HotSpotStock[]
-}
-
 export interface EmExpectStock {
   code: string
   name: string
@@ -1100,12 +1084,31 @@ export interface ZtPoolStock {
   /** 换手率 */
   hs: number
   sector: string
-  /** 封板描述文案，如 '🔥 秒封板' */
-  seal: string
+  /**
+   * 封单资金（亿）。
+   *
+   * ⚠️ 2026-09-16 实测更正：原注释写「封板描述文案，如 '🔥 秒封板'」并把类型标为
+   *    `string`，**是错的** —— 实测 `zt_history` / `yesterday_zt` /
+   *    `decision_log/<日期>/zt_pool` 三处共 1700+ 条记录，`seal` **100% 是 float**
+   *    （如 1.34 = 1.34 亿封单）。
+   *    带文案的 `seal` 属于**另一个接口** `ThemeLeaderDetail`（题材龙头），不要混。
+   *    该错标已实际导致 `/archive` 把封单资金渲染成「封板质量」。
+   */
+  seal: number
   /** 成交额（亿） */
   cje_yi: number
   /** 总市值（亿） */
   zsz_yi: number
+  /**
+   * 是否 20cm 标的（创业板/科创板）。
+   *
+   * ⚠️ 2026-09-16 实测补录：该字段**原系统一直在写**，但类型里从未声明，
+   *    导致想标「20cm 波动大·紧止损」时无字段可读（只能靠代码前缀自己判，
+   *    而前缀判断在 300/301 之外还会误判）。
+   */
+  is_20cm?: boolean
+  /** 流通市值（亿）—— 同样是一直在写、类型缺失的字段 */
+  lt_yi?: number
 }
 
 export interface ZtPoolSnapshot {
@@ -1117,7 +1120,16 @@ export interface ZtPoolSnapshot {
   max_boards: number
   ladder: ZtPoolLadder
   top_codes: ZtPoolTopCode[]
-  /** 仅 decision_log 的 zt_pool.json 带全量明细；yesterday_zt.json 不带 */
+  /**
+   * 涨停全量明细。
+   *
+   * ⚠️ 2026-09-16 实测更正：此处原注「yesterday_zt.json 不带」**是错的** ——
+   * `cache/yesterday_zt.json` 同样带 `zt_list`（当日 89 条，含 code/name/pct/
+   * price/boards/fbt/zbc/hs 等）。两者都带，仅落盘时点不同：
+   *   · `yesterday_zt.json`     —— 盘后 17:2x 由 record_zt_snapshot 固化（唯一权威）
+   *   · `decision_log/<日期>/zt_pool.json` —— 决策时点冻结（黑匣子口径）
+   * 保留 `.optional()` 是为了兼容早期无明细的旧归档，不是因为它常态缺失。
+   */
   zt_list?: ZtPoolStock[]
 }
 
@@ -1409,18 +1421,62 @@ export interface MarketMemoryState {
   index_trend: string
 }
 
+/**
+ * 当日被推送过的题材 —— 「今天系统推过什么」的客观台账。
+ *
+ * ⚠️ 实测（2026-09-16）为**对象数组**，不是 `string[]`。
+ *    早期定义写成 `string[]` 会让 `{t}` 渲染出 `[object Object]`，
+ *    且因类型宽松而无人察觉。
+ */
+export interface MarketMemoryPushedTopic {
+  name: string
+  /** 'sector' 等 —— 推送对象的类型标签 */
+  type: string
+  first_pushed: string
+  last_pushed: string
+  push_count: number
+  context: string
+  last_catalyst: string
+}
+
+/** 情绪事件流条目 —— 盘中情绪生变的逐条留痕 */
+export interface MarketMemoryEvent {
+  time: string
+  event: string
+  /** 'high' 等严重度；原系统未枚举，故保持 string */
+  severity: string
+  topic: string
+}
+
+/**
+ * 前一日题材 Top —— 实测与 `ThemeTop` 同构（含 leader / followers / zt_stocks）。
+ *
+ * 此处**保持可选**而非直接复用 `ThemeTop`：该字段在早期归档里可能只有
+ * `rank/name/desc` 三项，直接复用会把「旧归档」判成类型错误。
+ */
 export interface MarketMemoryTop5 {
   rank: number
   name: string
   desc: string
+  zt_count?: number | null
+  turn_avg?: number | null
+  total_stocks?: number | null
+  leader?: ThemeLeaderDetail | null
+  followers?: ThemeFollower[]
+  zt_stocks?: ThemeZtStock[]
+  diffusion?: string
+  risks?: string[]
+  positives?: string[]
+  delta?: string
+  zt_prev?: number | null
 }
 
 export interface MarketMemory {
   date: string
   updated_at: string
   market_state: MarketMemoryState
-  pushed_topics: string[]
-  event_log: unknown[]
+  pushed_topics: MarketMemoryPushedTopic[]
+  event_log: MarketMemoryEvent[]
   last_push_by_task: Record<string, string>
   prev_top5: MarketMemoryTop5[]
 }
@@ -1625,6 +1681,26 @@ export interface HithinkZtFile {
   items_raw: Array<Record<string, unknown>>
 }
 
+/**
+ * 涨停池双源校验差异（同花顺 vs 必盈）。
+ *
+ * ⚠️ **实测纠错（2026-09-16）**：`only_biying` / `only_hithink` 是**股票代码字符串数组**，
+ *    不是对象数组 —— 类型标的 `Record<string, unknown>[]` 虽宽松但会误导渲染层。
+ */
+export interface HithinkZtDiffFile {
+  date: string
+  /** 必盈口径涨停家数 */
+  biying_count: number
+  /** 同花顺口径涨停家数 */
+  hithink_count: number
+  /** 两源一致家数 */
+  both: number
+  /** 仅必盈有的代码 */
+  only_biying: string[]
+  /** 仅同花顺有的代码 */
+  only_hithink: string[]
+}
+
 export interface HithinkLadderWindow {
   length: number
   date_list: string[]
@@ -1632,9 +1708,21 @@ export interface HithinkLadderWindow {
   board_caps: Record<string, number>
 }
 
+/** 天梯单票（同花顺连板天梯 · 仅 2 板以上） */
+export interface HithinkLadderStock {
+  thscode: string
+  ticker: string
+  name: string
+  board_num: number
+  /** 次日是否封板（窗口内历史回溯字段，最新日多为 null） */
+  seal_nextday: boolean | null
+  sign_level: number
+}
+
 export interface HithinkLadderItem {
   date: string
-  boards: Record<string, unknown>
+  /** 板高档位 → 该档票列表。档位键实测为 two_board…seven_over */
+  boards: Record<string, HithinkLadderStock[]>
 }
 
 export interface HithinkLadderFile {
@@ -1659,20 +1747,55 @@ export interface HithinkAuctionFile {
   benchmark: HithinkAuctionBenchmark[]
 }
 
+/** 同花顺异动原因条目（2026-09-16 读真实文件确认字段） */
+export interface HithinkAnomalyItem {
+  code: string
+  name: string
+  /** 异动标签：'涨停' | '跌停' | '大涨' | '大跌' */
+  tag: string
+  /** AI 生成的异动说明原文 */
+  content: string
+  keywords: string[]
+}
+
 /** 同花顺异动原因（单份 250-300KB，路由只取最新一期） */
 export interface HithinkAnomalyFile {
   source: string
   date: string
   generated_ts: string
-  items: Array<Record<string, unknown>>
-  [k: string]: unknown
+  /** 抓取总数 */
+  total: number
+  /** 过滤后条数（剔除 688 / ST 后） */
+  filtered: number
+  excluded_688: number
+  excluded_st: number
+  /** 按标签计数：{涨停, 跌停, 大涨, 大跌} */
+  stats: Record<string, number>
+  items: HithinkAnomalyItem[]
 }
 
+/** 同花顺估值单票（任一指标可为 null） */
+export interface HithinkValuationItem {
+  pe?: number | null
+  pb?: number | null
+  ps?: number | null
+  pcf?: number | null
+}
+
+/**
+ * 同花顺估值。
+ *
+ * ⚠️ **实测纠错（2026-09-16）**：此前类型写 `items: Array<...>`，真实结构是
+ *    **`values`：code → 估值对象**。按 `items` 渲染会静默读空 —— 这类
+ *    「类型与数据反向」的错，只能靠读真实文件发现。
+ */
 export interface HithinkValuationFile {
   source: string
   date: string
-  items: Array<Record<string, unknown>>
-  [k: string]: unknown
+  generated_ts: string
+  requested: number
+  got: number
+  values: Record<string, HithinkValuationItem>
 }
 
 // ── 机构投研 ──
@@ -1816,6 +1939,9 @@ export interface RelayShadowRanked {
   score: number
   /** 分档，如 '不入池' */
   band: string
+  /** 是否通过入池闸门（与 eod_relay 同义，但打分口径不同） */
+  pass?: boolean
+  exclude_reason?: string | null
 }
 
 export interface RelayShadowEnvDigest {
@@ -1828,6 +1954,18 @@ export interface RelayShadowEnvDigest {
   max_boards: number
 }
 
+/** 影子排序与实际入池的差异 —— 影子模式要回答的核心问题 */
+export interface RelayShadowDiff {
+  /** 前 3 名中有几只一致 */
+  top3_same: number
+  /** 参与比对的前 N 名 */
+  top_n_compared: number
+  /** 影子会推、实际没推的代码 */
+  shadow_promoted: string[]
+  /** 实际推了、影子没进的代码 */
+  eod_only: string[]
+}
+
 /** 接力权重影子模式（只观察·不改产池）—— 实际入池 vs 影子排序对照 */
 export interface RelayShadow {
   date: string
@@ -1837,6 +1975,9 @@ export interface RelayShadow {
   mode: string
   eod_relay: RelayEodItem[]
   shadow_ranked: RelayShadowRanked[]
+  /** 影子分档计数：分档名 → 只数（**不是数组**，早期类型漏了此字段） */
+  bands: Record<string, number>
+  diff: RelayShadowDiff
 }
 
 // ── 风险监控 ──
@@ -1945,4 +2086,109 @@ export interface AuditEntry {
   after?: unknown
   snapshot?: string
   [k: string]: unknown
+}
+
+// ────────────────────────────────────────────────────────────────
+// 系统台账与运维（2026-09-16 增量：补齐「后端有产出、前端无路由」的能力）
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * 自动化任务台账条目 —— 由 `config/tasks.yaml` **原文解析**而来。
+ *
+ * ⚠️ 它不是 JSON：该文件是 YAML，路由以 `format: 'text'` 原样返回字符串，
+ *    前端只解析**自己需要的子集**（name/id/kind/rrule/webhook/writeback）。
+ *    只解析子集是刻意的 —— 本文件未使用锚点、多行标量、嵌套映射等 YAML 特性，
+ *    为它引入一个 YAML 解析依赖不划算（本项目依赖刻意收敛）。
+ */
+export interface TaskLedgerEntry {
+  name: string
+  /** automation id，与平台任务库对应（如 automation-1785767165508） */
+  id: string
+  /** 骨架类型：骨架A / 骨架B / pipeline / 脚本 / 机构投研 … */
+  kind: string
+  /** rrule 原文；PAUSED / 已删除任务可能没有 */
+  rrule?: string
+  /** 推送目标：auto / feishu_webhook_test … */
+  webhook?: string
+  /** 写回目标；`null` = 不回写 */
+  writeback?: string
+}
+
+/** `config/learning_config.json` —— 自学习阈值配置 */
+export interface LearningConfig {
+  schema: string
+  updated: string
+  note: string
+  /** ⚠️ 实测为布尔（Python True/False 序列化后即 true/false），非字符串 */
+  auto_apply: boolean
+  /** 单次最大调整步长 */
+  max_adjust_step: number
+  /** 统计窗口天数 */
+  window_days: number
+  /** 规则名 → 参数对象（各规则结构不同，保留原始键） */
+  rules: Record<string, unknown>
+}
+
+/** `config/short_spirit.json` —— 短线精灵阈值（用户 2026-08-18 定的可调参数） */
+export interface ShortSpiritConfig {
+  note?: string
+  min_pct: number
+  min_market_cap_yi: number
+  amount_morning_yi: number
+  amount_afternoon_yi: number
+  max_new_stock_days: number
+  top_per_sector: number
+  max_signals: number
+  [k: string]: unknown
+}
+
+/** 通用规则配置文件（`wealth_code/config/*.json`）—— 三者 schema 各异，保留原始键 */
+export interface RuleConfigFile {
+  schema?: string
+  updated?: string
+  note?: string
+  desc?: string
+  version?: string
+  [k: string]: unknown
+}
+
+/** 盘中引擎状态件外壳（4 件结构各异，按文件名区分：boost_state / pulse_pending / …） */
+export interface EngineStateFile {
+  ts?: number
+  date?: string
+  [k: string]: unknown
+}
+
+/** `cache/decision_log/index.jsonl` 单行 —— 黑匣子总目录 */
+export interface ArchiveIndexEntry {
+  date: string
+  archived_at: string
+  schema: string
+  sources: number
+  relay: number
+  watch: number
+  ai_view: string | null
+  cards: number
+  gaps: number
+}
+
+/** 晋级量化回测行（`cache/promo/backtest_*.json`） */
+export interface PromoBacktestRow {
+  /** 分组键（板块名 / 板数 / 日期，取决于该份报告的分组维度） */
+  key: string
+  n: number
+  ok: number
+  fail: number
+  /** 成功率 % */
+  succ_rate: number
+  prem_open1?: number | null
+  prem_close1?: number | null
+  prem_close2?: number | null
+  [k: string]: unknown
+}
+
+export interface PromoBacktest {
+  title: string
+  rows: PromoBacktestRow[]
+  ts: string
 }

@@ -18,6 +18,7 @@ import type {
   AiDecisionEntry,
   AiNavEntry,
   AiViewFile,
+  ArchiveIndexEntry,
   AuctionLive,
   AuditEntry,
   BacktestReport,
@@ -29,8 +30,13 @@ import type {
   DecisionManifest,
   DecisionDossier,
   EmotionSummary5D,
+  EngineStateFile,
   EruptionDay,
   FeedbackMatrix,
+  LearningConfig,
+  PromoBacktest,
+  RuleConfigFile,
+  ShortSpiritConfig,
   FlowHistoryDay,
   GeneHistory,
   GenePoolFile,
@@ -42,6 +48,7 @@ import type {
   HithinkLadderFile,
   HithinkLhbFile,
   HithinkValuationFile,
+  HithinkZtDiffFile,
   HithinkZtFile,
   InstitutionPoolFile,
   LhbTencentFile,
@@ -132,7 +139,7 @@ export interface RouteTypeMap {
   // ── 十一、同花顺专业数据 ──
   '/api/hithink/ladder': HithinkLadderFile
   '/api/hithink/zt': DatedFile<HithinkZtFile>[]
-  '/api/hithink/zt-diff': DatedFile<Record<string, unknown>>[]
+  '/api/hithink/zt-diff': DatedFile<HithinkZtDiffFile>[]
   '/api/hithink/auction': DatedFile<HithinkAuctionFile>[]
   '/api/hithink/anomaly': HithinkAnomalyFile
   '/api/hithink/valuation': HithinkValuationFile
@@ -164,7 +171,7 @@ export interface RouteTypeMap {
   '/api/card/panqian': DatedFile<CardArchiveFile>[]
   '/api/card/ambush': DatedFile<CardArchiveFile>[]
   '/api/card/lhb': DatedFile<CardArchiveFile>[]
-  '/api/card/verify': DatedFile<CardArchiveFile>[]
+  '/api/card/mixed': DatedFile<CardArchiveFile>[]
 
   // ── 十八、盘中脉冲存档 ──
   '/api/pulse/windows': DatedFile<PulseWindow>[]
@@ -172,7 +179,18 @@ export interface RouteTypeMap {
 
   // ── 十九、推送审计 ──
   '/api/audit/log': AuditEntry[]
-  '/api/push/dedup': Record<string, unknown>
+  '/api/push/dedup': Record<string, unknown>,
+
+  // ── 二十、系统台账与运维 ──
+  /** ⚠️ 返回**原始 YAML 字符串**（路由 format: 'text'），解析在前端做 */
+  '/api/system/tasks': string
+  '/api/system/learning': LearningConfig
+  '/api/system/short-spirit': ShortSpiritConfig
+  '/api/system/rules': DatedFile<RuleConfigFile>[]
+  '/api/system/engine': DatedFile<EngineStateFile>[]
+  '/api/system/backups': DatedFile<Record<string, unknown>>[]
+  '/api/system/archive-index': ArchiveIndexEntry[]
+  '/api/promo/backtest': DatedFile<PromoBacktest>[]
 
   // ── 体检 ──
   '/api/health': HealthPayload
@@ -340,7 +358,7 @@ export const api = {
   /** 龙虎榜卡存档 */
   cardLhb: () => fetchRoute('/api/card/lhb'),
   /** 竞价验证卡存档 */
-  cardVerify: () => fetchRoute('/api/card/verify'),
+  cardMixed: () => fetchRoute('/api/card/mixed'),
 
   // ── 十八、盘中脉冲存档 ──
   /** 脉冲窗口存档 */
@@ -351,6 +369,26 @@ export const api = {
   // ── 十九、推送审计 ──
   /** 推送审计日志 */
   auditLog: () => fetchRoute('/api/audit/log'),
+  /** 推送去重状态（同内容 10min 去重 · 排查重复推送用） */
+  pushDedup: () => fetchRoute('/api/push/dedup'),
+
+  // ── 二十、系统台账与运维 ──
+  /** 自动化任务台账（**原始 YAML 文本** · 前端解析子集） */
+  systemTasks: () => fetchRoute('/api/system/tasks'),
+  /** 自学习阈值配置 */
+  systemLearning: () => fetchRoute('/api/system/learning'),
+  /** 短线精灵阈值配置 */
+  systemShortSpirit: () => fetchRoute('/api/system/short-spirit'),
+  /** 策略规则配置（预期区间/接力权重/监管三份） */
+  systemRules: () => fetchRoute('/api/system/rules'),
+  /** 盘中引擎状态（加速/待推/板块风险/资金池） */
+  systemEngine: () => fetchRoute('/api/system/engine'),
+  /** 系统备份快照（白名单：净值/持仓/AI决策/学习回滚） */
+  systemBackups: () => fetchRoute('/api/system/backups'),
+  /** 决策存档索引（黑匣子总目录） */
+  systemArchiveIndex: () => fetchRoute('/api/system/archive-index'),
+  /** 晋级量化回测报告 */
+  promoBacktest: () => fetchRoute('/api/promo/backtest'),
 
   // ── 体检 ──
   /** 数据新鲜度体检 */

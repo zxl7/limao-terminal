@@ -41,6 +41,7 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.decisionManifest())
   await queryClient.ensureQueryData(analyticsQueries.decisionCandidates())
   await queryClient.ensureQueryData(analyticsQueries.decisionZtPool())
+  await queryClient.ensureQueryData(analyticsQueries.decisionArchive())
   return null
 }
 
@@ -49,10 +50,22 @@ export function Component() {
   const cands = useQuery(analyticsQueries.decisionCandidates())
   const ztPool = useQuery(analyticsQueries.decisionZtPool())
   const auction = useQuery(analyticsQueries.decisionAuctionHistory())
-  const [tab, setTab] = useState<'manifest' | 'candidates' | 'zt' | 'auction'>('manifest')
-  /** 候选/竞价的期次选择各自独立 —— 两者归档日期不一定重合；默认取最新一期 */
+  /**
+   * 黑匣子**原件**（`cache/decision_log/<日期>/candidates.json`）。
+   *
+   * ⚠️ 与 `decisionCandidates`（`wealth_code/cache/candidates-<日期>.json`）**不是重复**：
+   *    两者是同 schema 的两份落盘 —— 前者是 `archive_decision.py` 在决策时点
+   *    **冻结的副本**（与 manifest 记录的 sha256 对应），后者是选股脚本当天写出的原卷。
+   *    对不上就说明「归档之后原卷被改过」，这正是黑匣子要能发现的事。
+   */
+  const frozen = useQuery(analyticsQueries.decisionArchive())
+  const [tab, setTab] = useState<'manifest' | 'candidates' | 'frozen' | 'zt' | 'auction'>(
+    'manifest',
+  )
+  /** 候选/竞价/原件三路的期次选择各自独立 —— 归档日期不一定重合；默认取最新一期 */
   const [candFile, setCandFile] = useState('')
   const [auctionFile, setAuctionFile] = useState('')
+  const [frozenFile, setFrozenFile] = useState('')
 
   const m: DecisionManifest | undefined = manifest.data
 
@@ -73,6 +86,15 @@ export function Component() {
   )
   const activeAuction = auctionFiles.find((f) => f.file === auctionFile) ?? auctionFiles[0]
 
+  /** 黑匣子原件期次（`decision_log/<日期>/candidates.json`） */
+  const frozenFiles = useMemo(
+    () => (frozen.data ?? []).filter((f) => !!f.data).sort((a, b) => b.file.localeCompare(a.file)),
+    [frozen.data],
+  )
+  const activeFrozen =
+    (frozenFiles.find((f) => f.file === frozenFile)?.data as DecisionDossier | undefined) ??
+    (frozenFiles[0]?.data as DecisionDossier | undefined)
+
   /** 竞价报价的条目展开（quotes 是 code → 涨幅 的映射） */
   const auctionQuotes = useMemo(() => {
     const q = (activeAuction?.data as { quotes?: Record<string, number>; ts?: string } | undefined)?.quotes
@@ -82,7 +104,7 @@ export function Component() {
       .sort((a, b) => b.pct - a.pct)
   }, [activeAuction])
 
-  /** 板数降序的涨停池明细（仅 decision_log 的 zt_pool 带 zt_list） */
+  /** 板数降序的涨停池明细（本页取的是 decision_log 的 zt_pool，含全量 zt_list） */
   const ztList = useMemo(
     () => [...(pool?.zt_list ?? [])].sort((a, b) => b.boards - a.boards || (a.fbt || '').localeCompare(b.fbt || '')),
     [pool],
@@ -141,6 +163,7 @@ export function Component() {
             items={[
               { key: 'manifest', label: `来源清单 (${m?.sources?.length ?? 0})` },
               { key: 'candidates', label: `候选 (${candFiles.length})` },
+              { key: 'frozen', label: `黑匣子原件 (${frozenFiles.length})` },
               { key: 'zt', label: `涨停池 (${ztList.length || (pool?.zt_count ?? 0)})` },
               { key: 'auction', label: `竞价 (${auctionFiles.length})` },
             ]}
@@ -204,6 +227,41 @@ export function Component() {
           </>
         )}
 
+        {tab === 'frozen' && (
+          <>
+            {frozenFiles.length > 1 && (
+              <div className="mb-2">
+                <select
+                  value={frozenFiles.find((f) => f.data === activeFrozen)?.file ?? ''}
+                  onChange={(e) => setFrozenFile(e.target.value)}
+                  className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                >
+                  {frozenFiles.map((f) => (
+                    <option key={f.file} value={f.file}>
+                      {fileDate(f.file)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {activeFrozen ? (
+              <>
+                <div className="text-sub text-[11.5px] mb-2 leading-relaxed">
+                  以下是**决策时点冻结的原件**（`cache/decision_log/&lt;日期&gt;/candidates.json`）。
+                  与「候选」tab 的原卷逐字段对不上时，说明归档之后脚本又写过该日数据 ——
+                  这正是黑匣子存在的意义。
+                </div>
+                <DossierView d={activeFrozen} />
+              </>
+            ) : (
+              <EmptyState
+                text="无黑匣子原件"
+                hint="cache/decision_log/<日期>/candidates.json 缺失"
+              />
+            )}
+          </>
+        )}
+
         {tab === 'zt' && (
           <>
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
@@ -242,7 +300,14 @@ export function Component() {
                     { label: '成交额', num: true, cell: (s) => `${n1(s.cje_yi)}亿` },
                     { label: '市值', num: true, cell: (s) => `${n1(s.zsz_yi)}亿` },
                     { label: '板块', cell: (s) => <Tag>{s.sector || '—'}</Tag> },
-                    { label: '封板质量', cell: (s) => <span className="text-[11.5px]">{s.seal || '—'}</span> },
+                    {
+                      // ⚠️ 此列原标「封板质量」并直接渲染 seal —— 但 seal 实测是
+                      //    **封单资金（亿）**（float，1700+ 条全为 float），
+                      //    标成「质量」会让 1.34 被读成某种评分。已改为如实标注。
+                      label: '封单(亿)',
+                      num: true,
+                      cell: (s) => <span className="num text-sub">{n1(s.seal)}</span>,
+                    },
                   ]}
                 />
               </div>

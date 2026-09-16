@@ -14,8 +14,12 @@ export interface RouteDefLike {
   mode?: 'latest' | 'all'
   /** all 模式下只取最新 N 个；jsonl 模式下取尾部 N 行 */
   limit?: number
-  /** 落盘格式，默认 json */
-  format?: 'json' | 'jsonl'
+  /**
+   * 落盘格式，默认 json。
+   * `jsonl` = 按行解析为数组；`text` = **原样返回字符串**（YAML 等非 JSON 格式，
+   * 解析交给消费方 —— 见 `src/features/analytics/lib/task-ledger.ts`）。
+   */
+  format?: 'json' | 'jsonl' | 'text'
   cadence?: 'intraday' | 'daily' | 'manual'
   desc?: string
 }

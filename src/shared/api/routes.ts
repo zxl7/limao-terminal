@@ -37,8 +37,12 @@ export interface RouteDef {
   mode?: 'latest' | 'all'
   /** all 模式下只取**最新** N 个（防止历史无限增长撑爆响应） */
   limit?: number
-  /** 落盘格式。默认 json；`jsonl` 按行解析为数组（原系统账本类文件用） */
-  format?: 'json' | 'jsonl'
+  /**
+   * 落盘格式。默认 json；
+   * `jsonl` 按行解析为数组（原系统账本类文件用）；
+   * `text` 原样返回**字符串**（YAML 等非 JSON 格式，解析交给消费方）。
+   */
+  format?: 'json' | 'jsonl' | 'text'
   /** 刷新节拍：intraday=盘中 30s；daily=日频不轮询；manual=仅手动刷新 */
   cadence?: 'intraday' | 'daily' | 'manual'
   /** 用途说明 */
@@ -61,7 +65,15 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/market/candidates': { file: 'cache/pulse_snapshots/candidates.json',   cadence: 'intraday', desc: '候选池' },
   '/api/theme/rotation':    { file: 'cache/theme_rotation.json',               cadence: 'intraday', desc: '题材轮动·回流预测·5日资金' },
   '/api/theme/series':      { file: 'cache/theme_series.json',                 cadence: 'daily',    desc: '题材多日序列（数据堆叠 Tab 数据源）' },
-  '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'daily',    desc: '题材序列' },
+  // ⚠️ 2026-09-16 状态：**疑似停更**（最后写入 2026-09-03），已被 `/api/theme/series`
+  //    （theme_series.json，当日仍在更新）取代 —— 后者含 dates/daily_totals/
+  //    daily_details/themes/theme_leaders/table_rows 完整结构，
+  //    而本件只有 `{date, themes: string[], updated}` 三个键。
+  //    刻意**不删也不接页面**：① 用户明确「先增量、后统一裁剪」；
+  //    ② 它的停更状态**已由 `/record` 的「文件新鲜度」表自动暴露**（逐路由列龄期、
+  //       >1 天高亮），不需要再为它专门做一块 UI。
+  //    裁剪决策点：若确认不再产出，连同 `sequence` endpoint 一并删除。
+  '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'daily',    desc: '题材序列（⚠️ 疑似停更 · 已被 theme/series 取代 · 仅留档）' },
   '/api/flow/history':      { dir: 'cache/sector_flow_history', pattern: '^sector_flow_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily', desc: '板块资金历史（多日合并）' },
 
   // ══════════════════════════════════════════════════════════════
@@ -312,9 +324,16 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache', pattern: '^lhb_card_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
     desc: '龙虎榜速览卡存档（18:20 独立任务）',
   },
-  '/api/card/verify': {
-    dir: 'cache', pattern: '^verify_card_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
-    desc: '竞价验证卡存档',
+  // ⚠️ 2026-09-16 修正：原 `/api/card/verify` 定义 `dir: 'cache'` + `^verify_card_*.json$`，
+  //    但该目录下**从来没有** verify_card 文件（只有 demo），真身在 wealth_code/cache/ 下、
+  //    名为 `card_YYYYMMDD_HHMMSS.json`，且**与盘后候选卡混存**，靠 title 前缀区分：
+  //      ⚡ 财富密码·竞价验证·增量（09:26 / 盘中重推）
+  //      📊 财富密码·盘后候选·全量（15:37）
+  //    RouteDef 无内容谓词字段，无法按 title 过滤，故**如实命名为「混合卡」**，
+  //    由页面按 title 前缀分组展示。修正后 `npm run data` 由 60/61 → 61/61。
+  '/api/card/mixed': {
+    dir: 'wealth_code/cache', pattern: '^card_\\d{8}_\\d{6}\\.json$', mode: 'all', limit: 12, cadence: 'daily',
+    desc: '财富密码混合卡存档（竞价验证卡 + 盘后候选卡 · 按 title 前缀区分）',
   },
 
   // ══════════════════════════════════════════════════════════════
@@ -339,6 +358,59 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/push/dedup': {
     file: 'cache/push_dedup.json', cadence: 'daily',
     desc: '推送去重状态（10min 同内容去重）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 二十、系统台账与运维（2026-09-16 增量：补齐「后端有产出、前端无路由」的能力）
+  //
+  //     ⛔ 安全铁律 —— config/ 目录**不得整目录暴露**：
+  //        `config/settings.json`（飞书 webhook 全键）与 `config/app_config.yaml`
+  //        （feishu_webhook / BIYING_TOKEN）都含**明文密钥**。
+  //        2026-09-16 实测扫词命中，故此处只加**显式单文件**路由；
+  //        每新增一条前必须先对目标文件扫 webhook|secret|token|password|key。
+  // ══════════════════════════════════════════════════════════════
+  '/api/system/tasks': {
+    file: 'config/tasks.yaml', format: 'text', cadence: 'daily',
+    desc: '自动化任务台账（任务名/骨架/rrule/写回目标 · 原样 YAML 文本，前端只解析所需子集）',
+  },
+  '/api/system/learning': {
+    file: 'config/learning_config.json', cadence: 'daily',
+    desc: '自学习阈值配置（财神-回测的阈值自动调整基准）',
+  },
+  '/api/system/short-spirit': {
+    file: 'config/short_spirit.json', cadence: 'daily',
+    desc: '短线精灵配置（板块共振判定阈值）',
+  },
+  '/api/system/rules': {
+    dir: 'wealth_code/config', pattern: '^.+[.]json$', mode: 'all', cadence: 'daily',
+    desc: '策略规则配置（预期区间 expectation_rules / 接力权重 relay_score / 监管 regulatory）',
+  },
+  '/api/system/engine': {
+    dir: 'cache/pulse_snapshots',
+    pattern: '^(boost_state|pulse_pending|sector_risk_cache|sector_fund_pool)[.]json$',
+    mode: 'all', cadence: 'intraday',
+    desc: '盘中引擎状态（加速状态 / 待推队列 / 板块风险缓存 / 板块资金池）',
+  },
+  '/api/system/backups': {
+    /**
+     * ⛔ 用**前缀白名单**而不是 `^.+[.]json$` 通配 —— 实测该目录含
+     *    `settings.json.bak_20260910_222833`（settings 的备份，**含飞书 webhook 明文**）。
+     *    当前通配恰好不会命中它（结尾是数字），但「恰好安全」不是安全：
+     *    哪天有人把一个 `xxx.json` 的密钥备份丢进来就会直接泄露。
+     *    白名单只放行净值/持仓/AI 决策/学习回滚四类。
+     */
+    dir: 'cache/backups',
+    pattern: '^(nav_|ai_decisions_|learning_rollback_)[^/]*[.](json|jsonl)$',
+    mode: 'all', limit: 20, cadence: 'daily',
+    desc: '系统备份快照（净值/持仓/AI 决策/学习回滚 · 白名单制 · 运维与回滚依据）',
+  },
+  '/api/system/archive-index': {
+    file: 'cache/decision_log/index.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: '决策存档索引（逐日存档件清单 · 黑匣子总目录）',
+  },
+  '/api/promo/backtest': {
+    dir: 'cache/promo', pattern: '^backtest_.+[.]json$', mode: 'all', cadence: 'daily',
+    desc: '晋级量化回测报告（1进2 按板数/按日的历史表现）',
   },
 }
 

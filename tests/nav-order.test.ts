@@ -30,8 +30,21 @@ import { TABS } from '@/app/AppShell'
  *   /api/market/prev        → /record 数据记录
  *   /api/theme/rotation     → /rotation 题材轮动、/reflow 题材回流、/flow 资金流向
  *   /api/audit/log          → /ops 运维审计
+ *   /api/emotion/zt-history → /timeline 日内时间轴（含 `zt_list.fbt` 与 intraday_points）
+ *                             ⚠️ 该页归类为「实时」是**页面级决策**而非路由 cadence 推导：
+ *                             zt-history 路由本身是 daily，但页面读的 audit.jsonl 是
+ *                             intraday，且它的用途是盘中随盘推进地看「今天怎么走到现在」。
  */
-const REALTIME_TABS = ['/', '/rotation', '/mainline', '/reflow', '/flow', '/record', '/ops'] as const
+const REALTIME_TABS = [
+  '/',
+  '/timeline',
+  '/rotation',
+  '/mainline',
+  '/reflow',
+  '/flow',
+  '/record',
+  '/ops',
+] as const
 
 /** 段序 —— 实时段置首是本次改动的核心，顺序即契约 */
 const GROUP_ORDER = ['实时', '盘面', '题材', '决策', '数据'] as const
@@ -88,10 +101,21 @@ describe('导航顺序 —— 实时优先', () => {
       'utf8',
     )
     const intraday = [...src.matchAll(/cadence:\s*'intraday'/g)].length
-    // 8 = latest / prev / auction / signals / feedback / candidates / theme.rotation / audit.log
+    /**
+     * 9 = latest / prev / auction / signals / feedback / candidates /
+     *     theme.rotation / audit.log / system.engine
+     *
+     * ⚠️ 2026-09-16 审计记录（新增 `system.engine` 后重跑本锁）：
+     *    「实时段」的成员判定**不是**「页面是否含 intraday 路由」，而是两条准则的交集 ——
+     *    ① 实时性；② 短线交易优先级。`/system`（系统台账）虽然含一条 intraday 路由
+     *    （盘中引擎状态 · 60s 刷新），但页面主体是**日频配置与台账**；按准则 ②
+     *    它不该出现在导航最前，故留在「数据」段。
+     *    → 这条锁有意保持「数量」而非「映射」：cadence 是**路由级**属性，
+     *      导航段是**页面级**决策，两者本来就不是一一对应。
+     */
     expect(
       intraday,
       'intraday 路由数量变了 —— 请重新跑「页面 × cadence」审计，确认「实时」段是否需要增删成员',
-    ).toBe(8)
+    ).toBe(9)
   })
 })
