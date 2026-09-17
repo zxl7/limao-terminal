@@ -16,7 +16,14 @@ export { analyticsQueries } from './api/queries'
 export { DataTable, StatPair, Tag, SegTabs, type Column } from './components/Table'
 
 // 时间轴分钟槽卡片（固定宽卡 + 固定 CSS grid · 与 React 无关，可单测）
-export { TimelineSlotCard, SLOT_WIDTH, SLOT_GAP } from './components/TimelineSlotCard'
+export {
+  TimelineSlotCard,
+  TimelineLinkageCard,
+  TimelineMergedCard,
+  SLOT_WIDTH,
+  SLOT_HEIGHT,
+  SLOT_GAP,
+} from './components/TimelineSlotCard'
 
 // 飞书卡片存档阅读器（复盘/盘前/机构/脉冲卡共用）
 export { CardArchiveView, cardDate, type ArchiveCard } from './components/CardArchiveView'
@@ -36,16 +43,22 @@ export {
   clockMin,
   cumulativeByMarks,
   fbtMin,
+  groupTimelineSlots,
+  LINKAGE_MIN_SECTORS,
   MARK_LABELS,
   MARKS,
   minToClock,
   SHAPE_META,
+  SLOT_VISIBLE_SECTORS,
+  sortIntradaySectorEvents,
+  sortSlotSectors,
   timelineNodeKey,
   type EventNode,
   type PushNode,
   type SectorNode,
   type SectorShape,
   type SingleNode,
+  type TimelineBlock,
   type TimelineNode,
   type TimelineSlot,
   type TimelineSlotSector,
@@ -54,10 +67,13 @@ export {
 // 题材级爆发内核（解析原系统 event_log 的题材结论 · 纯函数，可单测）
 export {
   buildThemeBursts,
+  isLowStrengthSlot,
   normName,
   normTheme,
   parseThemeEvents,
   sameTheme,
+  slotThemeMarks,
+  type SlotThemeMarks,
   type StockThemeTag,
   type ThemeBurst,
   type ThemeBurstResult,

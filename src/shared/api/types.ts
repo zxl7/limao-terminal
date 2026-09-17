@@ -2192,3 +2192,48 @@ export interface PromoBacktest {
   rows: PromoBacktestRow[]
   ts: string
 }
+
+/**
+ * 盘中情绪时间轴事件（`cache/intraday_timeline_<YYYYMMDD>.jsonl` · `intraday_timeline.py` 产出）。
+ *
+ * ⛔ 这是**盘中逐事件**记录（append-only），与收盘口径的 `zt_list` 完全不同：
+ *   它同时记录**上涨侧**（涨停总数 / 板块走强 / 个股涨停）与**下跌侧**
+ *   （杀跌板块 / 新跌停 / 新炸板），用于还原「整个交易时间的情绪起落」。
+ *
+ * ⚠️ 诚实边界：`stock_up` 只覆盖「板块领涨精选」（非全量涨停池）；
+ *   个股下跌目前**只有跌停**（系统未落盘个股跌幅榜）。
+ */
+export interface IntradayTimelineEvent {
+  /** 记录时刻（真实交易时间 · `YYYY-MM-DD HH:MM:SS`） */
+  at: string
+  /** 事件类型 */
+  kind:
+    | 'zt_total'
+    | 'sector_up'
+    | 'stock_up'
+    | 'broken_new'
+    | 'limit_down_new'
+    | 'sector_down'
+    | string
+  /** 板块 / 个股名称（`zt_total` 无） */
+  name?: string | null
+  /** 个股代码（`stock_up`） */
+  code?: string | null
+  /** 个股所属板块（`stock_up`） */
+  sector?: string | null
+  /** 涨幅 %（`stock_up` / `sector_down`） */
+  pct?: number | null
+  /** 板数（`stock_up` · 可能为空串/缺省） */
+  boards?: string | number | null
+  /** 板块当刻涨停家数（`sector_up`） */
+  zt_count?: number | null
+  /** 家数增量（`sector_up`）/ 涨停总数增量（`zt_total`） */
+  delta?: number | null
+  /** 涨停总数（`zt_total`） */
+  total?: number | null
+  /** 主力净流入（元 · `sector_down`） */
+  inflow?: number | null
+  /** 板块龙头（`sector_up`） */
+  leader?: unknown
+  [k: string]: unknown
+}

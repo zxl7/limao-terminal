@@ -138,6 +138,10 @@ export const ROUTES: Record<string, RouteDef> = {
     file: 'cache/yesterday_zt.json', cadence: 'daily',
     desc: '昨日涨停池（**唯一涨停权威** · record_zt_snapshot 产出）',
   },
+  '/api/intraday/timeline': {
+    dir: 'cache', pattern: '^intraday_timeline_\\d{8}\\.jsonl$', mode: 'latest', format: 'jsonl', cadence: 'intraday',
+    desc: '盘中情绪时间轴（**逐事件 append-only** · up/down 双向 · intraday_timeline.py 产出）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 七、财富密码决策链（选股 → 竞价 → 净值闭环）

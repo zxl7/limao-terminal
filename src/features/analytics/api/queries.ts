@@ -109,6 +109,15 @@ export const analyticsQueries = {
       staleTime: 120_000,
     }),
 
+  /** 盘中情绪时间轴（当日逐事件 · 盘中实时）—— 盘中轮询，收盘后自然不再变化 */
+  intradayTimeline: () =>
+    queryOptions({
+      queryKey: ['intraday', 'timeline'] as const,
+      queryFn: api.intradayTimeline,
+      refetchInterval: intradayPollMs,
+      staleTime: 30_000,
+    }),
+
   // ══════════════ 财富密码决策链 ══════════════
   /** 选股候选存档（近 3 期） */
   decisionCandidates: () =>

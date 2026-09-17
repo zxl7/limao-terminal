@@ -115,17 +115,29 @@ export function readRoute(dataRoot, def) {
     const re = new RegExp(def.pattern)
     const files = names.filter((f) => re.test(f)).sort()
 
+    /**
+     * ⛔ 2026-09-17 修：形态②（目录 + pattern）此前**忽略 `format`**，对 JSONL 文件直接
+     * `JSON.parse` 必然抛错 → 路由被判「缺失」（实测 `/api/intraday/timeline`）。
+     * 现与形态① 对齐：`jsonl` 按行解析；`text` 原样返回。
+     */
+    const readOne = (f) => {
+      const raw = fs.readFileSync(path.join(dir, f), 'utf-8')
+      if (def.format === 'jsonl') return parseJsonl(raw, def.limit)
+      if (def.format === 'text') return raw
+      return JSON.parse(raw)
+    }
+
     if (def.mode === 'all') {
       return (def.limit ? files.slice(-def.limit) : files).map((f) => {
         try {
-          return { file: f, data: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')) }
+          return { file: f, data: readOne(f) }
         } catch {
           return { file: f, data: null }
         }
       })
     }
     const last = files.at(-1)
-    return last ? JSON.parse(fs.readFileSync(path.join(dir, last), 'utf-8')) : null
+    return last ? readOne(last) : null
   }
 
   return null

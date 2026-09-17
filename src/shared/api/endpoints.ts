@@ -70,6 +70,7 @@ import type {
   WeeklyZtMap,
   ZtHistoryDay,
   ZtPoolSnapshot,
+  IntradayTimelineEvent,
 } from './types'
 
 /**
@@ -111,7 +112,7 @@ export interface RouteTypeMap {
   '/api/emotion/zt-history': DatedFile<ZtHistoryDay>[]
   '/api/emotion/memory': DatedFile<MarketMemory>[]
   '/api/zt/yesterday': ZtPoolSnapshot
-
+  '/api/intraday/timeline': IntradayTimelineEvent[]
   // ── 七、财富密码决策链 ──
   // ⚠️ 这三条返回的都是**每日决策档案**（wealth_code_candidates_v1），
   //    不是「候选池」—— 曾因文件名含 candidates 而误绑 CandidatesFile，
@@ -265,6 +266,8 @@ export const api = {
   emotionMemory: () => fetchRoute('/api/emotion/memory'),
   /** 昨日涨停池（唯一涨停权威） */
   ztYesterday: () => fetchRoute('/api/zt/yesterday'),
+  /** 盘中情绪时间轴（当日逐事件 append-only · up/down 双向） */
+  intradayTimeline: () => fetchRoute('/api/intraday/timeline'),
 
   // ── 七、财富密码决策链 ──
   /** 每日决策档案存档（近 3 期 · 单份约 100KB） */

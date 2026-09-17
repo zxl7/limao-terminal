@@ -1,4 +1,4 @@
-import type { MarketMemory, ZtPoolStock } from '@/shared/api'
+import type { IntradayTimelineEvent, MarketMemory, ZtPoolStock } from '@/shared/api'
 
 /**
  * 日内炒作时间轴的**纯计算内核** —— 与 React 无关，可单测。
@@ -292,8 +292,79 @@ export interface TimelineSlotSector {
   dayTotal: number | null
 }
 
-/** 时间轴的一个「分钟槽」—— 页面的一个固定宽卡 */
-export interface TimelineSlot {
+/**
+ * 槽内「行业分组块」按**强度降序**排列 —— 用户 2026-09-17：
+ * 「卡片内的各板块做好强度的排序，比如说这个板块很强，那么它就排第一个」。
+ *
+ * ## 强度口径 = **既有字段的排序**，⛔ 不新造阈值 / 不引入权重系数
+ *
+ * | 序 | 依据 | 理由 |
+ * |---|---|---|
+ * | ① | `count` 当刻封板家数 降序 | 该分钟最直接的板块强度 |
+ * | ② | 组内 `max(boards)` 降序 | 板块高度（有无高板龙头） |
+ * | ③ | `dayTotal` 全天总数 降序 | 广度兜底 |
+ * | ④ | `sector` 名 升序 | 稳定 tie-break（同输入必同输出） |
+ *
+ * ⚠️ **纯函数**：返回**新数组**、不改动入参；排序**不丢不重**（守恒，测试锁）。
+ * 强、弱两端都保留 —— 弱板块只是排在后面，**不因排序被删**。
+ */
+export function sortSlotSectors(
+  groups: readonly TimelineSlotSector[],
+): TimelineSlotSector[] {
+  // ⚠️ 对缺失字段健壮：`boards` / `count` 理论上必有，但投影数据可能缺 →
+  // 用 `Number(x) || 0` 兜底，⛔ 绝不让 NaN 进入比较（NaN 比较恒 false → 排序退化为不稳定）
+  const maxBoards = (g: TimelineSlotSector) =>
+    g.stocks.reduce((m, s) => Math.max(m, Number(s.boards) || 0), 0)
+  return [...groups].sort(
+    (a, b) =>
+      (b.count || 0) - (a.count || 0) ||
+      maxBoards(b) - maxBoards(a) ||
+      (b.dayTotal ?? 0) - (a.dayTotal ?? 0) ||
+      a.sector.localeCompare(b.sector, 'zh-Hans-CN'),
+  )
+}
+
+/**
+ * 卡内**直接展示**的「板块」条目上限 —— 用户 2026-09-17：
+ * 「卡片给我做成显示最多显示 3 个板块，高度 240px，可以滚动」。
+ *
+ * 适用于**两类板块条目**（各自独立计数上限）：
+ *   ① 行业分组块（`TimelineSlotSector`）；
+ *   ② 盘中**板块级**事件（`sector_up` 板块走强 / `sector_down` 杀跌板块）。
+ *
+ * ⛔ 超出部分**不删除**：在标注「其余 N 个板块」之后照常渲染（下拉可见）——
+ * 遵守系统铁律「不丢不重」。
+ */
+export const SLOT_VISIBLE_SECTORS = 3
+
+/**
+ * 盘中**板块级**事件（`sector_up` / `sector_down`）按**强度降序**排序。
+ *
+ * | 方向 | 强度口径（⛔ 全用既有字段，不新造阈值） |
+ * |---|---|
+ * | `up`（板块走强） | `zt_count` 当刻板块涨停家数 降序 → `delta` 环比增量 降序 |
+ * | `down`（杀跌板块） | `pct` 跌幅**最负在前** → `inflow` 主力净流出**最负在前** |
+ *
+ * 末尾一律以 `name` 升序做**稳定 tie-break**（同输入必同输出、不依赖 V8 排序稳定性）。
+ * ⚠️ 纯函数：返回**新数组**，不改动入参、**不丢元素**（数量守恒，测试锁）。
+ */
+export function sortIntradaySectorEvents(
+  events: readonly IntradayTimelineEvent[],
+  dir: 'up' | 'down',
+): IntradayTimelineEvent[] {
+  const nm = (e: IntradayTimelineEvent) => String(e.name ?? '')
+  return [...events].sort((a, b) =>
+    dir === 'up'
+      ? (Number(b.zt_count) || 0) - (Number(a.zt_count) || 0) ||
+        (Number(b.delta) || 0) - (Number(a.delta) || 0) ||
+        nm(a).localeCompare(nm(b), 'zh-Hans-CN')
+      : (Number(a.pct) || 0) - (Number(b.pct) || 0) ||
+        (Number(a.inflow) || 0) - (Number(b.inflow) || 0) ||
+        nm(a).localeCompare(nm(b), 'zh-Hans-CN'),
+  )
+}
+
+/** 时间轴的一个「分钟槽」—— 页面的一个固定宽卡 */export interface TimelineSlot {
   /** 分钟（槽的排序键，也是稳定键的一部分） */
   at: number
   /** 按行业分组的当刻封板（同名行业同分钟合并一组） */
@@ -308,6 +379,14 @@ export interface TimelineSlot {
   pushTo: number | null
   /** 稳定身份键：类型 + 时间 + 内容身份（板块/单票/事件/推送）+ 必要重复序号 */
   key: string
+  /**
+   * **盘中逐事件 · 涨侧**（来自 `intraday_timeline_<date>.jsonl`）。
+   * ⛔ 与 `sectors`/`singles` 不同：那是**收盘口径**（首封时刻），这里是**盘中真实时刻**。
+   * 二者**按同一分钟合并进同一张卡**（2026-09-17 用户「合进我的时间轴里面」）。
+   */
+  intradayUp: IntradayTimelineEvent[]
+  /** **盘中逐事件 · 跌侧**（杀跌板块 / 新跌停 / 新炸板） */
+  intradayDown: IntradayTimelineEvent[]
 }
 
 /**
@@ -319,7 +398,15 @@ export interface TimelineSlot {
  *   · **顺序** —— slots 按 `at` 升序；
  *   · **唯一键** —— 槽键 `slot:${at}` 互不重复（每分钟至多一个槽）。
  */
-export function buildTimelineSlots(nodes: TimelineNode[]): TimelineSlot[] {
+export function buildTimelineSlots(
+  nodes: TimelineNode[],
+  /**
+   * **盘中逐事件**（`intraday_timeline_<date>.jsonl`）—— 2026-09-17 用户
+   * 「合进我的时间轴里面」：按 `at` 的**分钟**并入同一批槽（同分钟合并）。
+   * ⛔ 调用方须**只传与所选日期同一天**的事件（跨日并入会造成串线）。
+   */
+  intraday: IntradayTimelineEvent[] = [],
+): TimelineSlot[] {
   const slots = new Map<number, TimelineSlot>()
   /** 行业名 → 全天形态（来自 SectorNode），用于小注，不冒充当刻爆发 */
   const dayShapeBySector = new Map<string, { shape: SectorShape; span: number; total: number }>()
@@ -327,7 +414,10 @@ export function buildTimelineSlots(nodes: TimelineNode[]): TimelineSlot[] {
   const ensure = (at: number): TimelineSlot => {
     let s = slots.get(at)
     if (!s) {
-      s = { at, sectors: [], singles: [], events: null, pushes: null, pushTo: null, key: `slot:${at}` }
+      s = {
+        at, sectors: [], singles: [], events: null, pushes: null, pushTo: null,
+        intradayUp: [], intradayDown: [], key: `slot:${at}`,
+      }
       slots.set(at, s)
     }
     return s
@@ -378,7 +468,131 @@ export function buildTimelineSlots(nodes: TimelineNode[]): TimelineSlot[] {
     }
   }
 
+  // ── 盘中逐事件：按分钟并入同一批槽（2026-09-17 用户「合进我的时间轴里面」）──
+  const DOWN = new Set(['sector_down', 'limit_down_new', 'broken_new'])
+  for (const e of intraday ?? []) {
+    const t = clockMin(String(e.at ?? '').slice(11, 16))
+    if (t == null) continue
+    const s = ensure(t)
+    ;(DOWN.has(String(e.kind)) ? s.intradayDown : s.intradayUp).push(e)
+  }
+
   return [...slots.values()].sort((a, b) => a.at - b.at)
+}
+
+/**
+ * ⚠️⚠️ **待用户确认的业务阈值**（2026-09-17）—— 不要擅自当作已定规则。
+ *
+ * 「多板块联动」缺少权威定义。这里只做了**最保守的可推导口径**：
+ *   · 同一分钟；
+ *   · 每个行业当刻封板数 ≥ 既有爆发门槛 `BURST_MIN_STOCKS`（复用，不新造）；
+ *   · 达标行业数 ≥ 本常量 = 「多个」的字面最小读法。
+ *
+ * ⛔ 时间窗口（是否允许相邻分钟）、板块数下限、是否要求共同题材/产业链关系，
+ *    均由用户确认后调整；确认前**不得**据此把它当作交易信号或推送依据。
+ */
+export const LINKAGE_MIN_SECTORS = 2
+
+/**
+ * 展示分块 —— 三类展示模型的载体（页面按此渲染，**不再是「每分钟一张卡」**）。
+ *
+ * | 类别 | 判定 | 展示 |
+ * |---|---|---|
+ * | `linkage` | 同刻 ≥`LINKAGE_MIN_SECTORS` 个行业各达爆发门槛 | 聚合成一张、底色更深 |
+ * | `normal` | 含个股但未达联动门槛 | 普通平卡（不冠「爆发」） |
+ * | `merged` | 连续若干分钟**纯消息**（无个股，仅事件/推送） | 合并成一张、标明板块数与名称 |
+ *
+ * ⛔ 优先级：`linkage` > `normal` > `merged`。联动块**绝不**被低频合并吞掉，
+ *    以满足「不因低频合并策略延迟」。
+ */
+export type TimelineBlock =
+  | { kind: 'linkage'; at: number; to: number; slots: TimelineSlot[]; sectors: string[]; key: string }
+  | { kind: 'normal'; at: number; slot: TimelineSlot; key: string }
+  | { kind: 'merged'; at: number; to: number; slots: TimelineSlot[]; sectors: string[]; key: string }
+
+/** 槽内「当刻封板」达既有爆发门槛的行业名 */
+function slotLinkageSectors(s: TimelineSlot): string[] {
+  return s.sectors.filter((g) => g.count >= BURST_MIN_STOCKS).map((g) => g.sector)
+}
+
+/** 纯消息槽：无任何个股，仅有事件/推送 —— 低频合并的**默认**候选（页面会用题材感知版覆盖） */
+function isMessageOnly(s: TimelineSlot): boolean {
+  return s.sectors.length === 0 && s.singles.length === 0 && (!!s.events?.length || !!s.pushes?.length)
+}
+
+/** 合并块要标注的「板块名称」——取当刻推送的题材名（事件文案不参与命名） */
+function mergedNames(s: TimelineSlot): string[] {
+  return (s.pushes ?? []).map((p) => p.name).filter((n): n is string => !!n)
+}
+
+/**
+ * 把分钟槽序列折叠成展示分块序列。
+ *
+ * @param isLowStrength 判定「**低强度槽**」—— 只有低强度槽才允许低频合并。
+ *   默认 = 纯消息槽（无个股即算）。⚠️ 页面会传入**题材感知**判定 `isLowStrengthSlot`：
+ *   **含题材爆发/龙头易主/衰竭的槽 = 高强度，不得合并** ——
+ *   否则「题材爆发」会被吞进「📎 低频合并」卡里，且**无个股的日子（如盘中当日）
+ *   会整日塌成一张合并卡**，与有股的日子长得完全不一样（用户 2026-09-17 抓包「盘中一个样式、收盘一个样式」）。
+ *
+ * 不变量（测试锁）：
+ *  ① **不丢不重** —— 每个输入槽恰好出现在**一个** block 里；
+ *  ② **顺序** —— blocks 的 `at` 单调不减；
+ *  ③ **块键唯一**。
+ */
+export function groupTimelineSlots(
+  slots: TimelineSlot[],
+  isLowStrength: (s: TimelineSlot) => boolean = isMessageOnly,
+): TimelineBlock[] {
+  const blocks: TimelineBlock[] = []
+  let mergeRun: TimelineSlot[] = []
+  let linkRun: TimelineSlot[] = []
+
+  const flushMerged = () => {
+    if (mergeRun.length === 0) return
+    const first = mergeRun[0]
+    const last = mergeRun[mergeRun.length - 1]
+    blocks.push({
+      kind: 'merged',
+      at: first.at,
+      to: last.at,
+      slots: mergeRun,
+      sectors: [...new Set(mergeRun.flatMap(mergedNames))],
+      key: `merged:${first.at}-${last.at}`,
+    })
+    mergeRun = []
+  }
+  const flushLinkage = () => {
+    if (linkRun.length === 0) return
+    const first = linkRun[0]
+    const last = linkRun[linkRun.length - 1]
+    blocks.push({
+      kind: 'linkage',
+      at: first.at,
+      to: last.at,
+      slots: linkRun,
+      sectors: [...new Set(linkRun.flatMap(slotLinkageSectors))],
+      key: `linkage:${first.at}-${last.at}`,
+    })
+    linkRun = []
+  }
+
+  for (const slot of slots) {
+    if (slotLinkageSectors(slot).length >= LINKAGE_MIN_SECTORS) {
+      flushMerged()
+      linkRun.push(slot)
+      continue
+    }
+    flushLinkage()
+    if (isLowStrength(slot)) {
+      mergeRun.push(slot)
+      continue
+    }
+    flushMerged()
+    blocks.push({ kind: 'normal', at: slot.at, slot, key: `normal:${slot.key}` })
+  }
+  flushLinkage()
+  flushMerged()
+  return blocks
 }
 
 /** 推进曲线的时间刻度（跳过午休：11:30 → 13:00 之间不插刻度） */export const MARKS: number[] = [

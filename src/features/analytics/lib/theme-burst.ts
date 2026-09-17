@@ -342,6 +342,97 @@ export function buildThemeBursts(input: {
 }
 
 /**
+ * **时间节点上的题材标记**（2026-09-17 用户明确诉求）：
+ * 「时间轴 = 每个时间节点哪些题材爆发、哪些题材衰竭」。
+ *
+ * ## 四类来源（全部来自原系统现成结论，本函数只解析）
+ *
+ * | 标记 | 来源形态 | 语义 |
+ * |---|---|---|
+ * | 🚀 爆发 | `新主线崛起：{题材} 涨停{n}只，龙头 {名}` | 该题材在这一刻被系统认定爆发 |
+ * | 🔁 龙头易主 | `{题材} 龙头切换：{旧} → {新}` | **中性** —— 题材延续但换龙 |
+ * | ⚠️ 衰竭 | `关注板块集体重挫：{板块列表}` | 这些板块/题材集体转弱 |
+ * | 📤 推送 | `pushed_topics`（该刻同分钟合并） | 题材被系统推送过（活跃证据，不带方向） |
+ *
+ * ⛔⛔ **龙头易主 ≠ 衰竭**（2026-09-17 实测纠正）：切换只说明**领导权变化**，
+ * 题材往往仍在走强；把它标成「衰竭」是**误导**。故单列一类、不着涨跌色。
+ *
+ * ⛔ 时间一律是「**系统观测时点**」（卡片生成时刻），**不是事件发生时刻** —— UI 必须标明。
+ * ⛔ 只标题材层；`情绪`/`广度` 类事件**不属于题材层**，原样留给事件区展示。
+ */
+export interface SlotThemeMarks {
+  /** 该时刻**爆发**的题材 */
+  burst: Array<{ theme: string; count: number | null; leader: string | null }>
+  /** 该时刻**龙头易主**的题材（中性：题材延续、换龙） */
+  switched: Array<{ theme: string; from: string | null; to: string | null }>
+  /** 该时刻**衰竭**的板块/题材（原系统「集体重挫」） */
+  fade: Array<{ label: string }>
+  /** 该时刻被推送的题材（活跃证据） */
+  pushed: Array<{ name: string; pushCount: number | null }>
+}
+
+export function slotThemeMarks(
+  events: MarketMemory['event_log'] | null | undefined,
+  pushes: MarketMemory['pushed_topics'] | null | undefined,
+): SlotThemeMarks {
+  const parsed = parseThemeEvents(events ?? [])
+
+  const burst: SlotThemeMarks['burst'] = []
+  const switched: SlotThemeMarks['switched'] = []
+  const fade: SlotThemeMarks['fade'] = []
+
+  for (const e of parsed) {
+    if (e.kind === 'rise') {
+      burst.push({ theme: e.theme, count: e.count, leader: e.leader })
+    } else if (e.kind === 'plunge') {
+      const names = (e.detail ?? '')
+        .split(/[、,，]/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+      for (const n of names) fade.push({ label: n })
+    } else if (e.kind === 'switch') {
+      switched.push({ theme: e.theme, from: e.from, to: e.leader })
+    }
+  }
+
+  const pushed = (pushes ?? [])
+    .filter((p) => !!p.name)
+    .map((p) => ({ name: p.name, pushCount: p.push_count ?? null }))
+
+  return { burst, switched, fade, pushed }
+}
+
+/**
+ * 「该槽是否**低强度**」—— 只有低强度槽才允许被「低频合并」吞并。
+ *
+ * ## 为什么必须题材感知（2026-09-17 用户抓包「盘中一个样式、收盘一个样式」）
+ *
+ * 只用「无个股」当低强度会导致：**盘中当日没有涨停池 → 每个时刻都无个股 → 整日塌成一张合并卡**，
+ * 与有股的日子长得完全不一样。而实际上这些时刻里**题材爆发/衰竭本身就是高强度信号**。
+ *
+ * 故判定为：**无个股 ∧ 无任何题材标记（爆发/易主/衰竭）∧ 有事件或推送**。
+ *   · 含题材爆发 → **高强度，必须单独成卡**（它是本页要回答的核心）；
+ *   · 只有弱消息（无题材层内容）→ 才可合并。
+ *
+ * 参数用**结构类型**而非 `TimelineSlot` —— 避免 `timeline.ts ↔ theme-burst.ts` 循环依赖。
+ */
+export function isLowStrengthSlot(s: {
+  sectors: readonly unknown[]
+  singles: readonly unknown[]
+  events: MarketMemory['event_log'] | null
+  pushes: MarketMemory['pushed_topics'] | null
+  intradayUp?: readonly unknown[]
+  intradayDown?: readonly unknown[]
+}): boolean {
+  if (s.sectors.length > 0 || s.singles.length > 0) return false
+  // 盘中逐事件（涨停/板块走强/杀跌/炸板/跌停）都是**真实市场事件** → 不得被合并吞掉
+  if ((s.intradayUp?.length ?? 0) > 0 || (s.intradayDown?.length ?? 0) > 0) return false
+  const m = slotThemeMarks(s.events, s.pushes)
+  if (m.burst.length > 0 || m.switched.length > 0 || m.fade.length > 0) return false
+  return !!s.events?.length || !!s.pushes?.length
+}
+
+/**
  * ⛔ 口径边界（**界面上必须如实说明**）
  *
  * 「题材爆发榜」的题材名与家数**来自原系统 `event_log`**（系统自己算好的结论），
