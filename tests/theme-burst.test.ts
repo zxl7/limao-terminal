@@ -156,7 +156,6 @@ describe('龙头判定 —— 反复易主时必须取「最后一次」的落�
     })
     const t = r.themes[0]
     expect(t.currentLeader, '取成了第一个 leader（上一任龙头）').toBe('闽东电力')
-    expect(t.switchCount).toBe(3)
     expect(t.isNewMainline).toBe(true)
     expect(t.riseCount).toBe(3)
   })
@@ -192,7 +191,17 @@ describe('龙头判定 —— 反复易主时必须取「最后一次」的落�
       stocks: NO_STOCKS,
     })
     expect(r.themes[0].currentLeader).toBe('华脉科技')
-    expect(r.themes[0].switchCount).toBe(0)
+  })
+
+  it('⛔ 「龙头切换」不再计入任何展示字段（概念已废弃）', () => {
+    const r = buildThemeBursts({
+      events,
+      pushes: NO_PUSHES,
+      hotSpots: NO_SPOTS,
+      stocks: NO_STOCKS,
+    })
+    // ⛔ 类型层已删除 `switchCount`（编译期即挡住回加）
+    expect('switchCount' in r.themes[0]).toBe(false)
   })
 })
 
@@ -312,5 +321,52 @@ describe('风险层', () => {
     expect(r.risks[0].sectors).toEqual(['通信线缆及配套', '印制电路板'])
     // 重挫**不得**混进题材榜
     expect(r.themes).toEqual([])
+  })
+})
+
+/**
+ * 「初次爆发」与「反复」的时刻序列（用户 2026-09-17：
+ * 「题材的初次爆发，和反复加强也要显示在时间轴上呀，你放一个【题材爆发】时间区间没有意义」）。
+ *
+ * ⛔ 实测依据（4 个交易日）：`rise`（新主线崛起）**每题材每天只出现一次**
+ *   （09-16 4 个题材 / 09-15 2 个 / 09-14 1 个，重复 0 次）→ 它就是「初次爆发」；
+ *   同题材的后续带时刻记录只有 `switch` 类 → 那才是「反复」。
+ *   ⛔ 故**不能用「at~to 区间」**表达：区间看不出几点爆的、后面几点又动过。
+ */
+describe('题材观测时刻序列（替代无意义的区间）', () => {
+  const DAY: Ev[] = [
+    ev('10:57', '新主线崛起：福建自贸/海西概念 涨停3只，龙头 漳州发展', '福建自贸/海西概念'),
+    ev('11:02', '福建自贸/海西概念 龙头切换：漳州发展 → 闽东电力', '福建自贸/海西概念'),
+    ev('13:00', '福建自贸/海西概念 龙头切换：闽东电力 → 福建金森', '福建自贸/海西概念'),
+    ev('13:01', '福建自贸/海西概念 龙头切换：福建金森 → 闽东电力', '福建自贸/海西概念'),
+  ]
+
+  it('points 按时间升序，且包含该题材当日每一条事件', () => {
+    const r = buildThemeBursts({
+      events: DAY,
+      pushes: NO_PUSHES,
+      hotSpots: NO_SPOTS,
+      stocks: NO_STOCKS,
+    })
+    const t = r.themes[0]
+    expect(t.points).toHaveLength(DAY.length)
+    const ats = t.points.map((p) => p.at)
+    expect([...ats].sort((a, b) => a - b)).toEqual(ats) // 升序
+    expect(t.points.some((p) => p.kind === 'rise')).toBe(true) // 含初次爆发
+    expect(t.points.some((p) => p.kind === 'switch')).toBe(true) // 含反复
+    // at / to 仍与序列首末一致（向后兼容）
+    expect(t.at).toBe(ats[0])
+    expect(t.to).toBe(ats[ats.length - 1])
+  })
+
+  it('⛔ 只有一条事件的题材：points 长度为 1（没有伪造「反复」）', () => {
+    const r = buildThemeBursts({
+      events: [RISE],
+      pushes: NO_PUSHES,
+      hotSpots: NO_SPOTS,
+      stocks: NO_STOCKS,
+    })
+    expect(r.themes[0].points).toHaveLength(1)
+    expect(r.themes[0].points[0].kind).toBe('rise')
   })
 })

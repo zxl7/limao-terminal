@@ -1,4 +1,6 @@
 import type { IntradayTimelineEvent, MarketMemory, ZtPoolStock } from '@/shared/api'
+import { round2, type MaybeNum } from '@/shared/lib'
+import { emotionState, eventTier } from './event-text'
 
 /**
  * 日内炒作时间轴的**纯计算内核** —— 与 React 无关，可单测。
@@ -364,7 +366,13 @@ export function sortIntradaySectorEvents(
   )
 }
 
-/** 时间轴的一个「分钟槽」—— 页面的一个固定宽卡 */export interface TimelineSlot {
+/**
+ * 时间轴的一个「分钟槽」—— 页面的一个固定宽卡。
+ *
+ * ⛔ 注意 `.at` 只是**排序键与槽键**：槽内每条记录（个股 / 事件）各有自己的发生时刻，
+ * 「同槽」= 同一分钟，不代表同一时刻。
+ */
+export interface TimelineSlot {
   /** 分钟（槽的排序键，也是稳定键的一部分） */
   at: number
   /** 按行业分组的当刻封板（同名行业同分钟合并一组） */
@@ -387,6 +395,15 @@ export function sortIntradaySectorEvents(
   intradayUp: IntradayTimelineEvent[]
   /** **盘中逐事件 · 跌侧**（杀跌板块 / 新跌停 / 新炸板） */
   intradayDown: IntradayTimelineEvent[]
+  /**
+   * `events` 中**默认折叠**的下标（升序）—— 机器噪声，见 `event-text.ts` 的 `eventTier`。
+   *
+   * ⛔ **折叠 ≠ 删除**：`events` 数组**一条不改**，被折叠的仍渲染在「另有 N 条」的展开区里，
+   * 悬停明细中**一律全量展开**。
+   * ⛔ 判定必须按**全日时间顺序**累积（「情绪状态本日首次出现」要跨分钟才知道），
+   * 故在 `buildTimelineSlots` 里算好；缺失 = 不折叠（测试 fixture 的默认态）。
+   */
+  foldedIdx?: number[]
 }
 
 /**
@@ -406,6 +423,13 @@ export function buildTimelineSlots(
    * ⛔ 调用方须**只传与所选日期同一天**的事件（跨日并入会造成串线）。
    */
   intraday: IntradayTimelineEvent[] = [],
+  /**
+   * 展示闸门开关（⛔ 可逆，默认开）。
+   *
+   * `foldNoise: true` → 按 `eventTier` 标出 `foldedIdx`（默认折叠机器噪声）；
+   * `false` → **完全不折叠**（回到「逐条全列」的旧行为，用于对照与回退）。
+   */
+  opts: { foldNoise?: boolean } = {},
 ): TimelineSlot[] {
   const slots = new Map<number, TimelineSlot>()
   /** 行业名 → 全天形态（来自 SectorNode），用于小注，不冒充当刻爆发 */
@@ -477,7 +501,27 @@ export function buildTimelineSlots(
     ;(DOWN.has(String(e.kind)) ? s.intradayDown : s.intradayUp).push(e)
   }
 
-  return [...slots.values()].sort((a, b) => a.at - b.at)
+  const sorted = [...slots.values()].sort((a, b) => a.at - b.at)
+
+  // ── 展示闸门：标出「默认折叠」的机器噪声事件（⛔ 折叠 ≠ 删除，`events` 一条不改）──
+  // ⛔ 必须按**全日时间顺序**累积情绪状态：实测一天最多 14 条情绪转移、分散在不同分钟，
+  //    「本日首次出现」只有在扫完整天之后才判得准；单卡内去重等于没去重。
+  if (opts.foldNoise !== false) {
+    const seenStates = new Set<string>()
+    for (const slot of sorted) {
+      const events = slot.events ?? []
+      if (events.length > 0) {
+        const folded: number[] = []
+        events.forEach((e, i) => {
+          if (eventTier(e, seenStates) === 'noise') folded.push(i)
+          const st = emotionState(e.event)
+          if (st != null) seenStates.add(st)
+        })
+        if (folded.length > 0) slot.foldedIdx = folded
+      }
+    }
+  }
+  return sorted
 }
 
 /**
@@ -605,6 +649,130 @@ export const MARK_LABELS: string[] = MARKS.map(minToClock)
 /** 按首封时刻累计的涨停家数（推进曲线主干） */
 export function cumulativeByMarks(mins: number[], marks: number[] = MARKS): number[] {
   return marks.map((mk) => mins.filter((m) => m <= mk).length)
+}
+
+/**
+ * 实时「涨停 / 跌停 / 炸板率」时间序列 —— 由盘中情绪时间轴
+ *（`intraday_timeline_<date>.jsonl`）的逐事件推导，供时间轴页「动态监听」折线图。
+ *
+ * ## 为什么这是实时数据（而非盘后）
+ * `intraday_timeline.py` 每轮把「本轮新发生的情绪事件」追加写入 JSONL：
+ *   · `zt_total` —— 全市场涨停总数（`latest.json.total_zt`），盘中随封板/开板实时变化；
+ *   · `limit_down_new` —— 每出现一只**新跌停**记一条（累计即跌停家数）；
+ *   · `broken_new` —— 每出现一只**新炸板**记一条（累计即炸板家数）。
+ * 前端 `intradayTimeline()` 查询盘中轮询 → 序列**随交易推进自动增长**，即「动态监听」。
+ *
+ * ## 口径
+ *   · 涨停 = 封板家数 = 最新一条 `zt_total.total` 的**前向沿用**（盘中震荡取最近已知值）；
+ *   · 跌停 = `limit_down_new` 累计条数；
+ *   · 炸板率(%) = 炸板累计 / (封板 + 炸板累计) × 100
+ *     （「曾触及涨停」= 当前封板 + 已炸板；炸板率 = 炸板占曾触涨停的比例，A 股标准口径）。
+ *
+ * ## 时间窗
+ * 仅取交易时段（09:15–11:30、13:00–15:00，午休剔除）内事件；盘前残留
+ * （上一交易日 `00:02` 旧值、开盘 `09:06` 清零）一律排除，避免污染首点。
+ * 首个 `zt_total` 出现之前（非交易日 / 数据未开始）序列为 `null`（图上断线，不画假 0）。
+ */
+export interface LimitSeriesResult {
+  /** X 轴时钟标签（与 `MARKS` 对齐） */
+  labels: string[]
+  /** 涨停（封板）家数 · 与 `labels` 等长 */
+  zt: MaybeNum[]
+  /** 跌停家数（累计） */
+  ld: MaybeNum[]
+  /** 炸板率 %（0–100） */
+  brokenRate: MaybeNum[]
+}
+
+/** 交易时段（墙钟分钟）：午休 11:30–13:00 之间事件不参与序列 */
+function inTradingWindow(wm: number): boolean {
+  if (wm < 555 || wm > 900) return false // 09:15–15:00
+  if (wm > 690 && wm < 780) return false // 午休 11:30–13:00
+  return true
+}
+
+export function buildLimitSeries(events: IntradayTimelineEvent[]): LimitSeriesResult {
+  type SeqItem = { wm: number; kind: 'zt_total' | 'limit_down_new' | 'broken_new'; total: number | null }
+  const seq: SeqItem[] = []
+  for (const e of events) {
+    const wm = clockMin(String(e.at ?? '').slice(11, 16))
+    if (wm == null || !inTradingWindow(wm)) continue
+    if (e.kind === 'zt_total') {
+      seq.push({ wm, kind: 'zt_total', total: typeof e.total === 'number' ? e.total : null })
+    } else if (e.kind === 'limit_down_new' || e.kind === 'broken_new') {
+      seq.push({ wm, kind: e.kind, total: null })
+    }
+  }
+  seq.sort((a, b) => a.wm - b.wm)
+
+  let lastZt = 0
+  let ldCum = 0
+  let brokenCum = 0
+  let seen = false
+  let idx = 0
+  const zt: MaybeNum[] = []
+  const ld: MaybeNum[] = []
+  const brokenRate: MaybeNum[] = []
+
+  for (const m of MARKS) {
+    while (idx < seq.length && seq[idx].wm <= m) {
+      const cur = seq[idx]
+      if (cur.kind === 'zt_total' && cur.total != null) {
+        lastZt = cur.total
+        seen = true
+      } else if (cur.kind === 'limit_down_new') {
+        ldCum += 1
+      } else if (cur.kind === 'broken_new') {
+        brokenCum += 1
+      }
+      idx += 1
+    }
+    if (!seen) {
+      zt.push(null)
+      ld.push(null)
+      brokenRate.push(null)
+      continue
+    }
+    zt.push(lastZt)
+    ld.push(ldCum)
+    const denom = lastZt + brokenCum
+    brokenRate.push(denom > 0 ? round2((brokenCum / denom) * 100) : 0)
+  }
+
+  return { labels: MARK_LABELS, zt, ld, brokenRate }
+}
+
+/**
+ * 从「近若干交易日」的逐事件里挑出**曲线基准日** —— 最近一个「盘中窗口内有事件」的交易日。
+ *
+ * ## 为什么独立挑，而不是直接用页面选中的日期
+ * 盘中当日归档**没有涨停池**（`zt_list` 收盘后才写），页面默认选中日会退到
+ * 「上一个有池的交易日」= **昨天**。曲线若跟着选中日走，盘中看到的永远是昨天的曲线，
+ * 与「实时」相悖（用户 2026-09-19 明确要求实时）。
+ *
+ * 语义：
+ *   · 交易时段 → 返回**今天**（JSONL 每轮追加 → 曲线向右生长，即「实时」）；
+ *   · 当日收盘后 → 返回**今天**（完整盘中）；
+ *   · 非交易日（周末/节前）→ 返回**最近一个交易日**（调用方须标注基准日）。
+ *
+ * 返回 `null` = 近端数据里**没有任何盘中窗口事件**（日志尚未产生）→ 调用方走盘后回退。
+ */
+export function pickLiveBasis(
+  events: IntradayTimelineEvent[],
+): { date: string; events: IntradayTimelineEvent[] } | null {
+  const byDate = new Map<string, IntradayTimelineEvent[]>()
+  for (const e of events) {
+    const d = String(e.at ?? '').slice(0, 10)
+    if (!d) continue
+    const list = byDate.get(d)
+    if (list) list.push(e)
+    else byDate.set(d, [e])
+  }
+  for (const d of [...byDate.keys()].sort((a, b) => b.localeCompare(a))) {
+    const dayEvents = byDate.get(d) ?? []
+    if (buildLimitSeries(dayEvents).zt.some((v) => v != null)) return { date: d, events: dayEvents }
+  }
+  return null
 }
 
 /**

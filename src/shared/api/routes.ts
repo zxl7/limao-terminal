@@ -35,8 +35,16 @@ export interface RouteDef {
   dirPattern?: string
   /** latest = 取文件名倒序最新的一个；all = 全部合并为数组 */
   mode?: 'latest' | 'all'
-  /** all 模式下只取**最新** N 个（防止历史无限增长撑爆响应） */
+  /** all 模式下只取**最新** N 个文件（防止历史无限增长撑爆响应） */
   limit?: number
+  /**
+   * `format: 'jsonl'` 时，每个文件只取**尾部** N 行（append-only 账本会无限增长）。
+   *
+   * ⚠️ 与 `limit` 是**两个维度**：`limit` 管「取几个文件」，本字段管「每个文件取几行」。
+   *    ⛔ 2026-09-19 前实现把两者混为一谈 —— 给目录型 JSONL 路由设 `limit`
+   *    会**顺带把每个文件截断**成 N 行（盘中时间轴每天只剩 5 行 → 曲线变水平线）。
+   */
+  lines?: number
   /**
    * 落盘格式。默认 json；
    * `jsonl` 按行解析为数组（原系统账本类文件用）；
@@ -138,9 +146,18 @@ export const ROUTES: Record<string, RouteDef> = {
     file: 'cache/yesterday_zt.json', cadence: 'daily',
     desc: '昨日涨停池（**唯一涨停权威** · record_zt_snapshot 产出）',
   },
+  /**
+   * ⛔ 2026-09-19 修：原为 `mode: 'latest'` —— **只吐文件名最新的那一天**。
+   *    而消费方（时间轴页）要的是「近几个交易日里任一天」的盘中逐事件，
+   *    按所选日期过滤后必然空集 → 曲线退化成盘后累计单线（用户抓包「只看到涨停」）。
+   *
+   * 现在：`all` + `limit`（**文件数**，管历史不无限增长）+ `lines`（**每文件行数**，
+   * 须足够覆盖一整个交易日 —— 实测一天约 380 行，留 3 倍余量防截断）。
+   * 响应体积：4 × ≈60KB ≈ 240KB（体检 `--big` 阈值 300KB 内）。
+   */
   '/api/intraday/timeline': {
-    dir: 'cache', pattern: '^intraday_timeline_\\d{8}\\.jsonl$', mode: 'latest', format: 'jsonl', cadence: 'intraday',
-    desc: '盘中情绪时间轴（**逐事件 append-only** · up/down 双向 · intraday_timeline.py 产出）',
+    dir: 'cache', pattern: '^intraday_timeline_\\d{8}\\.jsonl$', mode: 'all', limit: 4, lines: 1200, format: 'jsonl', cadence: 'intraday',
+    desc: '盘中情绪时间轴（**逐事件 append-only** · up/down 双向 · intraday_timeline.py 产出 · 近 4 个交易日）',
   },
 
   // ══════════════════════════════════════════════════════════════

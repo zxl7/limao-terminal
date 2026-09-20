@@ -35,6 +35,20 @@ const DELTA_CLASS: Record<string, string> = {
   ongoing: 'bg-line-faint text-sub',
 }
 
+/** 文本里出现的科创板代码（688/689 开头） */
+const STAR_CODE_IN_TEXT = /\b68[89]\d{3}\b/
+
+/**
+ * ⛔ 科创板（688/689）无交易权限 —— 必须剔除。
+ *
+ * `positives` / `risks` 是**后端预格式化好的字符串**（形如 `浩瀚深度(688292)(转亏)`），
+ * 不是结构化对象，只能从文本里识别代码（字段形态决定的唯一可行做法）。
+ * ⚠️ 2026-09-19：本卡页脚声称「688 已剔除」，但这两栏此前漏了 —— 集成测试抓包。
+ */
+function noStarText(arr?: string[]): string[] {
+  return (arr ?? []).filter((s) => !STAR_CODE_IN_TEXT.test(s))
+}
+
 export function ThemeTopCard() {
   const { data } = useQuery(marketQueries.latest())
   const rows = data?.top5 ?? []
@@ -65,6 +79,9 @@ export function ThemeTopCard() {
             )
             const followers = (t.followers ?? []).filter((f) => !starNames.has(f.name))
             const leader = t.leader && !isStarMarket(t.leader.code) ? t.leader : null
+            // ⛔ 正面/风险提示是预格式化字符串，同样要剔除科创板（见 noStarText 说明）
+            const positives = noStarText(t.positives)
+            const risks = noStarText(t.risks)
             return (
               <div
                 key={`${rank}-${t.name}`}
@@ -150,14 +167,14 @@ export function ThemeTopCard() {
                   <div className="text-[11px] text-sub mt-0.5 line-clamp-1">催化：{t.desc}</div>
                 )}
 
-                {((t.positives?.length ?? 0) > 0 || (t.risks?.length ?? 0) > 0) && (
+                {(positives.length > 0 || risks.length > 0) && (
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-                    {(t.positives ?? []).map((p) => (
+                    {positives.map((p) => (
                       <span key={p} className="text-[11px] text-up">
                         ▲ {p}
                       </span>
                     ))}
-                    {(t.risks ?? []).map((r) => (
+                    {risks.map((r) => (
                       <span key={r} className="text-[11px] text-down">
                         ▼ {r}
                       </span>

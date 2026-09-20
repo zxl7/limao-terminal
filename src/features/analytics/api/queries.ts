@@ -22,6 +22,15 @@ const DAILY_STALE = 300_000
 /** 盘中会变的日频类数据：5 分钟轮询 */
 const intradayPollMs = () => (APP_CONFIG.pollIntradayMs ? 300_000 : undefined)
 
+/**
+ * **真·盘中实时**源：与后端守护（`intraday_timeline.py` 每轮追加）**同节拍**。
+ *
+ * ⛔ 不要与上面那个 5 分钟的 `intradayPollMs` 混用 —— 那条是「日频、只是盘中偶尔会变」
+ *    的兜底节拍（避免把 3.4MB 日频数据每 30 秒白拉一遍）。而情绪时间轴是**逐事件
+ *    流式账本**，5 分钟明显滞后（2026-09-19 用户明确要求「必须实时」）。
+ */
+const livePollMs = () => APP_CONFIG.pollIntradayMs
+
 export const analyticsQueries = {
   // ══════════════ 板块核心票 ══════════════
   /** 板块核心度（108 个板块，四维加权 core_score） */
@@ -109,13 +118,16 @@ export const analyticsQueries = {
       staleTime: 120_000,
     }),
 
-  /** 盘中情绪时间轴（当日逐事件 · 盘中实时）—— 盘中轮询，收盘后自然不再变化 */
+  /**
+   * 盘中情绪时间轴（近 5 个交易日逐事件 · **实时**）——
+   * 30s 轮询（与后端守护同频）；收盘后数据不再变化，空转代价可忽略。
+   */
   intradayTimeline: () =>
     queryOptions({
       queryKey: ['intraday', 'timeline'] as const,
       queryFn: api.intradayTimeline,
-      refetchInterval: intradayPollMs,
-      staleTime: 30_000,
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
     }),
 
   // ══════════════ 财富密码决策链 ══════════════

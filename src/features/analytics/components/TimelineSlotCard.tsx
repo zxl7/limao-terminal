@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib'
-import { Tag } from './Table'
 import { IntradayEventBlock } from './IntradayEventLine'
+import { severityNote, splitEventTextKeyed, type EventSegKind } from '../lib/event-text'
 import {
   minToClock,
   SHAPE_META,
@@ -93,7 +93,7 @@ function StockRow({
           <span
             key={t}
             className="text-[10px] px-1 rounded-sm bg-lead-soft text-lead min-w-0 max-w-full truncate"
-            title={`原系统认定：${t} 当前龙头`}
+            title={`当前龙头：${t}`}
           >
             👑 {t}
           </span>
@@ -191,7 +191,7 @@ function SectorSlotGroup({
         {meta && (
           <span
             className="text-[10.5px] text-sub flex-none"
-            title="该板块全天形态（汇总口径，非当刻爆发）"
+            title="全天形态"
           >
             {meta.icon} {meta.label}
           </span>
@@ -199,7 +199,7 @@ function SectorSlotGroup({
         {g.dayTotal != null && (
           <span
             className="text-[10px] text-sub"
-            title="该板块全天封板总数，属汇总非时间定位"
+            title="全天封板总数"
           >
             当日共 {g.dayTotal} 只
             {g.daySpan && g.daySpan > 0 ? ` · 跨 ${g.daySpan} 分` : ' · 当刻即全天'}
@@ -235,38 +235,93 @@ function SectorSlotGroup({
   )
 }
 
-/** 槽内事件分区（系统时点观测，非事件时刻） */
-function EventSlot({ events }: { events: NonNullable<TimelineSlot['events']> }) {
+/**
+ * 事件原文分段的渲染配色。
+ *
+ * ⛔ **主角是内容，不是标签**（用户 2026-09-17：「降低『系统观测』的视觉权重……
+ * 优先展示当前节点实际发生的事件，突出涉及的个股和题材」）：
+ * 题材紫、个股与关键值加粗深色、转弱板块跌色，**连接词一律退灰**。
+ */
+const SEG_CLASS: Record<EventSegKind, string> = {
+  theme: 'text-rec font-medium',
+  stock: 'text-txt font-semibold',
+  value: 'text-txt font-medium',
+  down: 'text-down font-medium',
+  plain: 'text-sub',
+}
+
+/** 一行系统观测（原文分段着色 + severity 例外标注） */
+function EventRow({ e }: { e: NonNullable<TimelineSlot['events']>[number] }) {
+  const sev = severityNote(e.severity)
+  return (
+    <li className="flex items-baseline gap-1.5 text-[12px] min-w-0">
+      <span className="truncate min-w-0" title={e.event}>
+        {/* 分段与 key 都由内核给（位移即身份）—— ⛔ 组件里不做跨段累加 */}
+        {splitEventTextKeyed(e.event).map((seg) => (
+          <span key={seg.key} className={SEG_CLASS[seg.kind]}>
+            {seg.text}
+          </span>
+        ))}
+      </span>
+      {sev && <span className="text-[10px] text-sub flex-none">[{sev}]</span>}
+    </li>
+  )
+}
+
+/**
+ * 槽内事件分区（原始事件流）。
+ *
+ * · **来源标注退到灰**：原先是饱和青绿 `text-warn` + 加粗 + ⚡，又出现在**每一张**有事件的卡上
+ *   → 整屏读起来「全部处于系统观测状态」，而真正发生了什么反而看不见。现降为 10px 灰字。
+ * · **正文高亮**：`splitEventText` 把原文切成 题材 / 个股 / 关键值 三段各自着色（⛔ 无损）。
+ * · **severity 只标例外**：实测 ~95% 是 `high`，逐行展示等于噪声 → 仅非最高档时以灰字附注。
+ * · **默认折叠机器噪声**（2026-09-17 用户拍板「可以」）：实测 5 天 109 条里 **86% 是噪声**
+ *   （龙头切换 51.4% / 情绪回摆 31.2% / 广度归零 3.7%）→ 默认只留真信号，
+ *   其余收进「另有 N 条系统观测」（原生 `<details>`，⛔ **折叠 ≠ 删除**）。
+ *   ⛔ 悬停明细（`unfold`）**一律全量展开** —— 那才是「完整明细」的落点。
+ */
+function EventSlot({ slot, unfold = false }: { slot: TimelineSlot; unfold?: boolean }) {
+  const events = slot.events ?? []
+  const folded = unfold ? new Set<number>() : new Set(slot.foldedIdx ?? [])
+  const shown: typeof events = []
+  const hidden: typeof events = []
+  events.forEach((e, i) => (folded.has(i) ? hidden : shown).push(e))
+
   return (
     <div className="flex flex-col gap-0.5 border-t border-line-faint pt-1 mt-0.5 min-w-0">
-      <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className="text-warn text-[11px] flex-none">⚡</span>
-        <span className="text-[11px] font-semibold text-warn">
-          {events.length > 1 ? `系统观测 ${events.length} 条` : '系统观测'}
-        </span>
-        <span
-          className="text-sub text-[10px]"
-          title="原系统按卡片批量写入，同一时刻的多条是同一张卡的观测"
-        >
-          卡片时刻，非事件时刻
-        </span>
-      </div>
-      <ul className="flex flex-col gap-0.5">
-        {events.map((e, i) => (
-          // oxlint-disable-next-line react/no-array-index-key -- 同名去重：同一张卡里可能重复同一句话，用内容做 key 会撞，索引即身份
-          <li key={i} className="flex items-baseline gap-1.5 text-[12px] min-w-0">
-            <Tag title="原系统严重度（信号强度，非涨跌方向）">{e.severity}</Tag>
-            <span className={cn('text-txt truncate min-w-0', /重挫/.test(e.event) && 'text-down')} title={e.event}>
-              {e.event}
+      {shown.length > 0 && (
+        <>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-[10px] text-sub">
+              {shown.length > 1 ? `系统观测 ${shown.length} 条` : '系统观测'}
             </span>
-          </li>
-        ))}
-      </ul>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {shown.map((e, i) => (
+              // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：事件流与时刻严格对齐，同一时刻可能重复同一句话，用内容做 key 反而会撞。
+              <EventRow key={i} e={e} />
+            ))}
+          </ul>
+        </>
+      )}
+      {hidden.length > 0 && (
+        <details className="min-w-0">
+          <summary className="text-[10px] text-sub cursor-pointer select-none">
+            另有 {hidden.length} 条系统观测
+          </summary>
+          <ul className="flex flex-col gap-0.5 pt-0.5">
+            {hidden.map((e, i) => (
+              // oxlint-disable-next-line react/no-array-index-key -- 同上：位置序列即身份
+              <EventRow key={i} e={e} />
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   )
 }
 
-/** 槽内推送分区（题材台账） */
+/** 槽内推送分区（题材台账）—— 标题同样退为灰色小字（分区标题不抢内容的风头） */
 function PushSlot({
   pushes,
   at,
@@ -279,8 +334,8 @@ function PushSlot({
   return (
     <div className="flex flex-col gap-0.5 border-t border-line-faint pt-1 mt-0.5 min-w-0">
       <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className="text-lead text-[11px] flex-none">📤</span>
-        <span className="text-[11px] font-semibold text-lead">题材推送 {pushes.length} 条</span>
+        <span className="text-[10px] text-sub flex-none">📤</span>
+        <span className="text-[10px] text-sub">题材推送 {pushes.length} 条</span>
         <span className="num text-sub text-[10.5px]">
           {minToClock(at)}~{minToClock(to ?? at)}
         </span>
@@ -360,50 +415,49 @@ function SlotHead({ slot, sectorCount }: { slot: TimelineSlot; sectorCount: numb
       </span>
       <span className="text-sub text-[10.5px]">当刻封板 {stockCount} 只</span>
       {sectorCount > 0 && (
-        <span
-          className="text-sub text-[10.5px]"
-          title={`板块按强度降序（当刻封板家数 → 组内最高板 → 全天总数）；卡面直接展示最强 ${SLOT_VISIBLE_SECTORS} 个`}
-        >
-          板块 {sectorCount} 个 · 按强度排序
-        </span>
-      )}
-      {sectorCount > SLOT_VISIBLE_SECTORS && (
-        <span className="text-warn text-[10px] flex-none">↓ 下拉看其余 {sectorCount - SLOT_VISIBLE_SECTORS} 个</span>
+        <span className="text-sub text-[10.5px]">板块 {sectorCount} 个</span>
       )}
     </div>
   )
 }
 
 /**
- * 槽内内容（**不含外框 / 宽度 / 高度**）—— 三处卡片共用。
+ * 槽内内容（**不含外框 / 宽度 / 高度**）—— 三处卡片 + 蛇形轴详情面板共用。
  *
- * @param showTime 是否在卡体内再渲染一次时刻行。联动卡 / 合并卡由卡头统一给时间区间，
- *   但其内部含**多个槽**，故仍需要每槽的时刻行（`showTime=true`）。
+ * @param showTime 是否在卡体内再渲染一次时刻行。普通卡由卡头给时刻（false）；
+ *   联动卡 / 合并卡 / **详情面板**内部含**多个槽**，故需要每槽的时刻行（true）。
+ * @param showAllSectors 是否**取消「最强 N 个板块」上限**。⛔ 详情面板必须传 `true`
+ *   —— 它是「更详细的内容」的落点，卡面的 3 个上限是为了紧凑，不该在详情里也截。
+ * @param showAllEvents 是否**取消系统观测的「噪声折叠」**（`slot.foldedIdx`）。
+ *   ⛔ 详情面板必须传 `true`：那里是「完整明细」，⛔ 一条都不能藏。
  */
-function SlotBody({
+export function SlotBody({
   slot,
   topBoard,
   tags,
   reasonByCode,
   showTime = false,
+  showAllSectors = false,
+  showAllEvents = false,
 }: {
   slot: TimelineSlot
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
   showTime?: boolean
+  showAllSectors?: boolean
+  showAllEvents?: boolean
 }) {
   /** 🚀 题材爆发 / ⚠️ 题材衰竭 —— 本页的**核心诉求**：每个时间节点哪些题材起、哪些题材落 */
   const marks = slotThemeMarks(slot.events, slot.pushes)
   const bursts = withKeys(marks.burst, (b) => b.theme)
-  const switches = withKeys(marks.switched, (s) => `${s.theme}|${s.from}|${s.to}`)
   const fades = withKeys(marks.fade, (f) => f.label)
   const pushes = withKeys(marks.pushed, (p) => p.name)
 
   /** 板块按**强度降序**（强 → 弱）：最强的最先被看到 */
   const sortedSectors = sortSlotSectors(slot.sectors)
-  const topSectors = sortedSectors.slice(0, SLOT_VISIBLE_SECTORS)
-  const restSectors = sortedSectors.slice(SLOT_VISIBLE_SECTORS)
+  const topSectors = showAllSectors ? sortedSectors : sortedSectors.slice(0, SLOT_VISIBLE_SECTORS)
+  const restSectors = showAllSectors ? [] : sortedSectors.slice(SLOT_VISIBLE_SECTORS)
 
   return (
     <>
@@ -418,31 +472,17 @@ function SlotBody({
 
       {/* ── 题材爆发 / 衰竭（置顶：这是时间轴要回答的第一件事）── */}
       {(marks.burst.length > 0 ||
-        marks.switched.length > 0 ||
         marks.fade.length > 0 ||
         marks.pushed.length > 0) && (
         <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
           {marks.burst.length > 0 && (
             <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10.5px] font-semibold text-up flex-none">🚀 爆发</span>
+              <span className="text-[10.5px] font-semibold text-up flex-none">🚀 首爆</span>
               {bursts.map(({ key, item: b }) => (
                 <span key={key} className="flex items-baseline gap-1 flex-none">
                   <span className="text-[11.5px] font-medium text-up break-all">{b.theme}</span>
                   {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
                   {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
-                </span>
-              ))}
-            </div>
-          )}
-          {marks.switched.length > 0 && (
-            <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10.5px] font-semibold text-rec flex-none">🔁 龙头易主</span>
-              {switches.map(({ key, item: s }) => (
-                <span key={key} className="flex items-baseline gap-1 flex-none">
-                  <span className="text-[11.5px] text-txt break-all">{s.theme}</span>
-                  <span className="text-[10px] text-sub">
-                    {s.from ?? '—'} → {s.to ?? '—'}
-                  </span>
                 </span>
               ))}
             </div>
@@ -475,7 +515,7 @@ function SlotBody({
       )}
 
       {/* ── 盘中逐事件（🔴 涨 / 🟢 跌）—— 2026-09-17 合进时间轴 ── */}
-      <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} />
+      <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
 
       {/* 行业内个股分区：**强度降序**，卡面直接给出最强 N 个（同刻同行业合并为一组） */}
       {topSectors.map((g, i) => (
@@ -490,9 +530,8 @@ function SlotBody({
       ))}
       {restSectors.length > 0 && (
         <>
-          <div className="flex items-baseline gap-1.5 gap-y-0 border-t border-line-faint pt-1 mt-0.5 text-[10.5px] text-sub min-w-0 flex-wrap">
-            <span className="flex-none">↓ 其余 {restSectors.length} 个板块（较弱，下拉查看）</span>
-            <span className="min-w-0 break-all">卡面直接展示最强的 {SLOT_VISIBLE_SECTORS} 个</span>
+          <div className="text-[10.5px] text-sub">
+            ↓ 其余 {restSectors.length} 个板块
           </div>
           {restSectors.map((g, i) => (
             <SectorSlotGroup
@@ -510,7 +549,7 @@ function SlotBody({
       {/* 单票分区（仅同分钟合并，不跨分钟） */}
       {slot.singles.length > 0 && (
         <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="text-[10.5px] text-sub">单票 {slot.singles.length} 只（未入板块集群）</div>
+          <div className="text-[10.5px] text-sub">单票 {slot.singles.length} 只</div>
           <div className="grid gap-x-2 gap-y-0.5 min-w-0">
             {(() => {
               const seen = new Map<string, number>()
@@ -534,8 +573,8 @@ function SlotBody({
         </div>
       )}
 
-      {/* 事件分区（同刻合并） */}
-      {slot.events && <EventSlot events={slot.events} />}
+      {/* 事件分区（同刻合并 · 默认只留真信号，机器噪声收进「另有 N 条」） */}
+      {slot.events && <EventSlot slot={slot} unfold={showAllEvents} />}
 
       {/* 推送分区（同刻合并） */}
       {slot.pushes && <PushSlot pushes={slot.pushes} at={slot.at} to={slot.pushTo} />}

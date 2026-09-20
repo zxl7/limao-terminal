@@ -4,6 +4,7 @@ import { queryClient } from '@/shared/api'
 import type {
   DecisionDossier,
   HithinkZtFile,
+  IntradayTimelineEvent,
   MarketMemory,
   ZtHistoryDay,
 } from '@/shared/api'
@@ -12,30 +13,29 @@ import {
   buildThemeBursts,
   buildTimeline,
   buildTimelineSlots,
-  BURST_MIN_STOCKS,
-  BURST_WINDOW_MIN,
+  buildLimitSeries,
   cumulativeByMarks,
   fbtMin,
   fileDate,
   groupTimelineSlots,
   isLowStrengthSlot,
-  LINKAGE_MIN_SECTORS,
-  SLOT_HEIGHT,
-  SLOT_VISIBLE_SECTORS,
   MARKS,
   minToClock,
+  pickLiveBasis,
   SegTabs,
   SHAPE_META,
   StatPair,
   TimelineLinkageCard,
   TimelineMergedCard,
   TimelineSlotCard,
+  TimelineSnake,
   type SectorNode,
   type ThemeBurstResult,
   type TimelineSlot,
 } from '@/features/analytics'
 import { Card, CardBadge, LineChart, type LineSeries } from '@/shared/ui'
-import { cn, isStarMarket } from '@/shared/lib'
+import { cn, inTrading, isStarMarket, round2 } from '@/shared/lib'
+import { useNow } from '@/shared/hooks'
 
 /**
  * 日内炒作时间轴 —— **严格按时间顺序**的一条轴，节点是「板块块 / 单票 / 事件 / 推送」。
@@ -65,6 +65,12 @@ import { cn, isStarMarket } from '@/shared/lib'
 
 /** 节点标记与语义色（已上移到分析域 barrel，统一来源） */
 
+/** 取序列最后一个非 null 值（实时指标卡的「最新值」） */
+function lastNum(a: Array<number | null | undefined>): number | null {
+  for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i] as number
+  return null
+}
+
 export async function loader() {
   await Promise.all([
     queryClient.ensureQueryData(analyticsQueries.emotionZtHistory()),
@@ -85,6 +91,11 @@ export function Component() {
   /** 📡 盘中情绪时间轴（当日逐事件 · 双向 · 实时轮询） */
   const itQ = useQuery(analyticsQueries.intradayTimeline())
   const [dayFile, setDayFile] = useState('')
+  /**
+   * 时间轴排版（2026-09-17）：`snake` = 蛇形折线（默认，一条线横走→弯→反向）；
+   * `cards` = 卡片流（原版）。⛔ 两视图共用同一批分块与排序内核，切换不改结论。
+   */
+  const [view, setView] = useState<'snake' | 'cards'>('snake')
 
   const days = useMemo(
     () =>
@@ -125,15 +136,33 @@ export function Component() {
   const isFullDay = hasPool(day)
 
   /**
-   * 盘中逐事件（`intraday_timeline_<date>.jsonl`）—— ⛔ 只取**与所选日期同一天**的事件：
+   * 全部盘中逐事件（近 5 个交易日 · 路由已摊平为事件数组）。
+   *
+   * ⚠️ 2026-09-19 前该路由是 `mode:'latest'`（只吐**最新一天**的文件），
+   *    下面「按所选日期过滤」必然得到空集 → 曲线永远退化成盘后单线（用户抓包「只看到涨停」）。
+   */
+  const itAll = useMemo<IntradayTimelineEvent[]>(() => itQ.data ?? [], [itQ.data])
+
+  /**
+   * 选中日的逐事件（**时间轴本体**用）—— ⛔ 只取与所选日期同一天：
    * 跨日并入会让历史日混进今天的盘中记录（串线）。历史日没有该日志 → 自然为空。
    */
   const itEvents = useMemo(() => {
-    const all = itQ.data ?? []
     if (!day?.date) return []
     const d = String(day.date).replace(/-/g, '')
-    return all.filter((e) => String(e.at ?? '').slice(0, 10).replace(/-/g, '') === d)
-  }, [itQ.data, day])
+    return itAll.filter((e) => String(e.at ?? '').slice(0, 10).replace(/-/g, '') === d)
+  }, [itAll, day])
+
+  /**
+   * 📈 推进曲线基准日 = 最近一个「盘中窗口内有事件」的交易日（纯函数 · 有回归锁）。
+   *
+   * ⛔ 为什么不跟「选中日」联动：盘中当日归档**没有涨停池**（`zt_list` 收盘后才写），
+   *    页面默认选中日会退到「上一个有池的交易日」= 昨天。曲线若跟着选中日走，
+   *    盘中看到的永远是**昨天**的曲线 —— 与「实时」相悖（用户 2026-09-19 要求实时）。
+   *    故曲线独立取「最近的盘中日」：交易时段 = 今天（30s 轮询 · 实时）；
+   *    非交易时段 = 最近一个交易日的完整盘中（并标注基准日）。
+   */
+  const chartBasis = useMemo(() => pickLiveBasis(itAll), [itAll])
 
   /**
    * 涨停全量：优先本日归档的 `zt_list`；归档残缺且恰是「今天」时，
@@ -222,7 +251,7 @@ export function Component() {
     [mem, hotSpots, visible],
   )
 
-  /** 题材层事件条数（rise + switch + plunge）—— 用于卡面「数据基准」说明 */
+  /** 题材层事件条数（rise + switch + plunge）—— 用于计数与空态判断 */
   const themeEventCount = bursts.themedCount + bursts.riskCount
 
   /** 题材级风险：同板块可能在多条事件里重复出现，合并后展示 */
@@ -234,10 +263,29 @@ export function Component() {
     return [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
   }, [bursts.risks])
 
+  /** 实时「涨停 / 跌停 / 炸板率」时间序列（盘中情绪时间轴 · 30s 轮询 → 动态） */
+  const limitSeries = useMemo(() => buildLimitSeries(chartBasis?.events ?? []), [chartBasis])
+  const hasLive = limitSeries.zt.some((v) => v != null)
+  /**
+   * 是否正处交易时段 —— 决定曲线标「🔴 盘中实时」还是「最近交易日」。
+   *
+   * ⚠️ 时段判定走 `shared/lib/marketTime` 单一实现；用 `useNow` 驱动而不是直接
+   *    `inTrading()`：React Compiler 会把**无参纯调用**当常量折叠，直接调会永远停在首帧。
+   */
+  const now = useNow(30_000)
+  const liveNow = inTrading(undefined, now)
   const curve = useMemo<LineSeries[]>(() => {
+    if (hasLive) {
+      return [
+        { name: '涨停', values: limitSeries.zt, tone: 'up' },
+        { name: '跌停', values: limitSeries.ld, tone: 'down' },
+        { name: '炸板率', values: limitSeries.brokenRate, tone: 'rec', axis: 'right', format: (v) => `${round2(v)}%` },
+      ]
+    }
+    // 回退：无实时数据但有盘后涨停池 → 累计涨停单线（旧行为，避免旧交易日图表退化）
     const mins = visible.map((s) => fbtMin(s.fbt)).filter((x): x is number => x != null)
     return [{ name: '累计涨停', values: cumulativeByMarks(mins, MARKS), tone: 'up', area: true }]
-  }, [visible])
+  }, [hasLive, limitSeries, visible])
 
   /** 行业级集群（辅口径）—— 各栏保留，但明确标为辅助 */
   const tally = useMemo(() => {
@@ -262,7 +310,7 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ── ⛔ 数据基准声明：本页**不是实时**，必须说清楚 ── */}
+      {/* ── ⛔ 数据基准声明：顶部曲线 = 盘中实时（最近盘中日 · 30s 刷新）；下方时间轴 = **所选日**盘面，非实时 ── */}
       {/* ── 通栏：当日定性 + 推进曲线 ── */}
       <Card
         title="🕒 日内炒作时间轴"
@@ -291,8 +339,24 @@ export function Component() {
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <StatPair
             label="涨停家数"
-            value={isFullDay ? `${visible.length} 只` : '待收盘'}
-            tone={isFullDay ? 'up' : undefined}
+            value={
+              hasLive && lastNum(limitSeries.zt) != null
+                ? `${lastNum(limitSeries.zt)} 只`
+                : isFullDay
+                  ? `${visible.length} 只`
+                  : '待收盘'
+            }
+            tone={hasLive && lastNum(limitSeries.zt) != null ? 'up' : isFullDay ? 'up' : undefined}
+          />
+          <StatPair
+            label="跌停家数"
+            value={hasLive && lastNum(limitSeries.ld) != null ? `${lastNum(limitSeries.ld)} 只` : '—'}
+            tone={hasLive && lastNum(limitSeries.ld) != null ? 'down' : undefined}
+          />
+          <StatPair
+            label="炸板率"
+            value={hasLive && lastNum(limitSeries.brokenRate) != null ? `${round2(lastNum(limitSeries.brokenRate)!)}%` : '—'}
+            tone="rec"
           />
           <StatPair label="最高板" value={isFullDay ? `${topBoard} 板` : '—'} tone="rec" />
           <StatPair
@@ -305,60 +369,40 @@ export function Component() {
           <StatPair label="题材事件" value={`${themeEventCount} 条`} />
         </div>
 
-        {/* ── ⛔ 数据基准声明（用户 2026-09-17 两次核实「是不是实时 / 9-17 去哪了」）── */}
-        <div className="mt-2 rounded-[var(--radius-sm)] border border-warn/40 bg-warn-soft px-2 py-1.5 text-[11.5px] leading-relaxed text-sub">
-          {isFullDay ? (
-            <>
-              <span className="text-warn font-semibold">⚠️ 完整交易日数据（收盘口径）。</span>{' '}
-              个股首封时刻 `fbt` 来自**完整涨停池**，只有收盘后才落盘 → 个股/板块的**分钟定位**是收盘数据，
-              **盘中不刷新**。
-            </>
-          ) : (
-            <>
-              <span className="text-warn font-semibold">⚠️ 盘中当日：题材实时、个股待收盘。</span>{' '}
-              今日归档**尚无涨停池**（`zt_list` 收盘后才写）→ 个股没有首封时刻 `fbt`，
-              **个股/板块的分钟定位今日暂缺**；但**题材爆发/衰竭/推送是实时落盘的**
-              （来自 `market_memory_{day?.date ?? '—'}.json`），下方时间轴按观测时刻如实呈现。
-            </>
-          )}
-          <br />
-          <span className="text-txt">
-            数据源：`zt_history/{day?.date ?? '—'}.json`
-            {isFullDay ? `（涨停 ${visible.length} 只）` : '（仅采样点·无涨停池）'}
-            ＋ `market_memory_{day?.date ?? '—'}.json`（题材事件 {themeEventCount} 条 · 推送台账）
-          </span>
-        </div>
-
         <div className="mt-3 border-t border-line-faint pt-2">
+          {/* 📈 曲线基准声明 —— 用户 2026-09-19 抓包「不知道是不是实时的、只看到涨停」 */}
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-[10.5px] text-sub">📈 情绪推进 · 涨停 / 跌停 / 炸板率</span>
+            {hasLive && chartBasis && (
+              <span className={cn('text-[10.5px]', liveNow ? 'text-txt font-semibold' : 'text-sub')}>
+                {liveNow ? '🔴 盘中实时' : '最近交易日'} · {chartBasis.date.slice(5)} 盘中
+                {liveNow ? ' · 30s 刷新' : ''}
+              </span>
+            )}
+            {!hasLive && (
+              <span className="text-[10.5px] text-sub">无盘中逐事件 → 回退「盘后累计涨停」单线</span>
+            )}
+          </div>
           <LineChart
             series={curve}
-            labels={MARKS.map(minToClock)}
+            labels={limitSeries.labels}
             height={160}
             zeroBased
             format={(v) => String(Math.round(v))}
             dotThreshold={20}
           />
-          <div className="text-sub text-[11px] mt-1 leading-relaxed">
-            按首封时刻（`fbt`）累计的涨停推进曲线 —— 图上折点即「资金开始打」的时刻。科创板 688/689
-            已按无权限剔除。盘中看它是**累积值**，不是当日最终值。
-          </div>
         </div>
       </Card>
 
       {/* ── 🚀 题材爆发（主口径）：直接回答「哪几条题材线在爆发」── */}
       <Card
-        title="🚀 题材爆发 · 题材级（主口径）"
+        title="🚀 题材爆发"
         extra={<CardBadge tone="up">{bursts.themes.length} 条题材线</CardBadge>}
       >
-        <div className="text-sub text-[11px] leading-relaxed mb-2">
-          题材名 / 涨停家数 / 龙头**取自原系统 `event_log` 的现成结论**，本页只解析不重算。
-          ⚠️ 时点是**卡片生成时刻**（系统何时说的），不是事件发生时刻。
-          个股题材归属来自决策档案的 `hot_spots`，当日仅覆盖一部分涨停票 —— **无标记 ≠ 无题材**。
-        </div>
 
         {bursts.themes.length === 0 ? (
           <div className="text-sub text-[12px] py-2">
-            当日 `event_log` 里没有题材级事件（系统未识别出新主线或龙头易主）
+            当日 `event_log` 里没有题材级事件
           </div>
         ) : (
           <div className="flex flex-row">
@@ -374,39 +418,39 @@ export function Component() {
                       🚀 新主线崛起
                     </span>
                   )}
-                  {t.switchCount > 0 && (
-                    <span className="text-[10.5px] px-1 rounded-sm bg-line-faint text-sub">
-                      🔁 龙头易主 {t.switchCount} 次
-                    </span>
-                  )}
                   {t.riseCount != null && (
                     <span className="num text-[12px] text-up">{t.riseCount} 只涨停</span>
                   )}
-                  <span className="num text-[11px] text-sub">
-                    {minToClock(t.at)}~{minToClock(t.to)} 系统观测
+                  {/* ⛔ 观测**时刻序列**，不用「at~to 区间」—— 区间说不清几点爆的、后面几点又动过 */}
+                  <span className="text-[10.5px] text-sub flex-none">观测</span>
+                  <span className="text-[11.5px] flex items-baseline gap-1 flex-wrap">
+                    {t.points.map((pt, i) => (
+                      <span
+                        // eslint-disable-next-line react/no-array-index-key -- 同题材同一分钟可有多条，索引即身份
+                        key={`${pt.at}#${i}`}
+                        className={cn('num', pt.kind === 'rise' ? 'text-up font-semibold' : 'text-txt')}
+                      >
+                        {i > 0 && <span className="text-sub">→ </span>}
+                        {minToClock(pt.at)}
+                        {pt.kind === 'rise' && ' 🚀'}
+                      </span>
+                    ))}
                   </span>
+                  <span className="num text-[10.5px] text-sub">共 {t.points.length} 次</span>
                   {t.pushCount != null && (
                     <span className="num text-[11px] text-sub">推送 {t.pushCount} 次</span>
                   )}
                 </div>
 
-                {/* 龙头链 —— 反复易主是真实信息（题材内部分歧），当前龙头高亮 */}
-                <div className="flex items-baseline gap-2 flex-wrap text-[12px]">
-                  <span className="text-[10.5px] text-sub flex-none">龙头</span>
-                  {t.leaders.map((l, i) => (
-                    <span key={l} className="inline-flex items-baseline gap-1">
-                      {i > 0 && <span className="text-sub">→</span>}
-                      <span
-                        className={cn(
-                          l === t.currentLeader ? 'text-lead font-semibold' : 'text-sub',
-                        )}
-                      >
-                        {l === t.currentLeader && '👑 '}
-                        {l}
-                      </span>
-                    </span>
-                  ))}
-                </div>
+                {/* ⛔ 只显示**当前**龙头 —— 不显示「A → B → C」链条：
+                    那个链条表达的是「龙头易主」这一概念，而系统那条事件只是
+                    「每轮重算板块领涨股导致的机械换人」（实测会在同一小撮票之间来回跳）。 */}
+                {t.currentLeader && (
+                  <div className="flex items-baseline gap-2 text-[12px]">
+                    <span className="text-[10.5px] text-sub flex-none">龙头</span>
+                    <span className="text-lead font-semibold">👑 {t.currentLeader}</span>
+                  </div>
+                )}
 
                 {t.catalyst && <div className="text-[11.5px] text-txt">催化：{t.catalyst}</div>}
                 {t.members.length > 0 && (
@@ -423,7 +467,7 @@ export function Component() {
           <div className="mt-2 pt-2 border-t border-line-faint">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-[10.5px] text-sub flex-none">
-                ⚠️ 题材级风险（原系统「关注板块集体重挫」）
+                ⚠️ 题材级风险
               </span>
               {riskSectors.map(([s, n]) => (
                 <span key={s} className="text-[11.5px] text-down">
@@ -436,88 +480,81 @@ export function Component() {
         )}
       </Card>
 
-      {/* ── 主体：三类展示分块（联动聚合 / 普通独立 / 低频合并 · 按时间左→右换行）── */}
+      {/* ── 主体：三类展示分块（联动聚合 / 普通独立 / 低频合并）
+          ⚠️ 两种排版（2026-09-17）：🐍 蛇形轴（默认 · 一条线横走→弯→反向）｜🃏 卡片流（原版）
+          ⛔ 两者**同一批分块、同一批排序内核** —— 切视图只改呈现，不改任何结论。── */}
       <Card
-        title="时间轴（三类展示）"
-        extra={<CardBadge>{blocks.length} 张卡 · {slots.length} 个时刻槽</CardBadge>}
-      >
-        <div className="text-sub text-[11px] leading-relaxed mb-2">
-          按信号强度分三类展示，⛔ **不再每分钟一张卡**：
-          <span className="text-up"> 🚀 板块联动</span>（同刻 ≥{LINKAGE_MIN_SECTORS} 个板块各达{' '}
-          {BURST_MIN_STOCKS} 只封板 → 聚合成一张、底色更深、**不受低频合并延迟**）｜
-          <span className="text-txt"> 普通卡</span>（含个股但未达联动门槛 → 逐个时刻平铺，不冠「爆发」）｜
-          <span className="text-sub"> 📎 低频合并</span>（连续若干分钟仅有消息 → 合并一张，标明板块数与名称）。
-          <br />
-          卡面**固定高 {SLOT_HEIGHT}px**、内容超出**卡内下拉**（⛔ 不裁剪数据）；卡内板块**按强度降序**
-          （当刻封板家数 → 组内最高板 → 全天总数），**直接展示最强 {SLOT_VISIBLE_SECTORS} 个**，
-          其余在标注后下拉可见。时刻固定在卡头，不随滚动消失。
-          ⚠️ 联动口径（时间窗口 / 板块数下限 / 是否要求同题材关系）**待确认**，暂按最保守的可推导口径。
-        </div>
-        {/* ⛔ 该日无个股数据（当日归档未落涨停池）→ 在轴内就地说明，避免误判「数据丢了」。
-            ⚠️ 放在卡片流**之外**：它是说明块、不是时间轴卡，混进等高卡片会破坏规整。 */}
-        {!isFullDay && (
-          <div className="mb-2 rounded-[var(--radius-sm)] border border-warn/40 bg-warn-soft p-2.5 text-[11.5px] leading-relaxed text-sub">
-            <div className="text-warn font-semibold">该日暂无个股数据（不是丢数据）</div>
-            <div className="mt-1">
-              `zt_list`（含个股**首封时刻**）**收盘后**才写入归档，因此盘中当日
-              **没有个股、也没有板块的时间定位**；本轴此刻呈现的是**题材级事件**（实时落盘）。
-            </div>
-            <div className="mt-1 text-txt">
-              想看**当日实时个股**（领涨/涨停清单）请到「**盘中实时**」页；
-              本页在**收盘后**会自动补全当日的个股与板块时间定位。
-            </div>
+        title="时间轴"
+        extra={
+          <div className="flex items-center gap-2">
+            <SegTabs
+              items={[
+                { key: 'snake', label: '时间轴' },
+                { key: 'cards', label: '卡片流' },
+              ]}
+              value={view}
+              onChange={(k) => setView(k as 'snake' | 'cards')}
+            />
+            <CardBadge>
+              {blocks.length} 张卡 · {slots.length} 个时刻槽
+            </CardBadge>
           </div>
-        )}
-        {/* ── 横向卡片流：左→右铺开、满了自动换行（⛔ 不用 grid —— grid 会把同一行的
-            卡片拉成等高，短卡下方留大片空白，正是「看起来被拉长」的原因）──
-            ⚠️ 卡片**固定高 240px**（2026-09-17）→ 即便用 flex 也天然等高，换行后行列整齐。 */}
-        <div className="flex flex-wrap items-start content-start gap-3 min-w-0">
-          {blocks.map((b) =>
-            b.kind === 'linkage' ? (
-              <TimelineLinkageCard
-                key={b.key}
-                block={b}
-                topBoard={topBoard}
-                tags={bursts.tags}
-                reasonByCode={reasonByCode}
-              />
-            ) : b.kind === 'merged' ? (
-              <TimelineMergedCard
-                key={b.key}
-                block={b}
-                topBoard={topBoard}
-                tags={bursts.tags}
-                reasonByCode={reasonByCode}
-              />
-            ) : (
-              <TimelineSlotCard
-                key={b.key}
-                slot={b.slot}
-                topBoard={topBoard}
-                tags={bursts.tags}
-                reasonByCode={reasonByCode}
-              />
-            ),
-          )}
-        </div>
-        {blocks.length === 0 && (
-          <div className="text-sub text-[12px] py-2">当日无可定位到分钟的记录</div>
+        }
+      >
+        {/* ── 🐍 蛇形轴（默认）：一条线横走 → 弯 → 反向横走；悬停节点即出完整明细（无需点击）── */}
+        {view === 'snake' ? (
+          <TimelineSnake
+            blocks={blocks}
+            topBoard={topBoard}
+            tags={bursts.tags}
+            reasonByCode={reasonByCode}
+          />
+        ) : (
+          <>
+            {/* ── 🃏 卡片流（原版 · 保留为可逆视图）：左→右铺开、满了自动换行
+                （⛔ 不用 grid —— grid 会把同一行的卡片拉成等高，短卡下方留大片空白）
+                ⚠️ 卡片**固定高 240px** → 即便用 flex 也天然等高，换行后行列整齐。 */}
+            <div className="flex flex-wrap items-start content-start gap-3 min-w-0">
+              {blocks.map((b) =>
+                b.kind === 'linkage' ? (
+                  <TimelineLinkageCard
+                    key={b.key}
+                    block={b}
+                    topBoard={topBoard}
+                    tags={bursts.tags}
+                    reasonByCode={reasonByCode}
+                  />
+                ) : b.kind === 'merged' ? (
+                  <TimelineMergedCard
+                    key={b.key}
+                    block={b}
+                    topBoard={topBoard}
+                    tags={bursts.tags}
+                    reasonByCode={reasonByCode}
+                  />
+                ) : (
+                  <TimelineSlotCard
+                    key={b.key}
+                    slot={b.slot}
+                    topBoard={topBoard}
+                    tags={bursts.tags}
+                    reasonByCode={reasonByCode}
+                  />
+                ),
+              )}
+            </div>
+            {blocks.length === 0 && (
+              <div className="text-sub text-[12px] py-2">当日无可定位到分钟的记录</div>
+            )}
+          </>
         )}
       </Card>
 
       {/* ── 行业级集群（辅口径）：题材榜之外的完整视角 · ⛔ 全天汇总，非时间定位 ── */}
       <Card
-        title="行业级集群（辅口径 · 全天汇总）"
+        title="行业级集群"
         extra={<CardBadge>{tally.sectorTotal} 个行业</CardBadge>}
       >
-        <div className="text-sub text-[11px] leading-relaxed">
-          `zt_list.sector` 是**行业**（通信设备 / 化学制品），不是炒作题材 —— 只用来给每只票一个
-          100% 覆盖的坐标。判定口径：同行业 **{BURST_WINDOW_MIN} 分钟**内 ≥ **{BURST_MIN_STOCKS} 只**
-          封板 = 🚀 爆发；达家数但跨度更大 = 〰 扩散（全天反复有人来打）。
-          ⛔ 行业口径**回答不了「哪条题材在爆发」**，故降为辅助。
-          ⛔⛔ 这是**全天汇总**，不在时间轴上定位任何一只票；下面每行是该行业全天的首末跨度与总量，
-          切勿把它当成「某一分钟当刻爆发」。
-        </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
           <span className={cn('text-[12.5px]', SHAPE_META.burst.cls)}>
             🚀 爆发 {tally.burst.length}
@@ -552,10 +589,6 @@ export function Component() {
 
       {looseStocks.length > 0 && (
         <Card title="无时间坐标" extra={<CardBadge tone="warn">{looseStocks.length} 只</CardBadge>}>
-          <div className="text-sub text-[11.5px] mb-1.5 leading-relaxed">
-            这些票在涨停池里但 `fbt`（首封时刻）缺失，**无法定位到时间轴上**。
-            如实列出而不是丢弃 —— 丢弃会让页面涨停数与原系统对不上。
-          </div>
           <div className="flex flex-wrap gap-x-2.5 gap-y-1">
             {looseStocks.map((s) => (
               <span key={s.code} className="text-[12px] text-txt">

@@ -23,13 +23,26 @@ function safeReaddir(abs) {
   }
 }
 
-/** JSONL 默认只取尾部 N 行 —— 账本类文件 append-only，全量会无限增长 */
+/** JSONL 尾部行数上限（**默认**）—— 账本类文件 append-only，全量会无限增长 */
 const JSONL_DEFAULT_TAIL = 500
 
-/** 按行解析 JSONL（单行损坏不影响其余行） */
-function parseJsonl(raw, limit) {
-  const lines = raw.split('\n')
-  const tail = limit && limit > 0 ? lines.slice(-limit) : lines.slice(-JSONL_DEFAULT_TAIL)
+/**
+ * 按行解析 JSONL（单行损坏不影响其余行）。
+ *
+ * ⚠️ `lines` 与路由的 `limit` 是**两个维度**，不要混用：
+ *    · `limit` = 取**几个文件**（`mode: 'all'`）；
+ *    · `lines` = 每个文件取**尾部几行**。
+ *
+ * ⛔ 2026-09-19 修：此前本函数直接拿 `limit` 当行数用，于是给「目录型 JSONL」路由
+ *    加 `limit` 会**顺带截断每个文件** —— 盘中情绪时间轴因此每天只剩最后 5 行，
+ *    曲线退化成一条水平线（用户抓包「K 线上只看得到涨停」）。
+ *
+ * @param {string} raw 文件原文
+ * @param {number} [lines] 尾部行数上限；缺省 = `JSONL_DEFAULT_TAIL`
+ */
+function parseJsonl(raw, lines) {
+  const rows = raw.split('\n')
+  const tail = lines && lines > 0 ? rows.slice(-lines) : rows.slice(-JSONL_DEFAULT_TAIL)
   const out = []
   for (const line of tail) {
     const t = line.trim()
@@ -53,7 +66,7 @@ function parseJsonl(raw, limit) {
  *   ④ 数量截断        { ..., limit }                    只取**最新** N 个（防止历史无限增长撑爆响应）
  *
  * @param {string} dataRoot 数据根目录（绝对路径）
- * @param {{file?: string, dir?: string, pattern?: string, dirPattern?: string, mode?: 'latest'|'all', limit?: number}} def
+ * @param {{file?: string, dir?: string, pattern?: string, dirPattern?: string, mode?: 'latest'|'all', limit?: number, lines?: number, format?: 'json'|'jsonl'|'text'}} def
  * @returns {unknown} 解析后的 JSON；目录型按 mode 返回单个或数组
  */
 export function readRoute(dataRoot, def) {
@@ -91,7 +104,7 @@ export function readRoute(dataRoot, def) {
   if (def.file) {
     const raw = fs.readFileSync(path.join(dataRoot, def.file), 'utf-8')
     // JSONL（账本类 append-only）按行解析为数组，否则常规 JSON 解析
-    if (def.format === 'jsonl') return parseJsonl(raw, def.limit)
+    if (def.format === 'jsonl') return parseJsonl(raw, def.lines)
     /**
      * `text` = **原样返回字符串**，不在本层解析。
      *
@@ -122,7 +135,7 @@ export function readRoute(dataRoot, def) {
      */
     const readOne = (f) => {
       const raw = fs.readFileSync(path.join(dir, f), 'utf-8')
-      if (def.format === 'jsonl') return parseJsonl(raw, def.limit)
+      if (def.format === 'jsonl') return parseJsonl(raw, def.lines)
       if (def.format === 'text') return raw
       return JSON.parse(raw)
     }

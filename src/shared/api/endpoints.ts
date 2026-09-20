@@ -112,7 +112,9 @@ export interface RouteTypeMap {
   '/api/emotion/zt-history': DatedFile<ZtHistoryDay>[]
   '/api/emotion/memory': DatedFile<MarketMemory>[]
   '/api/zt/yesterday': ZtPoolSnapshot
-  '/api/intraday/timeline': IntradayTimelineEvent[]
+  /** ⚠️ 目录型（近 5 个交易日）—— 原始响应是 `[{file, data}]`，
+   *  `api.intradayTimeline()` 会摊平成事件数组再交给消费端。 */
+  '/api/intraday/timeline': DatedFile<IntradayTimelineEvent>[]
   // ── 七、财富密码决策链 ──
   // ⚠️ 这三条返回的都是**每日决策档案**（wealth_code_candidates_v1），
   //    不是「候选池」—— 曾因文件名含 candidates 而误绑 CandidatesFile，
@@ -266,8 +268,17 @@ export const api = {
   emotionMemory: () => fetchRoute('/api/emotion/memory'),
   /** 昨日涨停池（唯一涨停权威） */
   ztYesterday: () => fetchRoute('/api/zt/yesterday'),
-  /** 盘中情绪时间轴（当日逐事件 append-only · up/down 双向） */
-  intradayTimeline: () => fetchRoute('/api/intraday/timeline'),
+  /**
+   * 盘中情绪时间轴（近 5 个交易日逐事件 · append-only · up/down 双向）。
+   *
+   * 路由是**目录型**（一天一个 JSONL）→ 原始响应为 `[{file, data}]`；
+   * 此处**摊平成事件数组**：消费端只关心「某时刻发生了什么」，
+   * 不关心文件外壳（2026-09-19 用户要求曲线可切日 / 实时）。
+   */
+  intradayTimeline: async () => {
+    const files = await fetchRoute('/api/intraday/timeline')
+    return files.flatMap((f) => f.data ?? [])
+  },
 
   // ── 七、财富密码决策链 ──
   /** 每日决策档案存档（近 3 期 · 单份约 100KB） */

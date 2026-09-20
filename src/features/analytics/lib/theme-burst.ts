@@ -163,8 +163,16 @@ export interface ThemeBurst {
   leaders: string[]
   /** **当前**龙头 —— 取最新一次事件的落点（rise 的龙头，或最后一次 switch 的新龙头） */
   currentLeader: string | null
-  /** 龙头易主次数 */
-  switchCount: number
+  /**
+   * **该题材当日的观测时刻序列**（升序）—— 卡面用它替代「at~to 区间」。
+   *
+   * ⛔ 为什么不能用区间：一个区间说不清「几点爆的、后面几点又动过」。
+   * 实测「初次爆发」= `rise`，而 `rise` **每题材每天只出现一次**（4/2/1 个题材，重复 0 次）；
+   * 后续的「反复」来自同题材的其它记录（原「龙头切换」等）——
+ * ⚠️ 该「反复」口径已于 2026-09-17 从**题材区**撤除（用户「干脆撤掉这一行」），
+ *    但 `points` 观测时刻序列仍保留在**题材爆发榜**上（用户明确要求「不要区间、要时刻」）。
+   */
+  points: Array<{ at: number; kind: ThemeEventKind }>
   /** 催化原文（来自 `pushed_topics.context`） */
   catalyst: string | null
   /** 题材推文被推次数（来自 `pushed_topics.push_count`） */
@@ -244,19 +252,22 @@ export function buildThemeBursts(input: {
     /** ⚠️ 必须按时间排序后再取「最后一次」 —— event_log 的顺序不保证等于时间顺序 */
     const sorted = list.slice().sort((a, b) => a.at - b.at)
     const lead: string[] = []
+    const points: Array<{ at: number; kind: ThemeEventKind }> = []
     let currentLeader: string | null = null
-    let switchCount = 0
     let riseCount: number | null = null
     let isNewMainline = false
 
     for (const e of sorted) {
+      points.push({ at: e.at, kind: e.kind })
       if (e.kind === 'rise') {
         isNewMainline = true
         if (e.count != null) riseCount = Math.max(riseCount ?? 0, e.count)
         if (e.leader) currentLeader = e.leader
-      } else {
-        switchCount += 1
-        if (e.leader) currentLeader = e.leader
+      } else if (e.leader) {
+        // ⛔ 原系统「龙头切换」= **每轮重算板块领涨股导致的机械换人**，不是市场层面的龙头更替
+        //    （实测会在同一小撮票之间来回跳，如 09-17 国产芯片 中晶科技↔西陇科学↔实益达）。
+        //    故**不计数、不展示**；只把它的落点用于推导「当前龙头」。
+        currentLeader = e.leader
       }
       if (e.leader && !lead.includes(e.leader)) lead.push(e.leader)
     }
@@ -279,18 +290,17 @@ export function buildThemeBursts(input: {
       riseCount,
       leaders: lead,
       currentLeader,
-      switchCount,
+      points,
       catalyst: push?.context || null,
       pushCount: push ? push.push_count : null,
       members,
     })
   }
 
-  /** 榜的排序：先「新主线崛起」（题材级最强信号），再按易主次数、观测时点 */
+  /** 榜的排序：先「新主线崛起」（题材级最强信号），再按涨停家数、观测时点 */
   themes.sort(
     (a, b) =>
       Number(b.isNewMainline) - Number(a.isNewMainline) ||
-      b.switchCount - a.switchCount ||
       (b.riseCount ?? 0) - (a.riseCount ?? 0) ||
       a.at - b.at,
   )
@@ -350,7 +360,7 @@ export function buildThemeBursts(input: {
  * | 标记 | 来源形态 | 语义 |
  * |---|---|---|
  * | 🚀 爆发 | `新主线崛起：{题材} 涨停{n}只，龙头 {名}` | 该题材在这一刻被系统认定爆发 |
- * | 🔁 龙头易主 | `{题材} 龙头切换：{旧} → {新}` | **中性** —— 题材延续但换龙 |
+ * | ~~🔁 龙头易主~~ | ~~`{题材} 龙头切换：{旧} → {新}`~~ | **⛔ 已废弃** |
  * | ⚠️ 衰竭 | `关注板块集体重挫：{板块列表}` | 这些板块/题材集体转弱 |
  * | 📤 推送 | `pushed_topics`（该刻同分钟合并） | 题材被系统推送过（活跃证据，不带方向） |
  *
@@ -363,8 +373,6 @@ export function buildThemeBursts(input: {
 export interface SlotThemeMarks {
   /** 该时刻**爆发**的题材 */
   burst: Array<{ theme: string; count: number | null; leader: string | null }>
-  /** 该时刻**龙头易主**的题材（中性：题材延续、换龙） */
-  switched: Array<{ theme: string; from: string | null; to: string | null }>
   /** 该时刻**衰竭**的板块/题材（原系统「集体重挫」） */
   fade: Array<{ label: string }>
   /** 该时刻被推送的题材（活跃证据） */
@@ -378,7 +386,6 @@ export function slotThemeMarks(
   const parsed = parseThemeEvents(events ?? [])
 
   const burst: SlotThemeMarks['burst'] = []
-  const switched: SlotThemeMarks['switched'] = []
   const fade: SlotThemeMarks['fade'] = []
 
   for (const e of parsed) {
@@ -390,16 +397,17 @@ export function slotThemeMarks(
         .map((x) => x.trim())
         .filter(Boolean)
       for (const n of names) fade.push({ label: n })
-    } else if (e.kind === 'switch') {
-      switched.push({ theme: e.theme, from: e.from, to: e.leader })
     }
+    // ⛔ `switch`（原系统「龙头切换」）**不再产生任何题材层标记**（2026-09-17 用户「干脆撤掉这一行」）：
+    //    它本就是「每轮重算板块领涨股」的机械换人（源头已在 `intraday_pulse` 用龙头锁定治掉），
+    //    既不是爆发也不是衰竭 → 题材区只保留 🚀 首爆 / ⚠️ 衰竭 / 📤 推送。
   }
 
   const pushed = (pushes ?? [])
     .filter((p) => !!p.name)
     .map((p) => ({ name: p.name, pushCount: p.push_count ?? null }))
 
-  return { burst, switched, fade, pushed }
+  return { burst, fade, pushed }
 }
 
 /**
@@ -428,12 +436,12 @@ export function isLowStrengthSlot(s: {
   // 盘中逐事件（涨停/板块走强/杀跌/炸板/跌停）都是**真实市场事件** → 不得被合并吞掉
   if ((s.intradayUp?.length ?? 0) > 0 || (s.intradayDown?.length ?? 0) > 0) return false
   const m = slotThemeMarks(s.events, s.pushes)
-  if (m.burst.length > 0 || m.switched.length > 0 || m.fade.length > 0) return false
+  if (m.burst.length > 0 || m.fade.length > 0) return false
   return !!s.events?.length || !!s.pushes?.length
 }
 
 /**
- * ⛔ 口径边界（**界面上必须如实说明**）
+ * ⛔ 口径边界（**写在这里供维护者判断，⛔ 不要写到界面上**）
  *
  * 「题材爆发榜」的题材名与家数**来自原系统 `event_log`**（系统自己算好的结论），
  * 本模块只解析、不重算。它回答的是「系统今天认定哪几条题材线在爆发」。
@@ -442,7 +450,19 @@ export function isLowStrengthSlot(s: {
  * （每日仅 12 条题材、成员有限）。故：
  *   · 有题材标记的票 = 系统明确归属的
  *   · 没有的 = **不等于没有题材**，只是当日成员表未覆盖
- * 界面上不得把「无标记」呈现成「无题材」。
+ *
+ * ⛔ 「不得把无标记呈现成无题材」是**判断原则**（少标比错标好），
+ * 不再要求界面上写这句免责 —— 页面零注释（2026-09-17 用户明确）。
+ *
+ * ## ⛔ 已废弃：「龙头易主」（2026-09-17 用户「这个概念不对」）
+ *
+ * 原系统 `event_log` 的 `{题材} 龙头切换：{旧} → {新}` 由
+ * `memory_lib.detect_events` 生成，触发条件只是**相邻两轮 `top5[].leader` 字段不同** ——
+ * 即「系统每轮重算板块领涨股」导致的**机械换人**，不是市场层面的龙头更替。
+ * 实测铁证（09-17 国产芯片）：09:32 中晶科技→西陇科学，09:41 →实益达，09:57 →西陇科学，10:02 →中晶科技
+ * —— **在同一小撮票之间来回跳**。
+ * 故：`switch` **不产生题材层标记、不计次数、不参与榜排序**；
+ * 只把它的落点用于推导「当前龙头」`currentLeader`（这个是有效信息）。
  *
  * 逐票的「涨停原因」（同花顺 `reason`）是**自由文本**（实测 86 只里 78 个不同的
  * 首 token，91% 仅出现一次），**只能作逐票说明，不能作聚类键**。

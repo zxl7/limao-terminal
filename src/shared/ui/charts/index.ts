@@ -20,6 +20,7 @@
  * 数学内核见 `@/shared/lib` 的 chart.ts（纯函数、框架无关、有独立单测）。
  */
 
+export { useChartWidth } from './useChartWidth'
 export { Sparkline } from './Sparkline'
 export { LineChart, maLine, type LineSeries, type RefLine } from './LineChart'
 export { BarChart, type Bar } from './BarChart'

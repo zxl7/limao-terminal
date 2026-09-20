@@ -27,6 +27,13 @@ export interface LineSeries {
   dashed?: boolean
   /** 参与悬浮读数展示（默认 true；纯装饰序列可置 false 避免干扰） */
   readable?: boolean
+  /**
+   * 坐标轴归属：默认 `'left'`。置 `'right'` 走**副轴** —— 用于与左轴不同量纲的序列
+   *（如 炸板率 % 与 涨停/跌停 家数同图）。左轴行为不受影响，向后兼容。
+   */
+  axis?: 'left' | 'right'
+  /** 该序列专属数值格式（覆盖全局 `format`）—— 副轴序列用它输出 `%` 等单位 */
+  format?: (v: number) => string
 }
 
 /** 横向参考线（如情绪分 7 分「偏强」阈值、2 分「退潮」阈值） */
@@ -98,29 +105,47 @@ export function LineChart({
   /* 容器实测宽度 —— 宽屏下保证「图变宽而不变高」，见 useChartWidth 头注 */
   const { width, el, setEl } = useChartWidth(widthHint)
 
-  const box = plotBox(width, height)
+  // 副轴：显式声明 axis:'right' 的序列走右轴（炸板率 % 这类与计数不同量纲的指标）
+  const leftSeries = useMemo(() => series.filter((s) => (s.axis ?? 'left') === 'left'), [series])
+  const rightSeries = useMemo(() => series.filter((s) => s.axis === 'right'), [series])
+
+  // 副轴存在时右侧留出刻度区，避免右轴标签被裁切（左轴行为不变）
+  const box = plotBox(width, height, rightSeries.length ? { padRight: 46 } : {})
 
   const scaleInfo = useMemo(() => {
-    const ext = extentOfMany(series.map((s) => s.values))
+    const ext = extentOfMany(leftSeries.map((s) => s.values))
     if (!ext) return null
     const lo = yMin ?? (zeroBased ? Math.min(0, ext[0]) : ext[0])
     const hi = yMax ?? Math.max(ext[1], ...refLines.map((r) => r.value))
     return niceScale(lo, hi, yTickCount)
-  }, [series, yMin, yMax, yTickCount, refLines, zeroBased])
+  }, [leftSeries, yMin, yMax, yTickCount, refLines, zeroBased])
+
+  const rightScaleInfo = useMemo(() => {
+    if (rightSeries.length === 0) return null
+    const ext = extentOfMany(rightSeries.map((s) => s.values))
+    if (!ext) return null
+    return niceScale(ext[0], ext[1], yTickCount)
+  }, [rightSeries, yTickCount])
 
   const sx = useMemo(
     () => scaleLinear([0, Math.max(1, labels.length - 1)], [box.x0, box.x1]),
     [labels.length, box.x0, box.x1],
   )
-  const sy = useMemo(
+  const syLeft = useMemo(
     () => (scaleInfo ? scaleLinear([scaleInfo.min, scaleInfo.max], [box.y1, box.y0]) : null),
     [scaleInfo, box.y1, box.y0],
   )
+  const syRight = useMemo(
+    () => (rightScaleInfo ? scaleLinear([rightScaleInfo.min, rightScaleInfo.max], [box.y1, box.y0]) : null),
+    [rightScaleInfo, box.y1, box.y0],
+  )
 
-  const hasData = !!scaleInfo && !!sy && series.some((s) => s.values.some(isNum))
+  const hasLeft = !!scaleInfo && !!syLeft && leftSeries.some((s) => s.values.some(isNum))
+  const hasRight = !!rightScaleInfo && !!syRight && rightSeries.some((s) => s.values.some(isNum))
+  const hasData = hasLeft || hasRight
 
   /** 空态：全序列无有效样本 —— 不画假线 */
-  if (!hasData || !sy || !scaleInfo) {
+  if (!hasData) {
     return (
       <div className={cn('flex items-center justify-center text-sub text-[12px]', className)} style={{ height }}>
         无可用序列数据
@@ -154,9 +179,11 @@ export function LineChart({
       return
     }
     const ys = series
-      .map((s) => s.values[i])
-      .filter(isNum)
-      .map((v) => sy(v))
+      .map((s) => {
+        const v = s.values[i]
+        return isNum(v) ? (s.axis === 'right' ? syRight : syLeft)?.(v) : null
+      })
+      .filter((y): y is number => y != null)
     const vy = ys.length ? Math.min(...ys) : box.y0
     setHover({ i, anchor: viewToPx(el, e.currentTarget, sx(i), vy, width) })
   }
@@ -170,7 +197,7 @@ export function LineChart({
             const v = s.values[hover.i]
             return {
               label: s.name,
-              value: isNum(v) ? format(v) : '—',
+              value: isNum(v) ? (s.format ?? format)(v) : '—',
               tone: isNum(v) ? (s.tone ?? 'mid') : ('sub' as const),
             }
           }),
@@ -196,6 +223,7 @@ export function LineChart({
                 }}
               />
               {s.name}
+              {s.axis === 'right' ? '（右轴）' : ''}
             </span>
           ))}
         </div>
@@ -211,9 +239,10 @@ export function LineChart({
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
       >
-        {/* ── 网格与 Y 轴刻度 ── */}
-        {scaleInfo.ticks.map((t) => {
-          const y = round2(sy(t))
+        {/* ── 网格与左轴刻度 ── */}
+        {scaleInfo &&
+          scaleInfo.ticks.map((t) => {
+            const y = round2(syLeft!(t))
           return (
             <g key={`yt-${t}`}>
               <line
@@ -238,9 +267,9 @@ export function LineChart({
           )
         })}
 
-        {/* ── 参考线（阈值线：情绪分 7 / 2 这类判定边界） ── */}
-        {refLines.map((r) => {
-          const y = round2(sy(r.value))
+        {/* ── 参考线（阈值线：情绪分 7 / 2 这类判定边界 · 左轴） ── */}
+        {scaleInfo && refLines.map((r) => {
+          const y = round2(syLeft!(r.value))
           return (
             <g key={`ref-${r.value}-${r.label ?? ''}`}>
               <line
@@ -262,6 +291,27 @@ export function LineChart({
           )
         })}
 
+        {/* ── 右轴刻度（副轴序列：炸板率 % 这类不同量纲指标）── */}
+        {rightScaleInfo &&
+          rightScaleInfo.ticks.map((t) => {
+            const y = round2(syRight!(t))
+            return (
+              <g key={`ryt-${t}`}>
+                <line x1={box.x1} y1={y} x2={box.x1 + 3} y2={y} stroke="var(--color-line-faint)" strokeWidth={1} />
+                <text
+                  x={box.x1 + 5}
+                  y={y + 3}
+                  textAnchor="start"
+                  fontSize={10}
+                  fill="var(--color-sub)"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {(rightSeries[0]?.format ?? format)(t)}
+                </text>
+              </g>
+            )
+          })}
+
         {/* ── X 轴标签（抽稀，恒保首尾） ── */}
         {tickIdx.map((i) => (
           <text
@@ -279,7 +329,9 @@ export function LineChart({
         {/* ── 序列本体 ── */}
         {series.map((s) => {
           const tone = s.tone ?? 'mid'
-          const at = (i: number, v: number) => [sx(i), sy(v)] as const
+          const scale = s.axis === 'right' ? syRight : syLeft
+          const at = (i: number, v: number): [number, number] =>
+            scale ? [sx(i), scale(v)] : [box.x0, box.y0]
           const areas = s.area ? areaSegments(s.values, at, box.y1) : []
           const segs = lineSegments(s.values, at)
           return (
@@ -314,7 +366,7 @@ export function LineChart({
                       // oxlint-disable-next-line react/no-array-index-key -- 与序列索引严格对齐
                       key={`${s.name}-d${i}`}
                       cx={round2(sx(i))}
-                      cy={round2(sy(v))}
+                      cy={scale ? round2(scale(v)) : 0}
                       r={2.6}
                       fill={toneVar(tone)}
                     />
@@ -338,11 +390,12 @@ export function LineChart({
             {series.map((s) => {
               const v = s.values[hover.i]
               if (!isNum(v)) return null
+              const scale = s.axis === 'right' ? syRight : syLeft
               return (
                 <circle
                   key={`hv-${s.name}`}
                   cx={round2(sx(hover.i))}
-                  cy={round2(sy(v))}
+                  cy={scale ? round2(scale(v)) : 0}
                   r={3.2}
                   fill="var(--color-card)"
                   stroke={toneVar(s.tone ?? 'mid')}

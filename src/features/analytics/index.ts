@@ -38,6 +38,7 @@ export { parseTaskLedger } from './lib/task-ledger'
 export {
   buildTimeline,
   buildTimelineSlots,
+  buildLimitSeries,
   BURST_MIN_STOCKS,
   BURST_WINDOW_MIN,
   clockMin,
@@ -48,6 +49,7 @@ export {
   MARK_LABELS,
   MARKS,
   minToClock,
+  pickLiveBasis,
   SHAPE_META,
   SLOT_VISIBLE_SECTORS,
   sortIntradaySectorEvents,
@@ -62,6 +64,7 @@ export {
   type TimelineNode,
   type TimelineSlot,
   type TimelineSlotSector,
+  type LimitSeriesResult,
 } from './lib/timeline'
 
 // 题材级爆发内核（解析原系统 event_log 的题材结论 · 纯函数，可单测）
@@ -97,3 +100,47 @@ export {
   fmtFbt,
   fileDate,
 } from './lib/format'
+
+// 蛇形时间轴布局内核（纯函数：轴坐标换算 + 穿行分行 + SVG 路径 · 与 React 无关，可单测）
+export {
+  axisOf,
+  clockOfAxis,
+  layoutSnake,
+  snakePos,
+  SEAM_AXIS,
+  SESSION_AM_END,
+  SESSION_CLOSE,
+  SESSION_OPEN,
+  SESSION_PM_START,
+  SESSION_TOTAL_MIN,
+  SNAKE_BAR_MAX_H,
+  SNAKE_BAR_W,
+  SNAKE_MAX_ROWS,
+  SNAKE_MIN_GAP,
+  SNAKE_MIN_ROWS,
+  SNAKE_NODE_W,
+  SNAKE_PAD_X,
+  SNAKE_PAD_Y,
+  SNAKE_ROW_HEIGHT,
+  type SnakeLane,
+  type SnakeLayout,
+  type SnakePoint,
+} from './lib/snake'
+
+// 分块摘要（hover 浮层用 · 纯函数：全部走既有排序内核，列表有界但总数单列）
+export { summarizeBlock, SUMMARY_CAP, type BlockSummary } from './lib/block-summary'
+
+// 蛇形时间轴（一条线横走→弯→反向 · hover 浮层 + 点击详情）
+export { TimelineSnake } from './components/TimelineSnake'
+
+// 事件原文分段（纯函数 · 无损：拼接恒等于原文 · 供卡片高亮题材/个股）
+export {
+  emotionState,
+  eventTier,
+  severityNote,
+  splitEventText,
+  splitEventTextKeyed,
+  type EventSeg,
+  type EventSegKind,
+  type EventTier,
+} from './lib/event-text'

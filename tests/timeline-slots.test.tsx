@@ -110,7 +110,7 @@ describe('TimelineSlotCard 布局契约', () => {
     expect(themeEl?.className).toContain('font-medium')
   })
 
-  it('事件/推送同刻合并进卡片，并标注「卡片时刻，非事件时刻」', () => {
+  it('事件/推送同刻合并进卡片（⛔ 不带系统口径注解）', () => {
     const { nodes } = buildTimeline({
       stocks: [mk('a', '100000', '电力'), mk('b', '100000', '电力')],
       events: [{ time: '10:00', event: '情绪由分歧转亢奋', severity: 'high', topic: '情绪' }],
@@ -130,8 +130,9 @@ describe('TimelineSlotCard 布局契约', () => {
     const { container } = render(
       <TimelineSlotCard slot={slots[0]} topBoard={1} tags={new Map()} reasonByCode={new Map()} />,
     )
-    expect(container.textContent).toContain('卡片时刻，非事件时刻')
     expect(container.textContent).toContain('题材推送 1 条')
+    // ⛔ 「卡片时刻，非事件时刻」这类系统注解已按用户要求从页面删除
+    expect(container.textContent).not.toContain('非事件时刻')
   })
 
   it('固定列宽：不同标记组合（仅板数 / +20cm / +20cm+炸板）每行 grid 完全一致，标记列不撑宽', () => {
@@ -307,8 +308,9 @@ describe('TimelineSlotCard 固定高 / 滚动 / 板块强度排序', () => {
     const badge1 = Array.from(container.querySelectorAll('span')).find((s) => s.textContent === '#1')
     expect(badge1).toBeTruthy()
     expect((badge1 as HTMLElement).parentElement?.textContent).toContain('电力')
-    // 卡头如实标注排序口径
-    expect(container.textContent).toContain('按强度排序')
+    // 卡头只留数量，⛔ 不再写「按强度排序」这类口径注解
+    expect(container.textContent).toContain('板块 4 个')
+    expect(container.textContent).not.toContain('按强度排序')
   })
 
   it('④ 卡面直接展示最强 3 个板块，其余在标注后仍渲染（⛔ 不丢数据）', () => {
@@ -320,8 +322,8 @@ describe('TimelineSlotCard 固定高 / 滚动 / 板块强度排序', () => {
     // 最弱的「农业」不在「前三个」里，但**必须仍在 DOM**（下拉可见，不是被删）
     expect(container.textContent).toContain('农业')
     expect(container.textContent).toContain('其余 1 个板块')
-    // 卡头提示下拉（4 个 → 其余 1 个）
-    expect(container.textContent).toContain('下拉看其余 1 个')
+    // ⛔ 卡头不再写「下拉看其余 N 个」；只保留「其余 N 个板块」这一条事实标注
+    expect(container.textContent).not.toContain('下拉看其余')
     // ④ 号的排名徽标存在（说明它只是被排到后面，没有被丢弃）
     const badge4 = Array.from(container.querySelectorAll('span')).find((s) => s.textContent === '#4')
     expect(badge4).toBeTruthy()
@@ -391,7 +393,8 @@ describe('卡片内板块条目：强度排序 + 最多 3 个', () => {
     expect(SLOT_VISIBLE_SECTORS).toBe(3)
     // 涨 / 跌各 5 个 → 各 2 个超出
     expect(container.textContent?.match(/其余 2 个板块/g)?.length).toBe(2)
-    expect(container.textContent).toContain('板块 5 个 · 按强度排序')
+    expect(container.textContent).toContain('板块 5 个')
+    expect(container.textContent).not.toContain('按强度排序')
   })
 
   it('③ ⛔ 不丢数据：超出 3 个的板块仍在 DOM（下拉可见），非板块条目不受影响', () => {
@@ -405,5 +408,53 @@ describe('卡片内板块条目：强度排序 + 最多 3 个', () => {
     // 非板块条目照常（⛔ 不被「板块上限」波及）
     expect(container.textContent).toContain('涨停总数')
     expect(container.textContent).toContain('33')
+  })
+})
+
+/**
+ * 题材区自 2026-09-17 起**只有三类**：`🚀 首爆` / `⚠️ 衰竭` / `📤 推送`。
+ *
+ * ⛔ `↻ 反复` 已**整类撤除**（用户「干脆撤掉这一行」）：
+ *   它的数据源是「每轮重算板块领涨股」的机械换人 —— 源头已用**龙头锁定**治掉
+ *   （`intraday_pulse.diagnose_dragon`），且它既不是爆发也不是衰竭，不该在题材区占位。
+ */
+describe('卡片题材区：只有首爆 / 衰竭 / 推送（⛔ 反复已撤除）', () => {
+  const evt = (text: string, time: string, topic: string) =>
+    ({ time, event: text, severity: 'high', topic }) as never
+  const mkSlot = (at: number, events: never[]) => ({
+    at, sectors: [], singles: [], events, pushes: null, pushTo: null,
+    intradayUp: [], intradayDown: [], key: `slot:${at}`,
+  })
+
+  it('⛔ 任何情况下都不再出现「↻ 反复」这一行', () => {
+    for (const events of [
+      // ① 混合：首爆 + 龙头切换
+      [evt('新主线崛起：光通信 涨停7只，龙头 华脉科技', '10:00', '光通信'),
+       evt('福建自贸/海西概念 龙头切换：漳州发展 → 闽东电力', '10:00', '福建自贸/海西概念')],
+      // ② 只有龙头切换（旧版会渲染「反复」行）
+      [evt('PCB板 龙头切换：中岩大地 → 中材科技', '10:00', 'PCB板')],
+    ] as never[][]) {
+      const { container } = render(
+        <TimelineSlotCard slot={mkSlot(600, events) as never} topBoard={1} tags={new Map()} reasonByCode={new Map()} />,
+      )
+      const txt = container.textContent ?? ''
+      expect(txt).not.toContain('反复')
+      expect(txt).not.toContain('易主')
+      expect(txt).not.toContain('换将')
+    }
+  })
+
+  it('首爆仍照常渲染（撤除的是「反复」不是「首爆」）', () => {
+    const { container } = render(
+      <TimelineSlotCard
+        slot={mkSlot(600, [evt('新主线崛起：光通信 涨停7只，龙头 华脉科技', '10:00', '光通信')]) as never}
+        topBoard={1}
+        tags={new Map()}
+        reasonByCode={new Map()}
+      />,
+    )
+    const txt = container.textContent ?? ''
+    expect(txt).toContain('🚀 首爆')
+    expect(txt).toContain('光通信')
   })
 })

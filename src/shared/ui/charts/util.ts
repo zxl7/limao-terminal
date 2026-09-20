@@ -81,7 +81,11 @@ export const AXIS = {
 } as const
 
 /** 图表内部绘图区的像素尺寸（由 viewBox 宽高减去留白得到） */
-export function plotBox(w: number, h: number, pad: Partial<typeof AXIS> = {}) {
+export function plotBox(
+  w: number,
+  h: number,
+  pad: Partial<{ padLeft: number; padRight: number; padTop: number; padBottom: number }> = {},
+) {
   const p = { ...AXIS, ...pad }
   return {
     x0: p.padLeft,

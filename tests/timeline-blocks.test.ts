@@ -225,15 +225,19 @@ describe('⛔ 形态一致性：含题材信号的时刻不得被低频合并（
     expect(blocks[0].kind).toBe('merged')
   })
 
-  it('盘中当日（无个股、只有题材事件）→ 每个时刻一张普通卡（与有股日子同一形态）', () => {
+  it('首爆 = 题材层信号 → 独立成普通卡；「龙头切换」**已降级为低强度** → 走合并', () => {
     const slots = [
       slot(592, { events: [ev('新主线崛起：玻璃基板封装 涨停3只，龙头 三峡新材')] }),
       slot(600, { events: [ev('PCB板 龙头切换：中岩大地 → 中材科技')] }),
       slot(622, { events: [ev('机器人 龙头切换：A → B')] }),
     ]
     const blocks = groupTimelineSlots(slots, isLowStrengthSlot)
-    expect(blocks.every((b) => b.kind === 'normal')).toBe(true)
-    expect(blocks).toHaveLength(3)
+    // ⚠️ 行为后果（2026-09-17 用户「干脆撤掉这一行」的连带效果，如实锁住）：
+    //    「龙头切换」不再是题材层信号 → 只含它的分钟 = 低强度 → 600/622 合成一张合并卡。
+    //    这是**想要**的：机械换人不该撑起一张独立的时间轴卡。
+    expect(blocks.map((b) => b.kind)).toEqual(['normal', 'merged'])
+    // ⛔ 不丢不重：3 个槽一个不少（合并 ≠ 删除）
+    expect(blocks.flatMap((b) => (b.kind === 'normal' ? [b.slot] : b.slots))).toHaveLength(3)
   })
 })
 

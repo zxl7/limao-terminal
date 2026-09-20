@@ -115,10 +115,13 @@ function DirectionSection({
   dir,
   label,
   events,
+  showAll = false,
 }: {
   dir: IntradayDirection
   label: string
   events: IntradayTimelineEvent[]
+  /** ⛔ 明细浮层必须传 true —— 它是「完整明细」的落点，不能再截到 3 个 */
+  showAll?: boolean
 }) {
   const kind = SECTOR_KIND[dir]
   const sectors = withKeys(
@@ -129,17 +132,16 @@ function DirectionSection({
     (e) => `is:${kind}:${String(e.name ?? '')}`,
   )
   const others = events.filter((e) => String(e.kind) !== kind)
-  const top = sectors.slice(0, SLOT_VISIBLE_SECTORS)
-  const rest = sectors.slice(SLOT_VISIBLE_SECTORS)
+  const cap = showAll ? sectors.length : SLOT_VISIBLE_SECTORS
+  const top = sectors.slice(0, cap)
+  const rest = sectors.slice(cap)
 
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
       <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
         {label}
         {sectors.length > 0 && (
-          <span className="text-sub font-normal ml-1.5">
-            板块 {sectors.length} 个 · 按强度排序
-          </span>
+          <span className="text-sub font-normal ml-1.5">板块 {sectors.length} 个</span>
         )}
       </span>
 
@@ -153,9 +155,7 @@ function DirectionSection({
 
       {rest.length > 0 && (
         <>
-          <div className="text-[10px] text-sub pl-1.5">
-            ↓ 其余 {rest.length} 个板块（较弱，下拉查看）
-          </div>
+          <div className="text-[10px] text-sub pl-1.5">↓ 其余 {rest.length} 个板块</div>
           <div className="flex flex-col gap-0.5 min-w-0 pl-1.5">
             {rest.map(({ key, item }) => (
               <IntradayEventLine key={key} e={item} />
@@ -183,15 +183,20 @@ function DirectionSection({
 export function IntradayEventBlock({
   up,
   down,
+  showAll = false,
 }: {
   up: IntradayTimelineEvent[]
   down: IntradayTimelineEvent[]
+  /** 取消「板块最多 3 个」上限（明细浮层用） */
+  showAll?: boolean
 }) {
   if (up.length === 0 && down.length === 0) return null
   return (
     <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
-      {up.length > 0 && <DirectionSection dir="up" label="🔴 爆发 / 走强" events={up} />}
-      {down.length > 0 && <DirectionSection dir="down" label="🟢 杀跌 / 炸板 / 跌停" events={down} />}
+      {up.length > 0 && <DirectionSection dir="up" label="🔴 爆发 / 走强" events={up} showAll={showAll} />}
+      {down.length > 0 && (
+        <DirectionSection dir="down" label="🟢 杀跌 / 炸板 / 跌停" events={down} showAll={showAll} />
+      )}
     </div>
   )
 }
