@@ -25,7 +25,9 @@ export function SignalsCard() {
       }
     >
       {rows.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        /* 上限 300px + 内部滚动：信号条数随盘面变化（实测盘中 6 条起），
+           不封顶会把等权网格的整行拉高、把页面顶出首屏（与 LeadersCard 同口径）。 */
+        <div className="flex flex-col gap-2 max-h-[300px] overflow-auto">
           {rows.map((s) => (
             <div
               key={s.code ?? s.name}

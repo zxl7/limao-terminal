@@ -93,6 +93,28 @@ describe('buildLimitSeries', () => {
     const r = buildLimitSeries([ev('2026-09-18 09:06:37', 'zt_total', { total: 5 })])
     expect(r.zt.every((v) => v == null)).toBe(true)
   })
+
+  it('⛔ untilWm：盘中只画到此刻，不平推到收盘（不画未来）', () => {
+    const events = [
+      ev('2026-09-18 09:31:23', 'zt_total', { total: 11 }),
+      ev('2026-09-18 10:00:00', 'broken_new', { name: 'X' }),
+      ev('2026-09-18 10:00:00', 'limit_down_new', { name: 'Y' }),
+    ]
+    // 盘中走到 10:03（墙钟 603）→ 此刻之前的刻度有值，之后的必须断线
+    // ⚠️ `MARKS` 是 **15 分钟**刻度（09:30 / 09:45 / 10:00 / 10:15 …）
+    const live = buildLimitSeries(events, 603)
+    expect(live.zt[idx('10:00')]).toBe(11)
+    expect(live.ld[idx('10:00')]).toBe(1)
+    expect(live.zt[idx('10:15')]).toBeNull()
+    expect(live.ld[idx('10:15')]).toBeNull()
+    expect(live.zt[idx('15:00')]).toBeNull()
+    expect(live.brokenRate[idx('15:00')]).toBeNull()
+
+    // 收盘后（缺省 = 填满全天）：最后一个观测值就是收盘值
+    const closed = buildLimitSeries(events)
+    expect(closed.zt[idx('15:00')]).toBe(11)
+    expect(closed.ld[idx('15:00')]).toBe(1)
+  })
 })
 
 /**
@@ -154,5 +176,17 @@ describe('pickLiveBasis', () => {
       ev('2026-09-19 08:30:00', 'zt_total', { total: 3 }),
     ])
     expect(r?.date).toBe('2026-09-18')
+  })
+
+  it('lastAt = 基准日最后一个「窗口内」事件时刻（盘后复盘卡 / 盘前残留都不算观测）', () => {
+    const r = pickLiveBasis([
+      ev('2026-09-18 09:35:00', 'zt_total', { total: 30 }),
+      ev('2026-09-18 14:57:28', 'zt_total', { total: 79 }),
+      ev('2026-09-18 17:42:00', 'zt_total', { total: 79 }),
+    ])
+    expect(r?.lastAt).toBe('2026-09-18 14:57:28')
+
+    // 只有窗口外事件时，不可能被选成基准日 → 不存在「用 00:06 当最后观测」
+    expect(pickLiveBasis([ev('2026-09-19 00:06:13', 'zt_total', { total: 79 })])).toBeNull()
   })
 })

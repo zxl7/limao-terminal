@@ -68,7 +68,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       return (
         <span className="text-[11.5px] text-up">
           <span className="font-medium">{e.name}</span>
-          <span className="num text-sub ml-1">{e.zt_count}只</span>
+          <span className="num text-sub ml-1">{e.zt_count == null ? '—' : `${e.zt_count}只`}</span>
           {e.delta != null && <span className="num text-sub ml-1">+{e.delta}</span>}
         </span>
       )

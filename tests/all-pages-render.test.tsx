@@ -150,3 +150,52 @@ describe('全页面真实数据渲染', () => {
     })
   }
 })
+
+/**
+ * `/timeline` 页的**内容归属**锁（2026-09-20 用户定调）。
+ *
+ * ⛔ 用户原话：「将题材爆发的时间节点…添加到时间轴上，然后把『题材爆发』这条组件删掉」。
+ * 即：题材信息必须活在**时间轴节点**上（紫色竖条 + 轴上板块名 + hover 展开催化/成员），
+ * ⛔ 不得再长出一张独立的题材清单大卡 —— 那是重复展示，还白占一屏。
+ *
+ * ⚠️ 卡被删掉后页面**照常工作、不报错**（纯展示层缺失）→ 只有断言能防回退。
+ */
+describe('/timeline 页 · 题材信息归属时间轴节点', () => {
+  async function renderTimeline() {
+    const mod = (await import('@/pages/timeline/TimelinePage')) as { Component?: ComponentType }
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchInterval: false, gcTime: 0 } },
+    })
+    const Page = mod.Component!
+    const wrap = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    const { container } = render(<Page />, { wrapper: wrap })
+    await waitFor(() => {
+      expect(client.isFetching()).toBe(0)
+    })
+    return container
+  }
+
+  const titlesOf = (c: HTMLElement) =>
+    [...c.querySelectorAll('.panel-title')].map((el) => el.textContent ?? '')
+
+  it('⛔ 不再有独立的「题材爆发」大卡（题材信息归时间轴节点）', async () => {
+    const c = await renderTimeline()
+    expect(
+      titlesOf(c).some((t) => t.includes('题材爆发')),
+      '「🚀 题材爆发」独立卡已按用户要求删除，不该被加回来',
+    ).toBe(false)
+  })
+
+  it('删的是重复展示、不是数据：主体卡与题材 KPI 仍在', async () => {
+    const c = await renderTimeline()
+    const titles = titlesOf(c)
+    for (const t of ['日内炒作时间轴', '时间轴', '行业级集群']) {
+      expect(titles.some((x) => x.includes(t)), `缺少「${t}」卡`).toBe(true)
+    }
+    // 题材线 / 题材事件 计数仍在通栏 KPI 里
+    expect(c.textContent).toContain('题材线')
+    expect(c.textContent).toContain('题材事件')
+  })
+})

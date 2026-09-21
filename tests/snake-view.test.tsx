@@ -11,6 +11,7 @@ import {
   SNAKE_MIN_ROWS,
   SNAKE_NODE_W,
   TimelineSnake,
+  type ThemeBurst,
   type TimelineBlock,
   type TimelineSlot,
   type TimelineSlotSector,
@@ -462,5 +463,153 @@ describe('TimelineSnake · 悬停明细必须全量（不折叠）', () => {
     fireEvent.mouseEnter(nodeAt(container, '10:00'))
     const dlg = container.querySelector('[role="dialog"]') as HTMLElement
     expect(dlg.textContent).not.toContain('另有')
+  })
+})
+
+/**
+ * 题材爆发节点（2026-09-20 用户三条定调，全部锁在这里）。
+ *
+ *   ① 「将题材爆发的时间节点，按照**板块和时间节点**添加到时间轴上」→ 轴上直接标板块名；
+ *   ② 「hover 详情…**板块、个股、催化**都可以显示」→ 详情里展开催化 / 成员 / 观测时刻；
+ *   ③ 「这种题材爆发的节点，可以标**紫色**显示」→ 竖条 `bg-rec`（原来是红 `bg-up/70`）。
+ *
+ * ⛔ 为什么必须钉住：颜色错了、名字漏了、催化没渲染，**页面都照常工作、不报错** ——
+ * 典型的静默退化，只有渲染断言能发现。
+ */
+describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含催化）', () => {
+  /** 竖条（宽度 = SNAKE_BAR_W 的那个 span） */
+  const barAt = (c: HTMLElement, clock: string) =>
+    nodeAt(c, clock).querySelector(`span[style*="width: ${SNAKE_BAR_W}px"]`) as HTMLElement
+
+  const themeInfo = new Map<string, ThemeBurst>([
+    [
+      '光通信',
+      {
+        theme: '光通信',
+        at: 11 * 60,
+        to: 14 * 60 + 53,
+        isNewMainline: true,
+        riseCount: 7,
+        leaders: ['华脉科技'],
+        currentLeader: '华脉科技',
+        points: [
+          { at: 11 * 60, kind: 'rise' },
+          { at: 14 * 60 + 53, kind: 'rise' },
+        ],
+        catalyst: '黄仁勋产能翻倍 + 光刻胶涨价',
+        pushCount: 2,
+        members: [{ code: '600522', name: '中天科技' }],
+      },
+    ],
+  ])
+
+  const RISE = {
+    time: '11:00',
+    event: '新主线崛起：光通信 涨停7只，龙头 华脉科技',
+    severity: 'high',
+    topic: '光通信',
+  }
+
+  /**
+   * 纯题材爆发槽（**无**杀跌板块）。
+   * ⚠️ 实测取证（2026-09-17/18 共 5 次 rise）：**从不**与 `sector_down` 同分钟，
+   * 故「紫」在真实数据里就是这类节点的常态颜色。
+   */
+  const burstBlock = () => normalBlock(11 * 60, slot(11 * 60, { events: [RISE] }))
+
+  it('① 题材爆发节点竖条为**紫色**（紫=题材），且不泛化到普通节点', () => {
+    const { container } = render(<TimelineSnake blocks={[burstBlock()]} {...props} {...instant} width={W} />)
+    const burstBar = barAt(container, '11:00')
+    expect(burstBar.className, '题材爆发节点应为紫色').toContain('bg-rec')
+    expect(burstBar.className, '⛔ 不得再退化成红色 bg-up/70').not.toContain('bg-up')
+
+    // 反例：普通节点仍是灰 —— 紫色是题材专用色，不能处处紫
+    const { container: c2 } = render(
+      <TimelineSnake
+        blocks={[normalBlock(14 * 60, slot(14 * 60, { singles: [mk('z', '140000', '黄酒')] }))]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    expect(barAt(c2, '14:00').className).toContain('bg-sub')
+  })
+
+  it('② 同一分钟既有题材爆发又有杀跌板块 → **风险优先**（绿），这是刻意的优先级', () => {
+    const mixed = normalBlock(
+      11 * 60,
+      slot(11 * 60, { events: [RISE], intradayDown: [ie('sector_down', '白银', { pct: -6.49 })] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[mixed]} {...props} {...instant} width={W} />)
+    // 文档既定顺序：联动 > 杀跌 > 题材 > 合并 > 普通（与卡片流同源）
+    expect(barAt(container, '11:00').className).toContain('bg-down')
+  })
+
+  it('③ 轴上直接标出板块名，无障碍名字里也带题材（非题材节点不带）', () => {
+    const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} {...instant} width={W} />)
+    const burstNode = nodeAt(container, '11:00')
+    expect(burstNode.textContent, '轴上应标出爆发题材名').toContain('光通信')
+    expect(burstNode.getAttribute('aria-label')).toContain('题材光通信')
+    const plainNode = nodeAt(container, '13:30')
+    expect(plainNode.getAttribute('aria-label')).not.toContain('题材')
+    expect(plainNode.textContent).not.toContain('🚀')
+  })
+
+  it('④ hover 详情展开该题材的催化 / 涨停成员 / 观测时刻，且浮层已放大', () => {
+    const { container } = render(
+      <TimelineSnake blocks={threeBlocks()} {...props} themeInfo={themeInfo} {...instant} width={W} />,
+    )
+    fireEvent.mouseEnter(nodeAt(container, '11:00'))
+    const dlg = dialogOf(container)!
+    expect(dlg.textContent, '详情缺催化原文').toContain('催化：黄仁勋产能翻倍 + 光刻胶涨价')
+    expect(dlg.textContent, '详情缺当日涨停成员（个股）').toContain('当日涨停成员：中天科技')
+    expect(dlg.textContent, '详情缺观测时刻序列').toContain('观测 11:00 → 14:53')
+    // 用户 2026-09-20「卡片 hover 可以显示大一点」：700 → 980
+    expect(dlg.style.width).toBe('980px')
+  })
+
+  it('⑤ ⛔ 不传 `themeInfo` 时详情不出现催化行（卡面/默认保持紧凑）', () => {
+    const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} {...instant} width={W} />)
+    fireEvent.mouseEnter(nodeAt(container, '11:00'))
+    const dlg = dialogOf(container)!
+    expect(dlg.textContent).toContain('光通信')
+    expect(dlg.textContent).not.toContain('催化：')
+    expect(dlg.textContent).not.toContain('当日涨停成员：')
+  })
+
+  /**
+   * ⑥⑦ 锁 2026-09-20 用户「全部题材上轴」（删掉题材爆发大卡后，题材可见性从 8 个掉到 3 个，
+   * 用户抓包「其他的题材全部都没看到了」→ 仅龙头轮动的题材也要在轴上可见）。
+   */
+  const ROTATED = {
+    time: '14:00',
+    event: 'PCB板 龙头切换：中岩大地 → 中材科技',
+    severity: 'high',
+    topic: 'PCB板',
+  }
+  const rotatedBlock = (at: number) => normalBlock(at, slot(at, { events: [ROTATED] }))
+
+  it('⑥ 仅龙头轮动的题材也上轴：淡紫弱标记 + 题材名（⛔ 不带 🚀）', () => {
+    const { container } = render(<TimelineSnake blocks={[rotatedBlock(14 * 60)]} {...props} {...instant} width={W} />)
+    const bar = barAt(container, '14:00')
+    expect(bar.className, '仅轮动 = 淡紫弱标记（不是爆发的实心紫）').toContain('bg-rec/40')
+    expect(bar.className.split(' '), '⛔ 不得与爆发同色').not.toContain('bg-rec')
+    const node = nodeAt(container, '14:00')
+    expect(node.textContent, '轴上必须看得到题材名').toContain('PCB板')
+    expect(node.textContent, '⛔ 轮动不是爆发，不带 🚀').not.toContain('🚀')
+    expect(node.getAttribute('aria-label')).toContain('题材轮动PCB板')
+  })
+
+  it('⑦ 同层标签放不下时**题材名优先**于普通时刻标签（否则题材等于不可见）', () => {
+    // 10:00 普通显著节点（3 个板块）与 10:01 仅轮动节点相隔 1 分钟 → 两个标签放不下
+    const plain = normalBlock(
+      10 * 60,
+      slot(10 * 60, { sectors: [sec('电力', 3), sec('半导体', 3), sec('医药', 3)] }),
+    )
+    const { container } = render(
+      <TimelineSnake blocks={[plain, rotatedBlock(10 * 60 + 1)]} {...props} {...instant} width={W} />,
+    )
+    expect(nodeAt(container, '10:01').textContent, '题材名必须赢得空间').toContain('PCB板')
+    expect(nodeAt(container, '10:00').textContent, '普通时刻标签让位').toBe('')
   })
 })

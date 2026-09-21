@@ -28,7 +28,9 @@ export function LadderCard() {
       }
     >
       {groups.length > 0 ? (
-        <div className="flex flex-col gap-[3px]">
+        /* 上限 300px + 内部滚动：梯队数与每档票数随盘面变化，
+           1/4 宽的卡里票名换行后更容易撑高（与 LeadersCard 同口径）。 */
+        <div className="flex flex-col gap-[3px] max-h-[300px] overflow-auto">
           {groups.map((g) => {
             const isTop = g.boards === maxBoards
             return (

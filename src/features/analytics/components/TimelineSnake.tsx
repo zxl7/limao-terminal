@@ -14,7 +14,7 @@ import {
   SNAKE_BAR_W,
   SNAKE_NODE_W,
 } from '../lib/snake'
-import type { StockThemeTag } from '../lib/theme-burst'
+import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
 
 /**
  * **蛇形时间轴**（boustrophedon）—— 一条线从 09:15 横过去、到边半圆弯下来、反向再横走。
@@ -48,10 +48,10 @@ import type { StockThemeTag } from '../lib/theme-burst'
 
 /** 未测量时的兜底宽度（PC 端典型内容区宽） */
 const FALLBACK_WIDTH = 1440
-/** 明细浮层宽度（px） */
-const DETAIL_W = 700
-/** 明细浮层最大高度（vh）—— 超出则浮层内部滚动 */
-const DETAIL_MAX_VH = 62
+/** 明细浮层宽度（px）—— 2026-09-20 用户「卡片 hover 可以显示大一点」：700 → 980 */
+const DETAIL_W = 980
+/** 明细浮层最大高度（vh）—— 超出则浮层内部滚动（62 → 76，配合宽度一起放大） */
+const DETAIL_MAX_VH = 76
 /** 浮层「往上放还是往下放」的 y 判定阈值（px） */
 const DETAIL_FLIP_Y = 300
 
@@ -65,13 +65,19 @@ const KIND_LABEL: Record<TimelineBlock['kind'], string> = {
 }
 
 /**
- * 竖条颜色 = 该刻**性质**（与 A 股语义一致：涨红 / 跌绿 / 题材紫 / 普通灰）。
+ * 竖条颜色 = 该刻**性质**（与 A 股语义一致：涨红 / 跌绿 / **题材紫** / 普通灰）。
  * ⛔ 与卡片流的判断顺序同源（联动 > 杀跌 > 题材 > 合并 > 普通），免得同一时刻两种视图颜色不一致。
+ *
+ * ⚠️ 2026-09-20 修：题材爆发原为 `bg-up/70`（**红**）—— 与「紫=题材」的全站语义相悖，
+ *    也与本函数注释自述不符（用户抓包「这种题材爆发的节点，可以标紫色显示」）。
+ *    现统一为 `bg-rec`（紫），并同步卡片题材区的 🚀 首爆 标签色。
  */
 function barTone(s: BlockSummary, block: TimelineBlock): string {
   if (block.kind === 'linkage') return 'bg-up'
   if (s.fade.length > 0 || s.downSectorCount > 0) return 'bg-down'
-  if (s.burst.length > 0) return 'bg-up/70'
+  if (s.burst.length > 0) return 'bg-rec'
+  // 仅龙头轮动的题材 → **淡紫**（弱一档：题材被观测到，但不是新崛起）
+  if (s.rotated.length > 0) return 'bg-rec/40'
   if (block.kind === 'merged') return 'bg-line-strong'
   return 'bg-sub'
 }
@@ -103,6 +109,9 @@ function isNotable(s: BlockSummary, block: TimelineBlock): boolean {
   return (
     block.kind === 'linkage' ||
     s.burst.length > 0 ||
+    // 轮动题材也要标名字（2026-09-20 用户「其他的题材全部都没看到了」）——
+    // 不标的话，仅轮动的题材在轴上依然不可见，等于白标记
+    s.rotated.length > 0 ||
     s.fade.length > 0 ||
     s.sectorCount >= SLOT_VISIBLE_SECTORS ||
     s.upSectorCount + s.downSectorCount >= 2
@@ -141,6 +150,7 @@ function HoverDetail({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
   x,
   y,
   width,
@@ -152,6 +162,8 @@ function HoverDetail({
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  /** 题材名 → 当日全貌（催化 / 成员 / 观测时刻）—— 详情里才展开，卡面不展开 */
+  themeInfo?: Map<string, ThemeBurst>
   x: number
   y: number
   width: number
@@ -216,6 +228,7 @@ function HoverDetail({
               topBoard={topBoard}
               tags={tags}
               reasonByCode={reasonByCode}
+              themeInfo={themeInfo}
               showTime={slots.length > 1}
               showAllSectors
               showAllEvents
@@ -240,6 +253,7 @@ export function TimelineSnake({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
   width,
   hoverOpenDelayMs = 110,
   hoverCloseDelayMs = 160,
@@ -248,6 +262,8 @@ export function TimelineSnake({
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  /** 题材名 → 当日全貌（催化 / 成员 / 观测时刻）—— 只在 hover 明细里展开 */
+  themeInfo?: Map<string, ThemeBurst>
   width?: number
   hoverOpenDelayMs?: number
   hoverCloseDelayMs?: number
@@ -322,13 +338,27 @@ export function TimelineSnake({
     const out = new Set<string>()
     for (const list of byLane.values()) {
       const sorted = [...list].sort((a, b) => a.point.x - b.point.x)
-      let lastX = Number.NEGATIVE_INFINITY
-      for (const n of sorted) {
+      /**
+       * ⛔ **题材节点优先占位**（2026-09-20 用户「其他的题材全部都没看到了」）：
+       *
+       * 旧实现是「按 x 从左到右贪心」—— 先到的普通时刻标签会把题材名挤掉，
+       * 于是密集段落里的题材在轴上彻底不可见（等于没标记）。
+       * 现改为**两轮**：① 先让带题材名（爆发/轮动）的节点占位；
+       * ② 再用剩余空间给普通节点标时刻。间距判据对**已放置的全部标签**成立（不是只比前一个）。
+       */
+      const hasTheme = (n: (typeof sorted)[number]) =>
+        n.summary.burst.length > 0 || n.summary.rotated.length > 0
+      const ordered = [
+        ...sorted.filter(hasTheme),
+        ...sorted.filter((n) => !hasTheme(n)),
+      ]
+      const placed: number[] = []
+      for (const n of ordered) {
         // ⛔ 盘外记录**一律标注**（它被夹到边界，没有标签就完全无法辨认）
         if (!n.point.outside && !isNotable(n.summary, n.block)) continue
-        if (n.point.x - lastX < MIN_LABEL_GAP) continue
+        if (placed.some((x) => Math.abs(n.point.x - x) < MIN_LABEL_GAP)) continue
         out.add(n.block.key)
-        lastX = n.point.x
+        placed.push(n.point.x)
       }
     }
     return out
@@ -385,6 +415,24 @@ export function TimelineSnake({
           const isOpen = block.key === openKey
           const outsideTag =
             point.outside === 'post' ? '（盘后）' : point.outside === 'pre' ? '（盘前）' : ''
+          /**
+           * 轴上直接标出的**板块名**（用户 2026-09-20「按照板块和时间节点添加到时间轴上」）：
+           *   · 新崛起 → `🚀题材名`（实心紫 = 强）
+           *   · 仅龙头轮动 → `题材名`（淡紫 = 弱一档，⛔ 不带 🚀）
+           * 多题材只列第一个 + `+N` 防叠字；完整名单在 hover 明细里。
+           */
+          const themeTag =
+            summary.burst.length > 0
+              ? {
+                  strong: true,
+                  text: `🚀${summary.burst[0].theme}${summary.burst.length > 1 ? `+${summary.burst.length - 1}` : ''}`,
+                }
+              : summary.rotated.length > 0
+                ? {
+                    strong: false,
+                    text: `${summary.rotated[0].theme}${summary.rotated.length > 1 ? `+${summary.rotated.length - 1}` : ''}`,
+                  }
+                : null
           return (
             <button
               key={block.key}
@@ -404,7 +452,14 @@ export function TimelineSnake({
                 transform: 'translate(-50%, -50%)',
                 zIndex: isOpen ? 12 : 10,
               }}
-              aria-label={`${minToClock(block.at)}${outsideTag} ${KIND_LABEL[block.kind]} 封板${summary.stockCount}只`}
+              aria-label={`${minToClock(block.at)}${outsideTag} ${KIND_LABEL[block.kind]} 封板${summary.stockCount}只${
+                // 该刻爆发的题材名直接进无障碍名字 —— 节点要能「按板块」被识别
+                summary.burst.length > 0 ? ` 题材${summary.burst.map((b) => b.theme).join('、')}` : ''
+              }${
+                summary.rotated.length > 0
+                  ? ` 题材轮动${summary.rotated.map((r) => r.theme).join('、')}`
+                  : ''
+              }`}
               // 语义：本按钮会弹出一个浮层（= 明细），展开态由 hover 驱动
               aria-haspopup="dialog"
               aria-expanded={isOpen}
@@ -432,6 +487,11 @@ export function TimelineSnake({
                   {point.outside && (
                     <span className="text-warn">{point.outside === 'post' ? '盘后' : '盘前'}</span>
                   )}
+                  {themeTag && (
+                    <span className={cn('ml-1', themeTag.strong ? 'text-rec' : 'text-rec/60')}>
+                      {themeTag.text}
+                    </span>
+                  )}
                 </span>
               )}
             </button>
@@ -445,6 +505,7 @@ export function TimelineSnake({
             topBoard={topBoard}
             tags={tags}
             reasonByCode={reasonByCode}
+            themeInfo={themeInfo}
             x={openNode.point.x}
             y={openNode.point.y}
             width={layout.width}

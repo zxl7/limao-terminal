@@ -412,13 +412,15 @@ describe('卡片内板块条目：强度排序 + 最多 3 个', () => {
 })
 
 /**
- * 题材区自 2026-09-17 起**只有三类**：`🚀 首爆` / `⚠️ 衰竭` / `📤 推送`。
+ * 题材区自 2026-09-20 起是**四类**：`🚀 首爆` / `轮动`（弱）/ `⚠️ 衰竭` / `📤 推送`。
  *
- * ⛔ `↻ 反复` 已**整类撤除**（用户「干脆撤掉这一行」）：
- *   它的数据源是「每轮重算板块领涨股」的机械换人 —— 源头已用**龙头锁定**治掉
- *   （`intraday_pulse.diagnose_dragon`），且它既不是爆发也不是衰竭，不该在题材区占位。
+ * ⛔ `↻ 反复` 仍然**整类不存在**（用户「干脆撤掉这一行」）—— 本组前两条断言钉住这点。
+ * ✅ 2026-09-20 新增「轮动」弱标记：删掉「🚀 题材爆发」大卡后题材可见性从 8 个掉到 3 个，
+ *    用户抓包「其他的题材全部都没看到了」→ 拍板**全部题材上轴**。
+ *    ⚠️ 它**只回答「这个题材今天在动」**，渲染上明显弱一档（描边淡紫、不带 🚀），
+ *      且不参与强度判定 —— 与旧「反复」把机械换人当**信号类**渲染不是一回事。
  */
-describe('卡片题材区：只有首爆 / 衰竭 / 推送（⛔ 反复已撤除）', () => {
+describe('卡片题材区：首爆 / 轮动(弱) / 衰竭 / 推送（⛔ 反复仍不存在）', () => {
   const evt = (text: string, time: string, topic: string) =>
     ({ time, event: text, severity: 'high', topic }) as never
   const mkSlot = (at: number, events: never[]) => ({
@@ -442,6 +444,22 @@ describe('卡片题材区：只有首爆 / 衰竭 / 推送（⛔ 反复已撤除
       expect(txt).not.toContain('易主')
       expect(txt).not.toContain('换将')
     }
+  })
+
+  it('✅ 仅龙头轮动 → 出「轮动」弱标记（描边淡紫、⛔ 不带 🚀），不再整类消失', () => {
+    const { container } = render(
+      <TimelineSlotCard
+        slot={mkSlot(600, [evt('PCB板 龙头切换：中岩大地 → 中材科技', '10:00', 'PCB板')]) as never}
+        topBoard={1}
+        tags={new Map()}
+        reasonByCode={new Map()}
+      />,
+    )
+    expect(container.textContent).toContain('轮动')
+    // 弱标记的视觉证据：描边淡紫的题材 chip（⛔ 不是实心、不带 🚀）
+    const chips = [...container.querySelectorAll('span[class*="border-rec/30"]')]
+    expect(chips.map((c) => c.textContent?.trim())).toEqual(['PCB板'])
+    expect(container.textContent).not.toContain('🚀')
   })
 
   it('首爆仍照常渲染（撤除的是「反复」不是「首爆」）', () => {

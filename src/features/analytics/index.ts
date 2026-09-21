@@ -133,6 +133,9 @@ export { summarizeBlock, SUMMARY_CAP, type BlockSummary } from './lib/block-summ
 // 蛇形时间轴（一条线横走→弯→反向 · hover 浮层 + 点击详情）
 export { TimelineSnake } from './components/TimelineSnake'
 
+// 盘中情绪走势（涨停 / 炸板率两条实时曲线 · 30s 轮询）
+export { IntradayMoodCard } from './components/IntradayMoodCard'
+
 // 事件原文分段（纯函数 · 无损：拼接恒等于原文 · 供卡片高亮题材/个股）
 export {
   emotionState,

@@ -110,14 +110,31 @@ async function renderIntraday() {
 }
 
 describe('盘中实时页 · PC 大屏布局不变量', () => {
-  it('实时页采用任务导向三栏分区，xl 断点升起多栏布局', async () => {
+  it('左 60% / 右 40% 两栏：左栏 4 张 2×2 均分，右栏 4 张纵向（2026-09-21 用户定稿）', async () => {
     const c = await renderIntraday()
     const zones = c.querySelector('.intraday-zones') as HTMLElement | null
-    expect(zones, '未找到三栏分区容器 `.intraday-zones` —— 退回单列 = 4K 空洞成因').toBeTruthy()
-    expect(
-      zones?.className,
-      '三栏分区未在 xl 断点升起（窄屏强塞三栏会挤压主区）',
-    ).toContain('xl:flex-row')
+    expect(zones, '未找到两栏容器 `.intraday-zones` —— 退回单列会让表格挤成两行').toBeTruthy()
+    expect(zones?.className, '窄屏应退化为单栏（flex-col）').toContain('flex-col')
+
+    const cols = [...zones!.children] as HTMLElement[]
+    expect(cols, '两栏 = 左 + 右').toHaveLength(2)
+    expect(cols[0].className, '左栏应占 60%').toContain('xl:w-[60%]')
+    expect(cols[1].className, '右栏应占 40%').toContain('xl:w-[40%]')
+
+    // 左栏：4 张卡在一个 2 列均分网格里
+    const leftGrid = cols[0].querySelector('div[class*="grid"]') as HTMLElement | null
+    expect(leftGrid, '左栏内部应是均分网格（⛔ 不能用 Board：它按视口给列数）').toBeTruthy()
+    expect(leftGrid!.className).toContain('xl:grid-cols-2')
+    expect([...leftGrid!.children], '左栏 4 张卡均分').toHaveLength(4)
+
+    // 右栏：纵向堆叠的 4 张（顺序 = 用户指定）
+    const rightTitles = [...cols[1].querySelectorAll('.panel-title')].map((e) => e.textContent ?? '')
+    expect(rightTitles).toHaveLength(4)
+    for (const [i, t] of ['昨日涨停反馈', '短线精灵', '连板天梯', '极值名单'].entries()) {
+      expect(rightTitles[i], `右栏第 ${i + 1} 张应是「${t}」`).toContain(t)
+    }
+    // 全页仍是 8 张卡：左 4 + 右 4
+    expect(c.querySelectorAll('.panel-title')).toHaveLength(8)
   })
 
   it('theme.css 定义了 3xl / 4xl 断点令牌（否则上面的类名不会生成 CSS）', () => {
@@ -126,13 +143,15 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(css, '缺少 --breakpoint-4xl —— 4xl: 前缀的类全部静默失效').toContain('--breakpoint-4xl')
   })
 
-  it('三栏主体位于首屏，情绪通栏不再占用盘中页首行', async () => {
+  it('两栏主体位于首屏，情绪通栏不再占用盘中页首行', async () => {
     const c = await renderIntraday()
     const root = c.firstElementChild as HTMLElement
     expect(root.className, '根容器应是纵向 flex（通栏由 flex 自然铺满）').toContain('flex-col')
-    // 情绪指挥条已上移顶栏 header，盘中页首屏主体应直接是三栏工作内容
-    const zones = root.querySelector('.intraday-zones') as HTMLElement | null
-    expect(zones, '首屏缺少三栏分区 —— 工作内容不是首屏主体').toBeTruthy()
+    // 情绪指挥条已上移顶栏 header，盘中页首屏主体应直接是两栏工作内容
+    expect(
+      root.querySelector('.intraday-zones'),
+      '首屏缺少两栏分区 —— 工作内容不是首屏主体',
+    ).toBeTruthy()
   })
 })
 
@@ -170,20 +189,29 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     }
   })
 
-  it('新增的 6 张实时卡全部上屏', async () => {
+  it('移除四张旧独立卡，保留紧凑题材表、核心标的与盘中情绪走势', async () => {
     const c = await renderIntraday()
-    const text = c.textContent ?? ''
-    const titles = [
-      '🚀 早鸟埋伏',
-      '🔥 主线热度',
-      '💰 板块资金与弱势',
-      '🧭 次日预期',
-      '🔀 板块增减',
-      '🧊 极值名单',
-    ]
-    for (const t of titles) {
-      expect(text, `卡片「${t}」未渲染 —— 该模块内容未上屏`).toContain(t)
+    const titles = [...c.querySelectorAll('.panel-title')].map((el) => el.textContent ?? '')
+    for (const old of ['早鸟埋伏', '主线热度', '次日预期', '板块增减']) {
+      expect(titles.some((title) => title.includes(old))).toBe(false)
     }
+    for (const title of ['盘中情绪走势', '题材强度', '昨日涨停反馈', '核心标的', '板块资金', '短线精灵', '连板天梯', '极值名单']) {
+      expect(titles.filter((text) => text.includes(title)), `「${title}」应恰好出现一次`).toHaveLength(1)
+    }
+    // ⛔ 盘中实时页不放日内时间轴（用户 2026-09-20 定调：时间轴归 /timeline）
+    expect(titles.some((title) => title.includes('时间轴'))).toBe(false)
+    expect(c.querySelector('table[aria-label="题材强度"]')).not.toBeNull()
+    /** 左栏（2×2 均分）的 4 张 —— 顺序即阅读顺序 */
+    const zones = c.querySelector('.intraday-zones')!
+    const leftGrid = zones.children[0].querySelector('div[class*="grid"]')!
+    const leftTitles = [...leftGrid.children].map((el) => el.querySelector('.panel-title')?.textContent ?? '')
+    expect(leftTitles).toHaveLength(4)
+    for (const [i, t] of ['盘中情绪走势', '题材强度', '核心标的', '板块资金'].entries()) {
+      expect(leftTitles[i], `左栏第 ${i + 1} 张应是「${t}」`).toContain(t)
+    }
+    const codes = [...c.querySelectorAll('[data-stock-code]')].map((el) => el.getAttribute('data-stock-code'))
+    expect(codes.length).toBeGreaterThan(0)
+    expect(new Set(codes).size).toBe(codes.length)
   })
 })
 

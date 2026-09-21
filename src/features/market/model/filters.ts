@@ -6,7 +6,47 @@
  * （而渲染测试里字段一旦换位置，断言就静默失效 —— 本项目已经踩过一次）。
  */
 
-import { isStarMarket } from '@/shared/lib'
+import { isLimitUp, isStarMarket } from '@/shared/lib'
+import type { EarlyItem, Leader } from '@/shared/api'
+
+type CoreStock = Pick<Leader, 'name' | 'code' | 'pct'> & Partial<Leader> & {
+  themes: string[]
+  catalysts: string[]
+  unsealed: boolean
+}
+
+/** 优先保留核心标的报价，同票多题材只补充归属，不重复铺行。 */
+export function mergeCoreStocks(leaders: Leader[], early: EarlyItem[]): CoreStock[] {
+  const rows: CoreStock[] = []
+  const codeKey = (code: string) => code.match(/\d{6}/)?.[0] ?? code.trim()
+  const nameKey = (name: string) => name.replace(/\s/g, '')
+  const locate = (s: { code: string; name: string }) => rows.find((r) =>
+    s.code && r.code ? codeKey(s.code) === codeKey(r.code) : nameKey(s.name) === nameKey(r.name),
+  )
+  for (const s of leaders) {
+    if (isStarMarket(s.code)) continue
+    const found = locate(s)
+    if (found) {
+      if (s.sector && !found.themes.includes(s.sector)) found.themes.push(s.sector)
+      continue
+    }
+    rows.push({ ...s, themes: s.sector ? [s.sector] : [], catalysts: [],
+      unsealed: s.buyable && !isLimitUp(s.pct, s.is_20cm),
+    })
+  }
+  for (const e of early) {
+    const s = e.buy
+    if (!s || isStarMarket(s.code) || s.limit_up_days !== 0 || !Number.isFinite(s.pct) || isLimitUp(s.pct, s.is_20cm)) continue
+    const found = locate(s)
+    if (found) {
+      if (e.sector && !found.themes.includes(e.sector)) found.themes.push(e.sector)
+      if (e.desc && !found.catalysts.includes(e.desc)) found.catalysts.push(e.desc)
+      continue
+    }
+    rows.push({ ...s, themes: e.sector ? [e.sector] : [], catalysts: e.desc ? [e.desc] : [], unsealed: true })
+  }
+  return rows
+}
 
 /**
  * 剔除科创板（688 / 689）标的后返回新数组。

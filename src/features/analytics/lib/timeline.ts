@@ -672,6 +672,11 @@ export function cumulativeByMarks(mins: number[], marks: number[] = MARKS): numb
  * 仅取交易时段（09:15–11:30、13:00–15:00，午休剔除）内事件；盘前残留
  * （上一交易日 `00:02` 旧值、开盘 `09:06` 清零）一律排除，避免污染首点。
  * 首个 `zt_total` 出现之前（非交易日 / 数据未开始）序列为 `null`（图上断线，不画假 0）。
+ * ## ⛔ 不画未来（`untilWm`）
+ * 涨停数是**状态量**：盘中最后一个已知值会一直「保持」到收盘。若无条件填到 15:00，
+ * 10:03 打开页面就会看到一条**平推到收盘**的线 —— 读起来像「今天已定型」，是假信息。
+ * 故调用方在**盘中**必须传 `untilWm` = 当前分钟，超过它的刻度一律 `null`（图上断线）。
+ * 收盘后的完整交易日不需要传（缺省 `Infinity` = 全天填满，此时最后一个观测值就是收盘值）。
  */
 export interface LimitSeriesResult {
   /** X 轴时钟标签（与 `MARKS` 对齐） */
@@ -691,7 +696,15 @@ function inTradingWindow(wm: number): boolean {
   return true
 }
 
-export function buildLimitSeries(events: IntradayTimelineEvent[]): LimitSeriesResult {
+export function buildLimitSeries(
+  events: IntradayTimelineEvent[],
+  /**
+   * 截止墙钟分钟（**含**）—— 大于它的刻度一律 `null`。
+   * 缺省 `Infinity` = 填满全天（收盘后语义）；
+   * 盘中传「当前分钟」，曲线只画到此刻（见上方「不画未来」）。
+   */
+  untilWm: number = Number.POSITIVE_INFINITY,
+): LimitSeriesResult {
   type SeqItem = { wm: number; kind: 'zt_total' | 'limit_down_new' | 'broken_new'; total: number | null }
   const seq: SeqItem[] = []
   for (const e of events) {
@@ -727,7 +740,8 @@ export function buildLimitSeries(events: IntradayTimelineEvent[]): LimitSeriesRe
       }
       idx += 1
     }
-    if (!seen) {
+    // 尚未开始（首个 zt_total 之前）或已超出截止分钟 → 断线，⛔ 不画假 0、也不平推未来
+    if (!seen || m > untilWm) {
       zt.push(null)
       ld.push(null)
       brokenRate.push(null)
@@ -759,7 +773,7 @@ export function buildLimitSeries(events: IntradayTimelineEvent[]): LimitSeriesRe
  */
 export function pickLiveBasis(
   events: IntradayTimelineEvent[],
-): { date: string; events: IntradayTimelineEvent[] } | null {
+): { date: string; lastAt: string; events: IntradayTimelineEvent[] } | null {
   const byDate = new Map<string, IntradayTimelineEvent[]>()
   for (const e of events) {
     const d = String(e.at ?? '').slice(0, 10)
@@ -770,9 +784,28 @@ export function pickLiveBasis(
   }
   for (const d of [...byDate.keys()].sort((a, b) => b.localeCompare(a))) {
     const dayEvents = byDate.get(d) ?? []
-    if (buildLimitSeries(dayEvents).zt.some((v) => v != null)) return { date: d, events: dayEvents }
+    if (buildLimitSeries(dayEvents).zt.some((v) => v != null)) {
+      return { date: d, lastAt: lastObservedAt(dayEvents) ?? `${d} 00:00:00`, events: dayEvents }
+    }
   }
   return null
+}
+
+/**
+ * 该日**最后一个盘中窗口内**事件时刻（`YYYY-MM-DD HH:MM:SS`）—— 曲线的「最后观测」。
+ *
+ * ⚠️ 只认窗口内事件：盘后复盘卡（17:4x）与盘前残留（00:0x）都不算观测，
+ * 否则会把「17:42 那批事件」说成曲线最后一个点。
+ */
+function lastObservedAt(events: IntradayTimelineEvent[]): string | null {
+  let out: string | null = null
+  for (const e of events) {
+    const at = String(e.at ?? '').replace('T', ' ')
+    const wm = clockMin(at.slice(11, 16))
+    if (wm == null || !inTradingWindow(wm)) continue
+    if (out == null || at > out) out = at
+  }
+  return out
 }
 
 /**

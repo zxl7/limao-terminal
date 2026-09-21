@@ -13,7 +13,7 @@ import {
 } from '../lib/timeline'
 import type { ZtPoolStock } from '@/shared/api'
 import type { StockThemeTag } from '../lib/theme-burst'
-import { slotThemeMarks } from '../lib/theme-burst'
+import { slotThemeMarks, type ThemeBurst } from '../lib/theme-burst'
 
 /**
  * 时间轴「分钟槽」卡片 —— **固定宽 × 固定高 × 内部滚动**。
@@ -436,6 +436,7 @@ export function SlotBody({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
   showTime = false,
   showAllSectors = false,
   showAllEvents = false,
@@ -444,6 +445,14 @@ export function SlotBody({
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  /**
+   * 题材名 → 该题材的当日全貌（催化原文 / 涨停成员 / 观测时刻序列）。
+   *
+   * ⛔ **只由 hover 详情面板传入** —— 卡面保持紧凑（题材名 + 家数 + 龙头），
+   *    详情里才补上「催化 / 成员 / 观测时刻」。故该 prop 是否存在本身就是
+   *    「这是详情模式」的开关，不与 `showAllSectors`（板块上限）混用。
+   */
+  themeInfo?: Map<string, ThemeBurst>
   showTime?: boolean
   showAllSectors?: boolean
   showAllEvents?: boolean
@@ -451,6 +460,7 @@ export function SlotBody({
   /** 🚀 题材爆发 / ⚠️ 题材衰竭 —— 本页的**核心诉求**：每个时间节点哪些题材起、哪些题材落 */
   const marks = slotThemeMarks(slot.events, slot.pushes)
   const bursts = withKeys(marks.burst, (b) => b.theme)
+  const rotateds = withKeys(marks.rotated, (r) => r.theme)
   const fades = withKeys(marks.fade, (f) => f.label)
   const pushes = withKeys(marks.pushed, (p) => p.name)
 
@@ -470,19 +480,65 @@ export function SlotBody({
         </div>
       )}
 
-      {/* ── 题材爆发 / 衰竭（置顶：这是时间轴要回答的第一件事）── */}
+      {/* ── 题材爆发 / 轮动 / 衰竭（置顶：这是时间轴要回答的第一件事）── */}
       {(marks.burst.length > 0 ||
+        marks.rotated.length > 0 ||
         marks.fade.length > 0 ||
         marks.pushed.length > 0) && (
         <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
           {marks.burst.length > 0 && (
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <div className="flex items-baseline gap-1 flex-wrap min-w-0">
+                {/* 题材爆发 = **紫色**（全站语义：紫=题材/机会）—— 与时间轴节点竖条同色，
+                    否则同一件事在轴上是紫的、在卡里是红的，读起来像两种信号。 */}
+                <span className="text-[10.5px] font-semibold text-rec flex-none">🚀 首爆</span>
+                {bursts.map(({ key, item: b }) => (
+                  <span key={key} className="flex items-baseline gap-1 flex-none">
+                    <span className="text-[11.5px] font-medium text-rec break-all">{b.theme}</span>
+                    {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
+                    {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
+                  </span>
+                ))}
+              </div>
+              {/* 详情模式（仅 hover 面板传 `themeInfo`）：补上该题材的催化原文 / 当日涨停成员 / 观测时刻序列 */}
+              {themeInfo &&
+                bursts.map(({ key, item: b }) => {
+                  const t = themeInfo.get(b.theme)
+                  if (!t) return null
+                  if (t.catalyst == null && t.members.length === 0 && t.points.length <= 1) return null
+                  return (
+                    <div key={`${key}#detail`} className="flex flex-col gap-0.5 pl-3 min-w-0">
+                      {t.catalyst && <span className="text-[11px] text-txt break-all">催化：{t.catalyst}</span>}
+                      {t.members.length > 0 && (
+                        <span className="text-[11px] text-sub break-all">
+                          当日涨停成员：{t.members.map((m) => m.name).join('、')}
+                        </span>
+                      )}
+                      {t.points.length > 1 && (
+                        <span className="num text-[10.5px] text-sub break-all">
+                          观测 {t.points.map((p) => minToClock(p.at)).join(' → ')}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+          {marks.rotated.length > 0 && (
+            /* 弱标记：题材当刻**被系统观测到**（仅龙头轮动）—— ⛔ 不是爆发，故描边淡紫、⛔ 不带 🚀。
+               ⚠️ 与 2026-09-17 撤除的「↻ 反复」不同：那类把机械换人当**题材层信号**渲染，
+                  本类只回答「这个题材今天在动」，且不参与强度判定（仍可被低频合并）。 */
             <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10.5px] font-semibold text-up flex-none">🚀 首爆</span>
-              {bursts.map(({ key, item: b }) => (
-                <span key={key} className="flex items-baseline gap-1 flex-none">
-                  <span className="text-[11.5px] font-medium text-up break-all">{b.theme}</span>
-                  {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
-                  {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
+              <span className="text-[10px] text-sub flex-none">轮动</span>
+              {rotateds.map(({ key, item: r }) => (
+                <span
+                  key={key}
+                  className="text-[11px] text-rec/80 border border-rec/30 rounded-sm px-1"
+                >
+                  {r.theme}
+                  {themeInfo && r.leader && (
+                    <span className="text-[10px] text-sub ml-1">龙 {r.leader}</span>
+                  )}
                 </span>
               ))}
             </div>

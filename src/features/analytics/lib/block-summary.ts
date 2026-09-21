@@ -53,6 +53,8 @@ export interface BlockSummary {
   otherDownCount: number
   /** 题材标记（各自截断） */
   burst: Marks['burst']
+  /** 该时刻仅发生**龙头轮动**的题材（弱标记 · 见 `SlotThemeMarks.rotated` 头注） */
+  rotated: Marks['rotated']
   fade: Marks['fade']
   pushed: Marks['pushed']
   /** 系统观测 / 题材推送的条数 */
@@ -122,6 +124,12 @@ export function summarizeBlock(block: TimelineBlock, cap: number = SUMMARY_CAP):
     (b) => b.theme,
     (a, b) => ((b.count ?? 0) > (a.count ?? 0) ? b : a),
   ).slice(0, cap)
+  const rotated = mergeBy(
+    marksList.flatMap((m) => m.rotated),
+    (r) => r.theme,
+    // 同名题材优先保留**带龙头**的那条（信息更多）
+    (a, b) => (b.leader ? b : a),
+  ).slice(0, cap)
   const fade = mergeBy(
     marksList.flatMap((m) => m.fade),
     (f) => f.label,
@@ -150,6 +158,7 @@ export function summarizeBlock(block: TimelineBlock, cap: number = SUMMARY_CAP):
     otherUpCount: upEvents.length - upSectorAll.length,
     otherDownCount: downEvents.length - downSectorAll.length,
     burst,
+    rotated,
     fade,
     pushed,
     eventCount: slots.reduce((n, s) => n + (s.events?.length ?? 0), 0),

@@ -14,6 +14,7 @@ import {
   buildTimeline,
   buildTimelineSlots,
   buildLimitSeries,
+  clockMin,
   cumulativeByMarks,
   fbtMin,
   fileDate,
@@ -34,7 +35,7 @@ import {
   type TimelineSlot,
 } from '@/features/analytics'
 import { Card, CardBadge, LineChart, type LineSeries } from '@/shared/ui'
-import { cn, inTrading, isStarMarket, round2 } from '@/shared/lib'
+import { cn, bjDateString, bjTimeString, inTrading, isStarMarket, round2 } from '@/shared/lib'
 import { useNow } from '@/shared/hooks'
 
 /**
@@ -254,26 +255,43 @@ export function Component() {
   /** 题材层事件条数（rise + switch + plunge）—— 用于计数与空态判断 */
   const themeEventCount = bursts.themedCount + bursts.riskCount
 
-  /** 题材级风险：同板块可能在多条事件里重复出现，合并后展示 */
-  const riskSectors = useMemo(() => {
-    const tally = new Map<string, number>()
-    for (const r of bursts.risks) {
-      for (const s of r.sectors) tally.set(s, (tally.get(s) ?? 0) + 1)
-    }
-    return [...tally.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  }, [bursts.risks])
+  /**
+   * 题材名 → 当日全貌 —— **只给 hover 明细用**（催化原文 / 涨停成员 / 观测时刻）。
+   *
+   * 2026-09-20：这些信息原先放在独立的「🚀 题材爆发」大卡里，与时间轴内容重复。
+   * 现改为**挂到时间轴节点上**（卡面仍只留题材名 + 家数 + 龙头，详情里才展开），该卡已删除。
+   */
+  const themeInfo = useMemo(
+    () => new Map(bursts.themes.map((t) => [t.theme, t])),
+    [bursts.themes],
+  )
 
+  /**
+   * ⛔ **不画未来**：基准日是**今天**时只画到「此刻」（`untilWm`）——
+   * 否则 10:03 打开页面会看到一条平推到 15:00 的假线（涨停是状态量，会一直「保持」）。
+   * 过去交易日（已收盘）不截断：最后一个观测值就是收盘值。
+   */
+  const now = useNow(30_000)
+  const today = bjDateString(now)
+  const isToday = chartBasis?.date === today
+  const untilWm = useMemo(
+    () => (isToday ? (clockMin(bjTimeString(now).slice(0, 5)) ?? undefined) : undefined),
+    [isToday, now],
+  )
   /** 实时「涨停 / 跌停 / 炸板率」时间序列（盘中情绪时间轴 · 30s 轮询 → 动态） */
-  const limitSeries = useMemo(() => buildLimitSeries(chartBasis?.events ?? []), [chartBasis])
+  const limitSeries = useMemo(
+    () => buildLimitSeries(chartBasis?.events ?? [], untilWm ?? Number.POSITIVE_INFINITY),
+    [chartBasis, untilWm],
+  )
   const hasLive = limitSeries.zt.some((v) => v != null)
   /**
-   * 是否正处交易时段 —— 决定曲线标「🔴 盘中实时」还是「最近交易日」。
+   * 「🔴 盘中实时」必须**同时**满足：基准日是今天 + 此刻在交易时段。
+   * ⛔ 只判时段会让「交易时段里画的是往日曲线」被标成实时（2026-09-21 实测踩到）。
    *
    * ⚠️ 时段判定走 `shared/lib/marketTime` 单一实现；用 `useNow` 驱动而不是直接
    *    `inTrading()`：React Compiler 会把**无参纯调用**当常量折叠，直接调会永远停在首帧。
    */
-  const now = useNow(30_000)
-  const liveNow = inTrading(undefined, now)
+  const liveNow = isToday && inTrading(undefined, now)
   const curve = useMemo<LineSeries[]>(() => {
     if (hasLive) {
       return [
@@ -394,91 +412,10 @@ export function Component() {
         </div>
       </Card>
 
-      {/* ── 🚀 题材爆发（主口径）：直接回答「哪几条题材线在爆发」── */}
-      <Card
-        title="🚀 题材爆发"
-        extra={<CardBadge tone="up">{bursts.themes.length} 条题材线</CardBadge>}
-      >
-
-        {bursts.themes.length === 0 ? (
-          <div className="text-sub text-[12px] py-2">
-            当日 `event_log` 里没有题材级事件
-          </div>
-        ) : (
-          <div className="flex flex-row">
-            {bursts.themes.map((t) => (
-              <div
-                key={t.theme}
-                className="flex flex-col gap-0.5 py-1.5 border-b border-line-faint last:border-0"
-              >
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-[13px] font-semibold text-txt">{t.theme}</span>
-                  {t.isNewMainline && (
-                    <span className="text-[10.5px] px-1 rounded-sm bg-up-soft text-up">
-                      🚀 新主线崛起
-                    </span>
-                  )}
-                  {t.riseCount != null && (
-                    <span className="num text-[12px] text-up">{t.riseCount} 只涨停</span>
-                  )}
-                  {/* ⛔ 观测**时刻序列**，不用「at~to 区间」—— 区间说不清几点爆的、后面几点又动过 */}
-                  <span className="text-[10.5px] text-sub flex-none">观测</span>
-                  <span className="text-[11.5px] flex items-baseline gap-1 flex-wrap">
-                    {t.points.map((pt, i) => (
-                      <span
-                        // eslint-disable-next-line react/no-array-index-key -- 同题材同一分钟可有多条，索引即身份
-                        key={`${pt.at}#${i}`}
-                        className={cn('num', pt.kind === 'rise' ? 'text-up font-semibold' : 'text-txt')}
-                      >
-                        {i > 0 && <span className="text-sub">→ </span>}
-                        {minToClock(pt.at)}
-                        {pt.kind === 'rise' && ' 🚀'}
-                      </span>
-                    ))}
-                  </span>
-                  <span className="num text-[10.5px] text-sub">共 {t.points.length} 次</span>
-                  {t.pushCount != null && (
-                    <span className="num text-[11px] text-sub">推送 {t.pushCount} 次</span>
-                  )}
-                </div>
-
-                {/* ⛔ 只显示**当前**龙头 —— 不显示「A → B → C」链条：
-                    那个链条表达的是「龙头易主」这一概念，而系统那条事件只是
-                    「每轮重算板块领涨股导致的机械换人」（实测会在同一小撮票之间来回跳）。 */}
-                {t.currentLeader && (
-                  <div className="flex items-baseline gap-2 text-[12px]">
-                    <span className="text-[10.5px] text-sub flex-none">龙头</span>
-                    <span className="text-lead font-semibold">👑 {t.currentLeader}</span>
-                  </div>
-                )}
-
-                {t.catalyst && <div className="text-[11.5px] text-txt">催化：{t.catalyst}</div>}
-                {t.members.length > 0 && (
-                  <div className="text-[11.5px] text-sub">
-                    当日涨停成员：{t.members.map((m) => m.name).join('、')}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {riskSectors.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-line-faint">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="text-[10.5px] text-sub flex-none">
-                ⚠️ 题材级风险
-              </span>
-              {riskSectors.map(([s, n]) => (
-                <span key={s} className="text-[11.5px] text-down">
-                  {s}
-                  {n > 1 && <span className="num text-[10px] text-sub ml-0.5">×{n}</span>}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </Card>
+      {/* 🚀 题材爆发 —— 2026-09-20 用户定调：**这张独立大卡已删除**。
+          题材信息一律挂到时间轴节点上：节点竖条**紫色** + 轴上直接标板块名 +
+          hover 详情里展开「催化原文 / 当日涨停成员 / 观测时刻」（数据经 `themeInfo` 注入）。
+          ⛔ 不要在页面里重新长出一张题材清单卡。 */}
 
       {/* ── 主体：三类展示分块（联动聚合 / 普通独立 / 低频合并）
           ⚠️ 两种排版（2026-09-17）：🐍 蛇形轴（默认 · 一条线横走→弯→反向）｜🃏 卡片流（原版）
@@ -508,6 +445,7 @@ export function Component() {
             topBoard={topBoard}
             tags={bursts.tags}
             reasonByCode={reasonByCode}
+            themeInfo={themeInfo}
           />
         ) : (
           <>

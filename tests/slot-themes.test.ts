@@ -39,11 +39,12 @@ describe('slotThemeMarks · 每刻题材爆发/衰竭', () => {
     expect(m.fade.map((f) => f.label)).toEqual(['通信线缆及配套', '印制电路板'])
   })
 
-  it('⛔⛔ 「龙头切换」**不产生任何题材层标记**（2026-09-17 用户「干脆撤掉这一行」）', () => {
-    // 三步演进史（⛔ 别再回退）：
-    //   ① 先被误标成「衰竭」；② 改成中性类「龙头易主」；③ 用户判「龙头基本不会日内切换」→
-    //      源头用**龙头锁定**治掉机械换人（`intraday_pulse.diagnose_dragon`），
-    //      题材区**整类撤除** —— 既不是爆发也不是衰竭，就不该有位置。
+  it('「龙头切换」只产出 **rotated 弱标记** —— ⛔ 不进 burst / fade（2026-09-20 用户「全部题材上轴」）', () => {
+    // 演进史（⛔ 别再回退成「当成爆发」）：
+    //   ① 先被误标成「衰竭」；② 改成中性类「龙头易主」；③ 2026-09-17 题材区整类撤除；
+    //   ④ 2026-09-20 删掉「🚀 题材爆发」大卡后题材可见性从 8 个掉到 3 个 → 用户抓包
+    //      「其他的题材全部都没看到了」→ 拍板**全部题材上轴**：切换恢复为 `rotated`
+    //      （弱标记：轴上淡紫 + 题材名、不带 🚀），但 ⛔ 仍不进 burst、⛔ 仍不参与强度判定。
     const m = slotThemeMarks(
       [
         ev('福建自贸/海西概念 龙头切换：漳州发展 → 闽东电力', '11:02', '福建自贸/海西概念'),
@@ -51,7 +52,12 @@ describe('slotThemeMarks · 每刻题材爆发/衰竭', () => {
       ],
       null,
     )
-    expect(m).toEqual({ burst: [], fade: [], pushed: [] })
+    expect(m.burst).toEqual([])
+    expect(m.fade).toEqual([])
+    expect(m.rotated).toEqual([
+      { theme: '福建自贸/海西概念', leader: '闽东电力', from: '漳州发展' },
+      { theme: '国产芯片', leader: '西陇科学', from: '中晶科技' },
+    ])
   })
 
   it('⛔ 只含「龙头切换」的时刻 = 低强度 → **可被低频合并**（撤掉后它不再撑起一张卡）', () => {
@@ -82,7 +88,7 @@ describe('slotThemeMarks · 每刻题材爆发/衰竭', () => {
       ],
       null,
     )
-    expect(m).toEqual({ burst: [], fade: [], pushed: [] })
+    expect(m).toEqual({ burst: [], rotated: [], fade: [], pushed: [] })
   })
 
   it('守恒：每条题材事件恰好出现一次（不丢不重）', () => {
@@ -93,14 +99,16 @@ describe('slotThemeMarks · 每刻题材爆发/衰竭', () => {
       ev('市场情绪由「修复」转为「亢奋」', '10:57', '情绪'),
     ]
     const m = slotThemeMarks(events, null)
-    // rise=1 → burst 1；plunge 拆 2 板块 → fade 2；switch → **不进任何一类**（已整类撤除）
+    // rise=1 → burst 1；plunge 拆 2 板块 → fade 2；switch → rotated 1（弱标记，不进其他两类）
     expect(m.burst).toHaveLength(1)
     expect(m.fade).toHaveLength(2)
+    expect(m.rotated).toHaveLength(1)
+    expect(m.rotated[0].theme).toBe('PCB板')
   })
 
   it('空/缺省输入安全', () => {
-    expect(slotThemeMarks(null, null)).toEqual({ burst: [], fade: [], pushed: [] })
-    expect(slotThemeMarks([], [])).toEqual({ burst: [], fade: [], pushed: [] })
+    expect(slotThemeMarks(null, null)).toEqual({ burst: [], rotated: [], fade: [], pushed: [] })
+    expect(slotThemeMarks([], [])).toEqual({ burst: [], rotated: [], fade: [], pushed: [] })
     // 无有效的板块名（只有顿号）→ 不产出空标签
     const m = slotThemeMarks([ev('关注板块集体重挫：、', '11:00', '风险')], null)
     expect(m.fade).toEqual([])

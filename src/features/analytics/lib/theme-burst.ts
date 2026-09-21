@@ -371,8 +371,25 @@ export function buildThemeBursts(input: {
  * ⛔ 只标题材层；`情绪`/`广度` 类事件**不属于题材层**，原样留给事件区展示。
  */
 export interface SlotThemeMarks {
-  /** 该时刻**爆发**的题材 */
+  /** 该时刻**爆发**的题材（新主线崛起）*/
   burst: Array<{ theme: string; count: number | null; leader: string | null }>
+  /**
+   * 该时刻**仅发生龙头轮动**的题材（当日被系统观测到，但**不是**新崛起）。
+   *
+   * ## 为什么把它加回来（2026-09-20 用户拍板「全部题材上轴」）
+   *
+   * 删掉「🚀 题材爆发」大卡后，题材可见性从 8 个降到 3 个 —— 因为**只有 rise 才留下标记**，
+   * 而那些当天只发生「龙头切换」的题材（实测 09-18 有 5 个：国产芯片/PCB板/智能电网/机器人/被动元件）
+   * 在轴上完全消失，用户抓包「其他的题材全部都没看到了」。
+   *
+   * ⛔ 与已撤除的「↻ 反复」**不是同一件事**：
+   *   · 旧「反复」把机械换人当成一个**题材层信号类**去渲染（用户「干脆撤掉这一行」）；
+   *   · 本类的语义只是「**这个题材当刻被系统观测到**」，渲染上**明显弱一档**
+   *     （轴上 `bg-rec/40` 淡紫 + 题材名，不带 🚀；卡面退灰细字）。
+   * ⛔ **且它不参与强度判定** —— `isLowStrengthSlot` 不看它，故「只有龙头切换」的时刻
+   *    仍可被低频合并（用户 2026-09-17 的原始判断保持不变）。
+   */
+  rotated: Array<{ theme: string; leader: string | null; from: string | null }>
   /** 该时刻**衰竭**的板块/题材（原系统「集体重挫」） */
   fade: Array<{ label: string }>
   /** 该时刻被推送的题材（活跃证据） */
@@ -386,11 +403,15 @@ export function slotThemeMarks(
   const parsed = parseThemeEvents(events ?? [])
 
   const burst: SlotThemeMarks['burst'] = []
+  const rotated: SlotThemeMarks['rotated'] = []
   const fade: SlotThemeMarks['fade'] = []
 
   for (const e of parsed) {
     if (e.kind === 'rise') {
       burst.push({ theme: e.theme, count: e.count, leader: e.leader })
+    } else if (e.kind === 'switch') {
+      // ⛔ 只作「该题材被观测到」的**弱标记**（见 `rotated` 头注），不进 burst、不进强度判定
+      rotated.push({ theme: e.theme, leader: e.leader, from: e.from })
     } else if (e.kind === 'plunge') {
       const names = (e.detail ?? '')
         .split(/[、,，]/)
@@ -398,16 +419,13 @@ export function slotThemeMarks(
         .filter(Boolean)
       for (const n of names) fade.push({ label: n })
     }
-    // ⛔ `switch`（原系统「龙头切换」）**不再产生任何题材层标记**（2026-09-17 用户「干脆撤掉这一行」）：
-    //    它本就是「每轮重算板块领涨股」的机械换人（源头已在 `intraday_pulse` 用龙头锁定治掉），
-    //    既不是爆发也不是衰竭 → 题材区只保留 🚀 首爆 / ⚠️ 衰竭 / 📤 推送。
   }
 
   const pushed = (pushes ?? [])
     .filter((p) => !!p.name)
     .map((p) => ({ name: p.name, pushCount: p.push_count ?? null }))
 
-  return { burst, fade, pushed }
+  return { burst, rotated, fade, pushed }
 }
 
 /**

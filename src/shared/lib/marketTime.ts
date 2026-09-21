@@ -69,6 +69,14 @@ export function bjTimeString(d: Date = new Date()): string {
   return `${p(bj.getHours())}:${p(bj.getMinutes())}:${p(bj.getSeconds())}`
 }
 
+/** 北京时间 "YYYY-MM-DD"（用于判断某个数据基准日是不是「今天」） */
+export function bjDateString(d: Date = new Date()): string {
+  const utcMs = d.getTime() + d.getTimezoneOffset() * 60_000
+  const bj = new Date(utcMs + BJ_OFFSET_MIN * 60_000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${bj.getFullYear()}-${p(bj.getMonth() + 1)}-${p(bj.getDate())}`
+}
+
 /** 距离某时间戳的秒数（正 = 过去） */
 export function ageSeconds(isoish: string | number | null | undefined): number | null {
   if (isoish == null) return null
