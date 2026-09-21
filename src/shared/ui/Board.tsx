@@ -102,10 +102,17 @@ export function BoardWide({ children, className }: { children: ReactNode; classN
  *    旁边的栏拖出空白。这正是「任务导向分区」相对「等权网格」的核心收益。
  *
  * `<xl` 退化为纵向单栏（窄屏不强塞多栏），`xl`(≥1280px) 起横向分栏。
+ *
+ * ⛔⛔ **「窄屏单栏」必须写成 `max-xl:flex-col`，⛔ 绝不能写裸 `flex-col`**（2026-09-21 实测事故）：
+ * Tailwind v4 产物里 `.flex-col{flex-direction:column}`（无媒体查询）**排在**
+ * `.xl\:flex-row{...}`（`@media (width>=80rem)`）**之后**，同层同权 ⇒ **裸 `flex-col` 在所有宽度都赢**
+ * → 两栏永远上下堆叠，用户看到的是「说好的左右结构呢」。
+ * `max-xl:flex-col`（`@media (width<80rem)`）与 `xl:flex-row`（`width>=80rem`）**媒体查询互斥**，
+ * 不存在同属性竞争 —— 这是本项目里表达「窄屏竖排 / 宽屏横排」的**唯一安全写法**。
  */
 export function ZoneRow({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('flex  gap-3 xl:flex-row xl:items-start xl:gap-3', className)}>
+    <div className={cn('flex gap-3 max-xl:flex-col xl:flex-row xl:items-start xl:gap-3', className)}>
       {children}
     </div>
   )

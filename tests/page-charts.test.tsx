@@ -34,6 +34,22 @@ const DATA_ROOT = resolveDataRoot(
   DATA_ROOT_ENV,
 )
 
+/**
+ * 当前 `market/latest` 的题材行数。
+ *
+ * ⚠️ 后端在**盘前约 09:06** 会把这份快照重置（`top5` / `leaders` / `early` / `ladder` 全空，
+ * 实测 2026-09-21 09:06:58，`ts` = 当日 09:06:42）→ 此时一切「依赖 latest 的图表」都应走空态。
+ * 数据依赖型断言必须按这个事实分支，否则每个交易日盘前都会误报失败。
+ */
+function top5Count(): number {
+  try {
+    const d = readRoute(DATA_ROOT, ROUTES['/api/market/latest']) as { top5?: unknown[] } | null
+    return d?.top5?.length ?? 0
+  } catch {
+    return 0
+  }
+}
+
 function installDataFetch() {
   const original = globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -263,6 +279,18 @@ describe('MainlinePage —— 题材涨停家数 今日 vs 昨日', () => {
     const container = await renderPage(await import('@/pages/mainline/MainlinePage'))
 
     expect(screen.getAllByText(/题材涨停家数/).length).toBeGreaterThan(0)
+
+    /**
+     * ⚠️ 盘前 09:06 后端会把 `market/latest` **重置**（`top5` 清空，实测 2026-09-21 09:06:58）
+     * → 此刻**没有柱可画**，本图本该是空态。
+     * 故按「数据与渲染**同真同假**」断言：有数据才要求有柱，无数据则必须是明确空态 ——
+     * ⛔ 不能把「盘前数据缺失」误判成「渲染失败」（原写法每个交易日盘前都会红）。
+     */
+    if (top5Count() === 0) {
+      expect(container.textContent, 'top5 为空却没给空态').toMatch(/暂无|未落盘|无题材/)
+      return
+    }
+
     expect(dataRects(container).length, '题材柱未生成 rect').toBeGreaterThan(0)
 
     /* 空心柱 = compare（昨日家数）：stroke 有值但 fill 为 none/transparent。

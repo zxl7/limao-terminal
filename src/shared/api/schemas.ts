@@ -317,6 +317,8 @@ export const FeedbackMatrixSchema = z.object({
   promote_list: z
     .array(z.object({ name: s.optional(), code: s.optional(), prev_boards: n.optional(), pct: n.optional() }))
     .optional(),
+  /** 全量晋级代码（不截断）· 集合判定专用（集合判定禁用 promote_list） */
+  promote_codes: z.array(s).optional(),
   sentiment_score: n.optional(),
   sentiment_label: s.optional(),
   regulatory_pressure: n.optional(),

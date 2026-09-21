@@ -38,7 +38,10 @@ export function Component() {
           涨跌家数 / 成交额）已全部上移到全局顶栏 header，本页不重复渲染。 */}
       <EbbBanner />
 
-      <ZoneRow className="intraday-zones flex-col">
+      {/* ⛔ 不要在这里加裸 `flex-col`：Tailwind v4 产物里它与 `xl:flex-row` 同层同权、
+          且排在后者之后 ⇒ 所有宽度都会变竖排（2026-09-21 实测事故：两栏上下堆叠）。
+          `ZoneRow` 已内置 `max-xl:flex-col`（媒体查询互斥，安全）。 */}
+      <ZoneRow className="intraday-zones">
         <Zone label="盘面与标的" dot="bg-up" className="xl:w-[60%]">
           <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
             <IntradayMoodCard />
@@ -50,9 +53,9 @@ export function Component() {
 
         <Zone label="反馈与信号" dot="bg-down" className="xl:w-[40%]">
           <FeedbackCard />
-          <SignalsCard />
           <LadderCard />
           <ExtremeCard />
+          <SignalsCard />
         </Zone>
       </ZoneRow>
     </div>

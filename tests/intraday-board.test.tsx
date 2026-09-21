@@ -114,7 +114,14 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     const c = await renderIntraday()
     const zones = c.querySelector('.intraday-zones') as HTMLElement | null
     expect(zones, '未找到两栏容器 `.intraday-zones` —— 退回单列会让表格挤成两行').toBeTruthy()
-    expect(zones?.className, '窄屏应退化为单栏（flex-col）').toContain('flex-col')
+    // ⛔⛔ 窄屏单栏必须是 `max-xl:flex-col`（与 `xl:flex-row` 媒体互斥）。
+    //    裸 `flex-col` 在同层同权下**排在 `xl:flex-row` 之后** → 所有宽度都竖排（真实事故）。
+    expect(zones?.className, '窄屏单栏应用 max-xl:flex-col').toContain('max-xl:flex-col')
+    expect(zones?.className, '宽屏横排').toContain('xl:flex-row')
+    expect(
+      zones?.className.split(/\s+/),
+      '⛔ 不得出现裸 flex-col —— 它会覆盖 xl:flex-row，使两栏永远堆叠',
+    ).not.toContain('flex-col')
 
     const cols = [...zones!.children] as HTMLElement[]
     expect(cols, '两栏 = 左 + 右').toHaveLength(2)
@@ -200,7 +207,15 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     }
     // ⛔ 盘中实时页不放日内时间轴（用户 2026-09-20 定调：时间轴归 /timeline）
     expect(titles.some((title) => title.includes('时间轴'))).toBe(false)
-    expect(c.querySelector('table[aria-label="题材强度"]')).not.toBeNull()
+    /* 题材表：数据与渲染**同真同假** —— 盘前约 09:06 后端会把 `market/latest` 重置
+       （`top5` 清空，实测 2026-09-21 09:06:58），此刻 ThemeTopCard 本该渲染空态。
+       ⛔ 不能把「盘前无数据」误判成「表格没渲染」。 */
+    const top5 = ((readSnapshot()?.top5 as unknown[] | undefined) ?? [])
+    if (top5.length > 0) {
+      expect(c.querySelector('table[aria-label="题材强度"]'), 'top5 非空却没渲染题材表').not.toBeNull()
+    } else {
+      expect(c.textContent, 'top5 为空时应给明确空态').toContain('暂无题材强度数据')
+    }
     /** 左栏（2×2 均分）的 4 张 —— 顺序即阅读顺序 */
     const zones = c.querySelector('.intraday-zones')!
     const leftGrid = zones.children[0].querySelector('div[class*="grid"]')!
@@ -209,9 +224,14 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     for (const [i, t] of ['盘中情绪走势', '题材强度', '核心标的', '板块资金'].entries()) {
       expect(leftTitles[i], `左栏第 ${i + 1} 张应是「${t}」`).toContain(t)
     }
+    /* 核心标的同理：盘前 `latest` 被重置（`leaders` / `early` 清空）时它本该是空态。
+       有数据才要求「票不重复上屏」。 */
     const codes = [...c.querySelectorAll('[data-stock-code]')].map((el) => el.getAttribute('data-stock-code'))
-    expect(codes.length).toBeGreaterThan(0)
-    expect(new Set(codes).size).toBe(codes.length)
+    if (codes.length > 0) {
+      expect(new Set(codes).size, '同一只票不得重复上屏').toBe(codes.length)
+    } else {
+      expect(c.textContent, 'leaders/early 为空时应给明确空态').toContain('暂无核心标的')
+    }
   })
 })
 

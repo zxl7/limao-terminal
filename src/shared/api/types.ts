@@ -437,6 +437,14 @@ export interface FeedbackMatrix {
   market_amount_yi: number
   breadth: { up: number; down: number }
   promote_list: PromoteItem[]
+  /**
+   * **全量**晋级代码（6 位）—— 与 `promote_list` 的区别是**不截断**。
+   *
+   * ⛔ 判「某票今天晋级了吗」必须用这个集合，**不能**用 `promote_list`：
+   * 后者是 `[:8]` 的展示用截断名单，拿它做集合判定会把第 9 只之后的晋级票
+   * 误判成「未晋级」（假阴性 —— 不报错、只是标错）。
+   */
+  promote_codes: string[]
   sentiment_score: number
   sentiment_label: string
   regulatory_pressure: number

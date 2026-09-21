@@ -70,6 +70,22 @@ export const marketQueries = {
       staleTime: 20_000,
     }),
 
+  /**
+   * 昨日涨停池（唯一涨停权威）—— 连板天梯的**基线**。
+   *
+   * ⛔ 与 `analyticsQueries.ztYesterday()` **共用同一个 queryKey**（`['zt','yesterday']`）：
+   * 同 key = 同一份缓存与同一个请求，两个 feature 各自声明不会打两份接口。
+   *
+   * ⛔ **不轮询**：这是日频数据（盘后 17:2x 才滚到新的一天，约 25KB），
+   * 盘中真正会变的是「今日晋级」（走 `feedback` 的 30s 轮询），与这份基线无关。
+   */
+  yesterday: () =>
+    queryOptions({
+      queryKey: ['zt', 'yesterday'] as const,
+      queryFn: api.ztYesterday,
+      staleTime: 120_000,
+    }),
+
   /** 候选池 */
   candidates: () =>
     queryOptions({
