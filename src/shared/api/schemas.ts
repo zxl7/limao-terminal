@@ -261,6 +261,8 @@ export const ShortSpiritSignalsSchema = z.object({
     .optional(),
   pool_total: n.optional(),
   after_filter: n.optional(),
+  /** 数据日期（后端 2026-09-21 新增） */
+  date: s.optional(),
   signals: z
     .array(
       z.object({
@@ -276,6 +278,28 @@ export const ShortSpiritSignalsSchema = z.object({
         flow_yi: n.optional(),
         strength: n.optional(),
         reason: s.optional(),
+      }),
+    )
+    .optional(),
+  /** 当日信号沉淀（展示口径）· 字段全可缺（历史条目由事件流回填，无 pct/资金/理由） */
+  signals_today: z
+    .array(
+      z.object({
+        code: s.optional(),
+        name: s.optional(),
+        sector: s.optional(),
+        type: s.optional(),
+        strength: n.optional(),
+        first_seen: s.optional(),
+        last_seen: s.optional(),
+        seen_count: n.optional(),
+        pct: n.optional(),
+        tags: z.array(s).optional(),
+        reason: s.optional(),
+        resonance: n.optional(),
+        flow_yi: n.optional(),
+        market_cap_yi: nOrNull.optional(),
+        amount_yi: n.optional(),
       }),
     )
     .optional(),
@@ -319,6 +343,19 @@ export const FeedbackMatrixSchema = z.object({
     .optional(),
   /** 全量晋级代码（不截断）· 集合判定专用（集合判定禁用 promote_list） */
   promote_codes: z.array(s).optional(),
+  /** 逐票实时行情（code → 涨幅/封单）· 全量不截断 · 旧数据缺该字段 */
+  quotes: z
+    .record(
+      z.string(),
+      z.object({
+        name: s.optional(),
+        pct: nOrNull.optional(),
+        price: nOrNull.optional(),
+        /** 封单额（亿）· 仅真封板时非空 */
+        seal_yi: nOrNull.optional(),
+      }),
+    )
+    .optional(),
   sentiment_score: n.optional(),
   sentiment_label: s.optional(),
   regulatory_pressure: n.optional(),

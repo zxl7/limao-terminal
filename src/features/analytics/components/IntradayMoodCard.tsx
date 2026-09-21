@@ -7,11 +7,12 @@ import { analyticsQueries } from '../api/queries'
 import { buildLimitSeries, clockMin, pickLiveBasis } from '../lib/timeline'
 
 /**
- * 盘中情绪走势 —— **涨停（左轴）＋ 炸板率（右轴）** 两条实时曲线。
+ * 盘中情绪走势 —— **涨停 ＋ 跌停（左轴 · 家数）＋ 炸板率（右轴 · %）** 三条实时曲线。
  *
  * ## 数据来源与节拍
  * `cache/intraday_timeline_<日期>.jsonl`（`intraday_timeline.py` 每轮守护追加写）：
  *   · `zt_total.total`   → 涨停（封板）家数；
+ *   · `limit_down_new` 累计 → 跌停家数；
  *   · `broken_new` 累计  → 炸板家数 → 炸板率 = 炸板 / (封板 + 炸板累计) × 100。
  * 查询用 `analyticsQueries.intradayTimeline()`（**30s 轮询**，与后端守护同频）——
  * 盘中曲线随交易推进自动向右生长，即「动态」。
@@ -24,7 +25,12 @@ import { buildLimitSeries, clockMin, pickLiveBasis } from '../lib/timeline'
  *   3. **不假实时** —— 非交易时段明确标「最近交易日 · MM-DD」，
  *      只有真正处于交易时段才标「盘中实时」（时段判定走 `shared/lib/marketTime` 单一实现）。
  *
- * ⚠️ 单位不同量纲：涨停是家数、炸板率是百分比 → 炸板率走**右轴**（`axis: 'right'`）。
+ * ⚠️ 量纲：涨停与跌停**同为家数 → 共用左轴**（同轴才可比、可交叉）；
+ *    炸板率是百分比 → **右轴**（`axis: 'right'`）。
+ *    ⛔ 不要把跌停挪到右轴：家数与百分比共轴会造出「跌停 3 只 vs 炸板 40%」这种伪对比。
+ * ⚠️ 跌停家数量级通常远小于涨停（常态 0–3 只 vs 涨停数十只）→ 平时会贴近基线，
+ *    这**不是渲染缺陷**而是事实（「今天几乎没有跌停」）；情绪恶化日跌停放大后与涨停
+ *    同轴交叉可见。逐点读数走 hover 浮层。
  */
 export function IntradayMoodCard() {
   const query = useQuery(analyticsQueries.intradayTimeline())
@@ -52,6 +58,8 @@ export function IntradayMoodCard() {
   const curve = useMemo<LineSeries[]>(
     () => [
       { name: '涨停', values: series.zt, tone: 'up' },
+      // 跌停与涨停同量纲（家数）→ 共用左轴：两条线交叉即「亏钱效应盖过赚钱效应」
+      { name: '跌停', values: series.ld, tone: 'down' },
       {
         name: '炸板率',
         values: series.brokenRate,

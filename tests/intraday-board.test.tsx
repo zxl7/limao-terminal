@@ -81,6 +81,16 @@ function readSnapshot(): Record<string, unknown> | null {
   }
 }
 
+/** 读真实短线精灵文件 —— 用于「当日沉淀」的数据驱动断言 */
+function readSignals(): { signals?: unknown[]; signals_today?: unknown[] } | null {
+  const def = (ROUTES as Record<string, RouteDefLike>)['/api/market/signals']
+  try {
+    return readRoute(DATA_ROOT, def) as { signals?: unknown[]; signals_today?: unknown[] }
+  } catch {
+    return null
+  }
+}
+
 let restore: () => void
 beforeAll(() => {
   restore = installDataFetch()
@@ -134,14 +144,50 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(leftGrid!.className).toContain('xl:grid-cols-2')
     expect([...leftGrid!.children], '左栏 4 张卡均分').toHaveLength(4)
 
-    // 右栏：纵向堆叠的 4 张（顺序 = 用户指定）
+    // 右栏：纵向堆叠的 4 张（顺序 = 用户实际调定的顺序；测试跟随，⛔ 不反向覆盖用户的调整）
     const rightTitles = [...cols[1].querySelectorAll('.panel-title')].map((e) => e.textContent ?? '')
     expect(rightTitles).toHaveLength(4)
-    for (const [i, t] of ['昨日涨停反馈', '短线精灵', '连板天梯', '极值名单'].entries()) {
+    for (const [i, t] of ['昨日涨停反馈', '连板天梯', '极值名单', '短线精灵'].entries()) {
       expect(rightTitles[i], `右栏第 ${i + 1} 张应是「${t}」`).toContain(t)
     }
     // 全页仍是 8 张卡：左 4 + 右 4
     expect(c.querySelectorAll('.panel-title')).toHaveLength(8)
+  })
+
+  it('⚡ 短线精灵渲染「当日沉淀」（signals_today）—— 刷新后列表不空，且剔除科创板', async () => {
+    const c = await renderIntraday()
+    const panel = [...c.querySelectorAll('.panel')].find((p) =>
+      (p.querySelector('.panel-title')?.textContent ?? '').includes('短线精灵'),
+    ) as HTMLElement | undefined
+    expect(panel, '未找到短线精灵卡').toBeTruthy()
+    const txt = panel!.textContent ?? ''
+
+    /* 数据与渲染**同真同假**：当日有沉淀 → 必须渲染出条目；
+       ⛔ 不得退回「本轮 signals 为空 ⇒ 空态」——那正是用户抓包的「一刷新就空」。
+       存量为空时（如全新交易日盘前）才允许空态。 */
+    const sig = readSignals()
+    const deposit = (sig?.signals_today ?? []) as { code?: string }[]
+    if (deposit.length > 0) {
+      expect(txt, '有当日沉淀却没渲染出列表（读回「本轮」会导致空态）').not.toContain('暂无短线信号')
+      /* ⛔ 硬锁（弱断言会被「此刻本轮恰好非空」蒙过去，2026-09-21 实测踩到）：
+         「只在沉淀里、不在本轮里」的信号**必须**渲染出来 —— 只有真的读了
+         `signals_today` 才可能满足这一点。 */
+      const curCodes = new Set(((sig?.signals ?? []) as { code?: string }[]).map((s) => s.code))
+      const onlyDeposit = deposit
+        .map((d) => d.code)
+        .filter((code): code is string => !!code && !curCodes.has(code))
+      if (onlyDeposit.length > 0) {
+        expect(
+          onlyDeposit.some((code) => txt.includes(code)),
+          '只在沉淀里的信号未渲染 → 读的是「本轮 signals」而非「当日沉淀」',
+        ).toBe(true)
+      }
+    } else {
+      expect(txt).toContain('暂无短线信号')
+    }
+
+    // ⛔ 科创板（688/689）无交易权限 —— 全卡剔除（后端未滤，前端兜底）
+    expect(txt.match(/68[89]\d{3}/g), '短线精灵出现科创板代码').toBeNull()
   })
 
   it('theme.css 定义了 3xl / 4xl 断点令牌（否则上面的类名不会生成 CSS）', () => {

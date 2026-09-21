@@ -13,16 +13,11 @@ import {
   buildThemeBursts,
   buildTimeline,
   buildTimelineSlots,
-  buildLimitSeries,
-  clockMin,
-  cumulativeByMarks,
   fbtMin,
   fileDate,
   groupTimelineSlots,
   isLowStrengthSlot,
-  MARKS,
   minToClock,
-  pickLiveBasis,
   SegTabs,
   SHAPE_META,
   StatPair,
@@ -34,8 +29,8 @@ import {
   type ThemeBurstResult,
   type TimelineSlot,
 } from '@/features/analytics'
-import { Card, CardBadge, LineChart, type LineSeries } from '@/shared/ui'
-import { cn, bjDateString, bjTimeString, inTrading, isStarMarket, round2 } from '@/shared/lib'
+import { Card, CardBadge } from '@/shared/ui'
+import { cn, inTrading, isStarMarket } from '@/shared/lib'
 import { useNow } from '@/shared/hooks'
 
 /**
@@ -65,12 +60,6 @@ import { useNow } from '@/shared/hooks'
  */
 
 /** 节点标记与语义色（已上移到分析域 barrel，统一来源） */
-
-/** 取序列最后一个非 null 值（实时指标卡的「最新值」） */
-function lastNum(a: Array<number | null | undefined>): number | null {
-  for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i] as number
-  return null
-}
 
 export async function loader() {
   await Promise.all([
@@ -128,8 +117,23 @@ export function Component() {
    * 用户打开页面会看到**一整片没有个股**的时间轴，误以为「个股数据不见了」
    * （2026-09-17 用户两次抓包）。今天仍**照常可选**（标 `·盘`），只是不作为默认。
    */
+  /** 30s 时钟 —— 驱动「盘中默认选今天」的判定（时段判定走 `shared/lib/marketTime` 单一实现） */
+  const now = useNow(30_000)
+
+  /**
+   * 默认选中：**盘中选今天**，其余时段优先「有个股数据的最近一天」。
+   *
+   * ⛔ 为什么盘中要选今天：今日的题材事件（`market_memory_<今日>`）与盘中逐事件
+   *    （`intraday_timeline_<今日>.jsonl`）都是**实时落盘**的，选今天 = 轴随交易推进生长。
+   *    若默认停在「最近一个完整交易日」，盘中看到的永远是**静止的历史** ——
+   *    用户 2026-09-21 抓包「时间轴没有动态更新」。
+   * ⛔ 为什么不一路选今天：今日 `zt_list` 收盘后才落盘 → 个股没有首封时刻（`fbt`），
+   *    非交易时段看今天只会得到一片没有个股的轴；故**只在盘中**这样做（该日同时标 `·盘`）。
+   * ⛔ `inTrading` 必须传 `now`：React Compiler 会把无参纯调用当常量折叠，直接调会停在首帧。
+   */
   const day: ZtHistoryDay | null | undefined =
     days.find((f) => f.file === dayFile)?.data ??
+    (inTrading(undefined, now) ? days[0]?.data : undefined) ??
     days.find((f) => hasPool(f.data))?.data ??
     days[0]?.data
 
@@ -153,17 +157,6 @@ export function Component() {
     const d = String(day.date).replace(/-/g, '')
     return itAll.filter((e) => String(e.at ?? '').slice(0, 10).replace(/-/g, '') === d)
   }, [itAll, day])
-
-  /**
-   * 📈 推进曲线基准日 = 最近一个「盘中窗口内有事件」的交易日（纯函数 · 有回归锁）。
-   *
-   * ⛔ 为什么不跟「选中日」联动：盘中当日归档**没有涨停池**（`zt_list` 收盘后才写），
-   *    页面默认选中日会退到「上一个有池的交易日」= 昨天。曲线若跟着选中日走，
-   *    盘中看到的永远是**昨天**的曲线 —— 与「实时」相悖（用户 2026-09-19 要求实时）。
-   *    故曲线独立取「最近的盘中日」：交易时段 = 今天（30s 轮询 · 实时）；
-   *    非交易时段 = 最近一个交易日的完整盘中（并标注基准日）。
-   */
-  const chartBasis = useMemo(() => pickLiveBasis(itAll), [itAll])
 
   /**
    * 涨停全量：优先本日归档的 `zt_list`；归档残缺且恰是「今天」时，
@@ -267,43 +260,15 @@ export function Component() {
   )
 
   /**
-   * ⛔ **不画未来**：基准日是**今天**时只画到「此刻」（`untilWm`）——
-   * 否则 10:03 打开页面会看到一条平推到 15:00 的假线（涨停是状态量，会一直「保持」）。
-   * 过去交易日（已收盘）不截断：最后一个观测值就是收盘值。
-   */
-  const now = useNow(30_000)
-  const today = bjDateString(now)
-  const isToday = chartBasis?.date === today
-  const untilWm = useMemo(
-    () => (isToday ? (clockMin(bjTimeString(now).slice(0, 5)) ?? undefined) : undefined),
-    [isToday, now],
-  )
-  /** 实时「涨停 / 跌停 / 炸板率」时间序列（盘中情绪时间轴 · 30s 轮询 → 动态） */
-  const limitSeries = useMemo(
-    () => buildLimitSeries(chartBasis?.events ?? [], untilWm ?? Number.POSITIVE_INFINITY),
-    [chartBasis, untilWm],
-  )
-  const hasLive = limitSeries.zt.some((v) => v != null)
-  /**
-   * 「🔴 盘中实时」必须**同时**满足：基准日是今天 + 此刻在交易时段。
-   * ⛔ 只判时段会让「交易时段里画的是往日曲线」被标成实时（2026-09-21 实测踩到）。
+   * 所选日的**最近一个盘中采样点**（非完整交易日用）—— 提供涨停家数 / 最高板。
    *
-   * ⚠️ 时段判定走 `shared/lib/marketTime` 单一实现；用 `useNow` 驱动而不是直接
-   *    `inTrading()`：React Compiler 会把**无参纯调用**当常量折叠，直接调会永远停在首帧。
+   * ⛔ 不借「今天」的实时值：那是另一个日期的数据，混进来就是串线。
+   *   实时情绪曲线归 `/intraday`（用户 2026-09-21：「已经放在实时页了」）。
    */
-  const liveNow = isToday && inTrading(undefined, now)
-  const curve = useMemo<LineSeries[]>(() => {
-    if (hasLive) {
-      return [
-        { name: '涨停', values: limitSeries.zt, tone: 'up' },
-        { name: '跌停', values: limitSeries.ld, tone: 'down' },
-        { name: '炸板率', values: limitSeries.brokenRate, tone: 'rec', axis: 'right', format: (v) => `${round2(v)}%` },
-      ]
-    }
-    // 回退：无实时数据但有盘后涨停池 → 累计涨停单线（旧行为，避免旧交易日图表退化）
-    const mins = visible.map((s) => fbtMin(s.fbt)).filter((x): x is number => x != null)
-    return [{ name: '累计涨停', values: cumulativeByMarks(mins, MARKS), tone: 'up', area: true }]
-  }, [hasLive, limitSeries, visible])
+  const livePoint = useMemo(() => {
+    const pts = day?.intraday_points ?? []
+    return pts.length > 0 ? pts[pts.length - 1] : null
+  }, [day])
 
   /** 行业级集群（辅口径）—— 各栏保留，但明确标为辅助 */
   const tally = useMemo(() => {
@@ -328,7 +293,9 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ── ⛔ 数据基准声明：顶部曲线 = 盘中实时（最近盘中日 · 30s 刷新）；下方时间轴 = **所选日**盘面，非实时 ── */}
+      {/* ── 🕒 通栏：所选交易日的定性 + 日期切换。
+          盘中默认选中**今天**（`day` 的选中逻辑），逐事件按所选日过滤 → 轴随实时推进生长；
+          实时情绪曲线在 `/intraday`，⛔ 本页不再有折线图。 ── */}
       {/* ── 通栏：当日定性 + 推进曲线 ── */}
       <Card
         title="🕒 日内炒作时间轴"
@@ -357,26 +324,14 @@ export function Component() {
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <StatPair
             label="涨停家数"
-            value={
-              hasLive && lastNum(limitSeries.zt) != null
-                ? `${lastNum(limitSeries.zt)} 只`
-                : isFullDay
-                  ? `${visible.length} 只`
-                  : '待收盘'
-            }
-            tone={hasLive && lastNum(limitSeries.zt) != null ? 'up' : isFullDay ? 'up' : undefined}
+            value={isFullDay ? `${visible.length} 只` : livePoint ? `${livePoint.total} 只` : '待收盘'}
+            tone={isFullDay || livePoint ? 'up' : undefined}
           />
           <StatPair
-            label="跌停家数"
-            value={hasLive && lastNum(limitSeries.ld) != null ? `${lastNum(limitSeries.ld)} 只` : '—'}
-            tone={hasLive && lastNum(limitSeries.ld) != null ? 'down' : undefined}
-          />
-          <StatPair
-            label="炸板率"
-            value={hasLive && lastNum(limitSeries.brokenRate) != null ? `${round2(lastNum(limitSeries.brokenRate)!)}%` : '—'}
+            label="最高板"
+            value={isFullDay ? `${topBoard} 板` : livePoint ? `${livePoint.max_boards} 板` : '—'}
             tone="rec"
           />
-          <StatPair label="最高板" value={isFullDay ? `${topBoard} 板` : '—'} tone="rec" />
           <StatPair
             label="最早首封"
             value={isFullDay && firstMin != null ? minToClock(firstMin) : '—'}
@@ -387,29 +342,10 @@ export function Component() {
           <StatPair label="题材事件" value={`${themeEventCount} 条`} />
         </div>
 
-        <div className="mt-3 border-t border-line-faint pt-2">
-          {/* 📈 曲线基准声明 —— 用户 2026-09-19 抓包「不知道是不是实时的、只看到涨停」 */}
-          <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-[10.5px] text-sub">📈 情绪推进 · 涨停 / 跌停 / 炸板率</span>
-            {hasLive && chartBasis && (
-              <span className={cn('text-[10.5px]', liveNow ? 'text-txt font-semibold' : 'text-sub')}>
-                {liveNow ? '🔴 盘中实时' : '最近交易日'} · {chartBasis.date.slice(5)} 盘中
-                {liveNow ? ' · 30s 刷新' : ''}
-              </span>
-            )}
-            {!hasLive && (
-              <span className="text-[10.5px] text-sub">无盘中逐事件 → 回退「盘后累计涨停」单线</span>
-            )}
-          </div>
-          <LineChart
-            series={curve}
-            labels={limitSeries.labels}
-            height={160}
-            zeroBased
-            format={(v) => String(Math.round(v))}
-            dotThreshold={20}
-          />
-        </div>
+        {/* 📈 盘中「涨停 / 跌停 / 炸板率」实时曲线 **已移出本页**（2026-09-21 用户：
+            「时间轴不需要涨跌的折线图，已经放在实时页了」）→ 现由 `/intraday` 的
+            `IntradayMoodCard` 承担（30s 轮询 · 涨停 ＋ 跌停 ＋ 炸板率）。
+            ⛔ 不要在本页重新长出折线图：本页的时间维度 = **所选交易日**的推进，不是实时情绪曲线。 */}
       </Card>
 
       {/* 🚀 题材爆发 —— 2026-09-20 用户定调：**这张独立大卡已删除**。

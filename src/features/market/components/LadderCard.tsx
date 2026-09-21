@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { cn } from '@/shared/lib'
+import { cn, fmtPct } from '@/shared/lib'
 import { Card, EmptyState } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
+import { pctTone } from '../model/labels'
 
 /**
  * 连板天梯 —— **昨日梯队 × 今日晋级**。
@@ -39,6 +40,11 @@ export function LadderCard() {
   const basisDate = yzt?.date ?? ''
   const sameBasis = !!basisDate && !!fb && !fb.error && fb.prev_date === basisDate
   const promoted = useMemo(() => new Set(sameBasis ? (fb?.promote_codes ?? []) : []), [sameBasis, fb])
+  /**
+   * 逐票实时行情（涨幅 / 封单）—— 同样受「对照日一致」约束：
+   * ⛔ 不同日时给空表，免得把**别的交易日**的涨幅标到今天的梯队上。
+   */
+  const quotes = useMemo(() => (sameBasis ? (fb?.quotes ?? {}) : {}), [sameBasis, fb])
 
   const maxBoards = groups[0]?.boards ?? 0
   const total = groups.reduce((n, g) => n + g.stocks.length, 0)
@@ -69,14 +75,23 @@ export function LadderCard() {
                 className={cn('flex items-baseline gap-2.5 px-1.5 py-[3px] rounded', isTop && 'bg-up-soft')}
               >
                 <span className="num flex-none w-10 text-xs font-bold text-up">{g.boards}板</span>
-                <span className="flex flex-wrap gap-x-2.5 gap-y-1">
+                <span className="flex flex-wrap gap-x-3 gap-y-1">
                   {g.stocks.map((s) => {
                     const ok = promoted.has(s.code)
+                    const q = quotes[s.code]
                     return (
                       <span key={s.code} className="inline-flex items-baseline gap-0.5">
                         <span className={cn('text-xs', ok ? 'text-up font-semibold' : 'text-txt')}>
                           {s.name}
                         </span>
+                        {/* 今日实时涨幅 —— 缺行情时 `—`，⛔ 不退化成 0 */}
+                        <span className={cn('num text-[10.5px]', pctTone(q?.pct))}>
+                          {q?.pct != null ? fmtPct(q.pct) : '—'}
+                        </span>
+                        {/* 封单额：仅**真封板**时后端才给值（无卖盘），非封板的票不显示 */}
+                        {q?.seal_yi != null && (
+                          <span className="num text-[10px] text-lead">封{q.seal_yi}亿</span>
+                        )}
                         {ok && <span className="text-[10px] font-bold text-up">✓</span>}
                       </span>
                     )

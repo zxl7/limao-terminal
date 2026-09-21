@@ -340,13 +340,49 @@ export interface ShortSpiritSignal {
   reason: string
 }
 
+/**
+ * 当日信号沉淀条目（2026-09-21）——「今天在什么时刻发现过什么票」。
+ *
+ * ⛔ 为什么需要它：`signals` 是**本轮触发**的信号，文件每轮覆盖写；而后端 `_timeliness_gate`
+ * 会剔掉「存量涨停」（上一轮已观测为涨停的票）→ 大部分轮次 `signals` 为空 →
+ * 前端一刷新列表就消失（用户抓包「我这一刷新，列表那里就空了」）。
+ *
+ * ⚠️ 字段**全部可缺**：历史条目由事件流（`short_spirit_events_<date>.jsonl`）回填，
+ * 那里只有身份与时刻，没有 pct / 资金 / 理由 → 渲染必须 `—` 兜底，⛔ 不得退化成 0。
+ */
+export interface ShortSpiritDeposit {
+  code: string
+  name?: string
+  sector?: string
+  type?: string
+  strength?: number
+  /** 首次触发时刻（`HH:MM:SS`）—— 沉淀的核心，⛔ 一经确定不再改写 */
+  first_seen?: string
+  /** 最近一次触发时刻（`HH:MM:SS`） */
+  last_seen?: string
+  /** 当日出现过几轮（>1 = 反复触发） */
+  seen_count?: number
+  pct?: number
+  tags?: string[]
+  reason?: string
+  resonance?: number
+  flow_yi?: number
+  market_cap_yi?: number
+  amount_yi?: number
+}
+
 export interface ShortSpiritSignals {
   ts: string
+  /** 数据日期（后端 2026-09-21 新增；旧数据缺 → 沉淀按同日判定，缺失即视为不可用） */
+  date?: string
   session: 'morning' | 'afternoon' | string
   thresholds: SignalThresholds
   pool_total: number
   after_filter: number
+  /** **本轮**触发的信号（推送口径） */
   signals: ShortSpiritSignal[]
+  /** **当日沉淀**（展示口径）· 按 `first_seen` 倒序 · 旧数据缺该字段 */
+  signals_today?: ShortSpiritDeposit[]
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -358,6 +394,22 @@ export interface PromoteItem {
   code: string
   prev_boards: number
   pct: number
+}
+
+/**
+ * 逐票实时行情（`feedback.quotes` · 全量不截断）—— 供「连板天梯」显示每只票的
+ * 今日实时涨幅与封单（2026-09-21 用户「连板天梯上面显示涨幅和封单」）。
+ *
+ * ⚠️ `seal_yi` **只在真封板时非空**：判据是盘口「卖一量为 0」（无卖盘）。
+ * 未涨停的票买一也有挂单，但那不是封单 → 后端给 `null`，⛔ 前端不得退化成 0。
+ */
+export interface QuoteItem {
+  name?: string
+  /** 今日实时涨跌幅 % */
+  pct?: number | null
+  price?: number | null
+  /** 封单额（亿）· 仅真封板时非空 */
+  seal_yi?: number | null
 }
 
 export interface TrendHistoryItem {
@@ -445,6 +497,8 @@ export interface FeedbackMatrix {
    * 误判成「未晋级」（假阴性 —— 不报错、只是标错）。
    */
   promote_codes: string[]
+  /** 逐票实时行情（code → 涨幅/封单）· 全量不截断 · 旧数据缺该字段 */
+  quotes: Record<string, QuoteItem>
   sentiment_score: number
   sentiment_label: string
   regulatory_pressure: number

@@ -19,14 +19,14 @@
  * 也就永远发现不了真实数据里的坑。
  */
 
-import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest'
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ComponentType, ReactNode } from 'react'
 import path from 'node:path'
 import { ROUTES, FILE_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from '@/shared/api'
 // eslint-disable-next-line
-import { readRoute, healthPayload, resolveDataRoot } from '../scripts/lib/read-route.mjs'
+import { readRoute, healthPayload, resolveDataRoot, type RouteDefLike } from '../scripts/lib/read-route.mjs'
 
 /** ⚠️ 用 `import.meta.dirname`（Node ≥20.11）而非 `__dirname` —— 后者在 ESM 下不存在，
  *  只能靠 `fileURLToPath(import.meta.url)` 手工重建；前者是原生等价物，少一层转换。 */
@@ -197,5 +197,61 @@ describe('/timeline 页 · 题材信息归属时间轴节点', () => {
     // 题材线 / 题材事件 计数仍在通栏 KPI 里
     expect(c.textContent).toContain('题材线')
     expect(c.textContent).toContain('题材事件')
+  })
+})
+
+/**
+ * `/timeline` 页的**盘中默认日**锁（2026-09-21 用户抓包「时间轴没有动态更新」）。
+ *
+ * 病根 = 默认选中「最近一个**有涨停池**的完整交易日」：今日 `zt_list` 收盘后才落盘
+ * → `hasPool(今天)` 恒假 → 默认日退到**上一交易日**；而逐事件是**按所选日过滤**的
+ * （跨日并入会串线）→ 今天那 241 条实时事件全被滤掉 → 轴静止不动。
+ *
+ * 修法 = 盘中（`inTrading`）默认选 `days[0]`（= 最新那天，今天有归档时就是今天）。
+ * ⛔ 这类断言**必须钉死时钟**：只在交易时段才成立，盘后跑会假绿（skill 已记过同类坑）。
+ * ⛔ 只伪 `Date`、不伪 timers —— `waitFor` 要靠真实定时器推进。
+ */
+describe('/timeline 页 · 盘中默认跟随最新交易日', () => {
+  /** 北京时间构造（本机时区无关）：BJ = UTC+8 */
+  const bjAt = (h: number, mi: number) => new Date(Date.UTC(2026, 8, 21, h - 8, mi))
+
+  /** 真实 `zt_history` 里最新的一天 = 页面日期列表的第一项 */
+  function latestHistoryDate(): string {
+    const def = (ROUTES as Record<string, RouteDefLike>)['/api/emotion/zt-history']
+    const rows = readRoute(DATA_ROOT, def) as { file?: string }[]
+    const files = rows.map((r) => r.file ?? '').sort((a, b) => b.localeCompare(a))
+    return /zt_(\d{4}-\d{2}-\d{2})\.json/.exec(files[0] ?? '')?.[1] ?? ''
+  }
+
+  it('⛔ 盘中默认选中最新交易日（今天有归档时即今天）；且本页不再有涨跌折线图', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(bjAt(10, 30))
+    try {
+      const mod = (await import('@/pages/timeline/TimelinePage')) as { Component?: ComponentType }
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false, refetchInterval: false, gcTime: 0 } },
+      })
+      const Page = mod.Component!
+      const wrap = ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      )
+      const { container } = render(<Page />, { wrapper: wrap })
+      await waitFor(() => {
+        expect(client.isFetching()).toBe(0)
+      })
+
+      const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+      // 1) 折线图已移出本页（用户 2026-09-21：「时间轴不需要涨跌的折线图，已经放在实时页了」）
+      expect(text, '⛔ 本页不得再出现「📈 情绪推进」折线图（已归 /intraday）').not.toContain('情绪推进')
+
+      // 2) 盘中默认日 = 日期列表最新那天（今天有归档时就是今天）
+      const latest = latestHistoryDate()
+      if (latest) {
+        expect(text, `盘中应默认选中最新交易日 ${latest}（退到上一个有池日 = 轴静止）`).toContain(latest)
+      }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

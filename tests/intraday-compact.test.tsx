@@ -76,7 +76,7 @@ describe('盘中精简内容', () => {
   })
 })
 
-describe('盘中情绪走势（涨停 + 炸板率）', () => {
+describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
   /** 一个「过去的交易日」—— 无论测试在何时跑都不会变成今天，故断言与运行时刻无关 */
   const PAST = [
     ev('2020-01-02 09:31:00', 'zt_total', { total: 20 }),
@@ -84,15 +84,16 @@ describe('盘中情绪走势（涨停 + 炸板率）', () => {
     ev('2020-01-02 14:57:28', 'zt_total', { total: 79 }),
   ]
 
-  it('只画涨停与炸板率两条，标出真实基准日与最后观测；炸板率走右轴', () => {
+  it('画涨停 / 跌停（左轴 · 同量纲）与炸板率（右轴），并标出真实基准日与最后观测', () => {
     const { container } = mount({}, PAST)
     expect(container.textContent).toContain('最近交易日 · 01-02')
     expect(container.textContent).toContain('最后观测 14:57:28')
-    // 图例：涨停（左轴）· 炸板率（右轴，百分比量纲）
+    // 图例：涨停 ＋ 跌停（左轴 · 同为家数）· 炸板率（右轴 · 百分比量纲）
     expect(container.textContent).toContain('涨停')
+    expect(container.textContent).toContain('跌停')
     expect(container.textContent).toContain('炸板率（右轴）')
-    // 用户 2026-09-20 明确只要这两条 —— 跌停不上屏（不擅自扩列）
-    expect(container.textContent).not.toContain('跌停')
+    // ⛔ 跌停必须留在**左轴**（与涨停同量纲）：挪到右轴会与百分比造出「跌停 3 只 vs 炸板 40%」的伪对比
+    expect(container.textContent).not.toContain('跌停（右轴）')
     // 走势图已渲染
     expect(container.querySelector('svg')).not.toBeNull()
   })
