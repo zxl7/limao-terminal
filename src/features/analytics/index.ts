@@ -48,6 +48,7 @@ export {
   cumulativeByMarks,
   fbtMin,
   groupTimelineSlots,
+  intradayStockUp,
   LINKAGE_MIN_SECTORS,
   MARK_LABELS,
   MARKS,
@@ -74,12 +75,14 @@ export {
 // 题材级爆发内核（解析原系统 event_log 的题材结论 · 纯函数，可单测）
 export {
   buildThemeBursts,
+  groupSlotByTheme,
   isLowStrengthSlot,
   normName,
   normTheme,
   parseThemeEvents,
   sameTheme,
   slotThemeMarks,
+  type SlotThemeGroup,
   type SlotThemeMarks,
   type StockThemeTag,
   type ThemeBurst,
@@ -137,10 +140,11 @@ export { summarizeBlock, SUMMARY_CAP, type BlockSummary } from './lib/block-summ
 // 蛇形时间轴（一条线横走→弯→反向 · hover 浮层 + 点击详情）
 export { TimelineSnake } from './components/TimelineSnake'
 
-// 单个时间轴分块的**完整详情**（右侧 hover 浮层 + 左栏详情列表共用同一实现）
+// 单个时间轴分块的**完整详情**（右侧 hover 浮层 + 左栏详情列表共用同一实现·
+// 2026-09-22 起详情走**题材主轴**：题材 → 该题材当刻个股 → 该题材当日全部涨停成员）
 export { BlockDetail, blockRangeText, KIND_LABEL } from './components/BlockDetail'
 
-// 左栏「节点详情」虚拟列表（纵向倒序 · @tanstack/react-virtual 窗口化渲染）
+// 左栏「节点详情」虚拟列表（纵向倒序 · 自研窗口化渲染）
 export { TimelineDetailList } from './components/TimelineDetailList'
 
 // 盘中情绪走势（涨停 / 炸板率两条实时曲线 · 30s 轮询）

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BURST_MIN_STOCKS,
+  buildTimeline,
   buildTimelineSlots,
   groupTimelineSlots,
   isLowStrengthSlot,
@@ -74,9 +75,57 @@ describe('⛔ 盘中逐事件并入主时间轴（2026-09-17 用户「合进我�
   const itev = (at: string, kind: string, extra: Record<string, unknown> = {}) =>
     ({ at, kind, ...extra }) as unknown as import('@/shared/api').IntradayTimelineEvent
 
-  it('按分钟并入：无节点的分钟也会生成槽', () => {
-    const slots = buildTimelineSlots([], [
-      itev('2026-09-17 13:10:05', 'stock_up', { code: '603626' }),
+  /**
+   * 建一批「有个股落点」的槽 —— 2026-09-22 起**槽的存在性由事实决定**：
+   * 个股落点（`nodes.fbt`）或当日记忆事件，而**不是**「某分钟广播了一次板块计数」。
+   */
+  const nodesAt = (fbts: string[]) =>
+    buildTimeline({
+      stocks: fbts.map((f, i) => stk(`60${i}`, f)),
+      events: [],
+      pushes: [],
+    }).nodes
+
+  it('⛔ 2026-09-22：盘中事件**只并入、不新建**槽（无个股落点 = 无槽）', () => {
+    // 用户第二次抓包「普通卡很多空白」→ 详情只渲染「题材 + 个股」，
+    // 纯事件槽在详情里就是整块空白（实测 09-21 = 126 块里 56 块空白）。
+    const slots = buildTimelineSlots(nodesAt([]), [
+      itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
+      itev('2026-09-17 13:12:40', 'broken_new', { name: '中材科技' }),
+    ])
+    expect(slots, '没有个股落点就不该有槽').toEqual([])
+  })
+
+  it('🔒 不变量：槽集合**只由 nodes 决定**，与盘中事件无关（杜绝空白块）', () => {
+    const nodes = nodesAt(['131005', '131240'])
+    const bare = buildTimelineSlots(nodes, [])
+    const withEvents = buildTimelineSlots(nodes, [
+      itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
+      itev('2026-09-17 13:12:40', 'broken_new', { name: '中材科技' }),
+      itev('2026-09-17 13:15:00', 'sector_down', { name: '白银' }), // ⛔ 无落点的分钟
+      itev('2026-09-17 13:20:00', 'zt_total', { total: 33 }), // ⛔ 播报类
+    ])
+    expect(
+      withEvents.map((s) => s.at),
+      '事件不得新增任何槽（否则详情出现空白块）',
+    ).toEqual(bare.map((s) => s.at))
+  })
+
+  it('⛔ 2026-09-22：统计播报与个股事件**不并入**（zt_total / stock_up）', () => {
+    // `zt_total` 是每分钟一条的「全市场涨停总数」播报（统计口径，顶部 KPI 已展示）；
+    // `stock_up` 已被 `intradayStockUp` 转成结构化个股行，再作事件渲染即同一时刻重复。
+    const slots = buildTimelineSlots(nodesAt(['131005']), [
+      itev('2026-09-17 13:10:05', 'zt_total', { total: 33 }),
+      itev('2026-09-17 13:10:20', 'stock_up', { code: '603626' }),
+    ])
+    expect(slots).toHaveLength(1)
+    expect(slots[0].intradayUp, '两类都不该进事件流').toEqual([])
+    expect(slots[0].intradayDown).toEqual([])
+  })
+
+  it('盘中事件并入**同一分钟**的已有槽（个股落点建槽）', () => {
+    const slots = buildTimelineSlots(nodesAt(['131005', '131240']), [
+      itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
       itev('2026-09-17 13:12:40', 'broken_new', { name: '中材科技' }),
     ])
     expect(slots.map((s) => s.at)).toEqual([13 * 60 + 10, 13 * 60 + 12])
@@ -85,28 +134,41 @@ describe('⛔ 盘中逐事件并入主时间轴（2026-09-17 用户「合进我�
   })
 
   it('同分钟涨跌各自归位（⛔ 跌侧不得混进涨侧）', () => {
-    const slots = buildTimelineSlots([], [
-      itev('2026-09-17 13:10:05', 'stock_up'),
+    const slots = buildTimelineSlots(nodesAt(['131005']), [
+      itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
       itev('2026-09-17 13:10:20', 'sector_down', { name: '白银' }),
       itev('2026-09-17 13:10:40', 'limit_down_new', { name: '海南发展' }),
     ])
     expect(slots).toHaveLength(1)
-    expect(slots[0].intradayUp.map((e) => e.kind)).toEqual(['stock_up'])
+    expect(slots[0].intradayUp.map((e) => e.kind)).toEqual(['sector_up'])
     expect(slots[0].intradayDown.map((e) => e.kind).sort()).toEqual(['limit_down_new', 'sector_down'])
   })
 
+  it('⛔ `SESSION_OPEN`(09:15) 前的记录一律丢弃（守护进程 00:03 补写昨日收盘快照）', () => {
+    // 实测 09-18 曾出现 `00:02` 的槽、09-22 出现 `00:03` —— 那是昨日收盘的补写，不是今日盘中。
+    const slots = buildTimelineSlots(nodesAt(['131005']), [
+      itev('2026-09-17 00:02:11', 'broken_new', { name: '隔夜补写' }),
+      itev('2026-09-17 09:14:00', 'sector_up', { name: '盘前' }),
+      itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信' }),
+    ])
+    expect(slots).toHaveLength(1)
+    expect(slots[0].intradayUp.map((e) => String(e.name))).toEqual(['光通信'])
+  })
+
   it('非法时刻被跳过（不丢整批、不抛错）', () => {
-    const slots = buildTimelineSlots([], [
-      itev('', 'stock_up'),
-      itev('坏时间', 'stock_up'),
-      itev('2026-09-17 13:20:00', 'stock_up'),
+    const slots = buildTimelineSlots(nodesAt(['132000']), [
+      itev('', 'sector_up'),
+      itev('坏时间', 'sector_up'),
+      itev('2026-09-17 13:20:00', 'sector_up', { name: '光通信' }),
     ])
     expect(slots).toHaveLength(1)
     expect(slots[0].at).toBe(13 * 60 + 20)
   })
 
   it('⛔ 含盘中事件的槽不得被低频合并吞掉', () => {
-    const slots = buildTimelineSlots([], [itev('2026-09-17 13:10:05', 'broken_new', { name: 'X' })])
+    const slots = buildTimelineSlots(nodesAt(['131005']), [
+      itev('2026-09-17 13:10:05', 'broken_new', { name: 'X' }),
+    ])
     const blocks = groupTimelineSlots(slots, isLowStrengthSlot)
     expect(blocks.map((b) => b.kind)).toEqual(['normal'])
   })

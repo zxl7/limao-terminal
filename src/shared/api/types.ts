@@ -894,6 +894,14 @@ export interface ConfidenceFactors {
   capital: string
   /** 阶段因子（如 "boom"） */
   phase: string
+  /**
+   * **K线止跌**（2026-09-22 新增·第 5 维）—— 龙头个股日K四条判据命中数，如
+   * `"stop_fall(止跌2/4)"` / `"not_yet(未止跌1/4)"` / `"no_data(无K线)"`。
+   *
+   * ⚠️ 可选：该维度上线前的历史归档没有这个字段（⛔ 别当 `''` 或 `'not_yet'` 处理）。
+   * 判据见 `scripts/theme_rotation._kline_stop_fall`（①站上MA5 ②近2日不创新低 ③跌幅收窄 ④缩量）。
+   */
+  kline?: string
 }
 
 /** 回流候选题材 */

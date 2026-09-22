@@ -35,12 +35,21 @@ export async function loader() {
   return null
 }
 
-/** 四因子全满足 = 高置信；缺资金 = 待确认；缺催化 = 仅技术性回流 */
+/**
+ * 五因子全满足 = 高置信；缺资金 = 待确认；缺催化 = 仅技术性回流。
+ *
+ * ⚠️ 2026-09-22 由四因子扩为**五因子**（新增「K线止跌」，用户口径：
+ * 「监听板块消息、资金流和**K线是否止跌**，确定是否回流」）——
+ * 资金/消息再好但**价格没止跌**，按用户口径不算真回流，故单列一档提示。
+ */
 function confTier(c: RotationCandidate): { label: string; tone: 'up' | 'rec' | 'warn' | 'neutral' } {
   const f = c.confidence_factors
   const capitalOk = f.capital === 'inflow_rising'
-  if (f.catalyst && capitalOk && f.phase === 'boom') return { label: '四因子齐备', tone: 'up' }
-  if (capitalOk) return { label: '资金已回', tone: 'rec' }
+  const klineOk = String(f.kline ?? '').startsWith('stop_fall')
+  if (f.catalyst && capitalOk && f.phase === 'boom' && klineOk)
+    return { label: '五因子齐备', tone: 'up' }
+  if (capitalOk && klineOk) return { label: '资金已回·K线止跌', tone: 'rec' }
+  if (capitalOk) return { label: '资金已回·K线未止跌', tone: 'warn' }
   if (f.catalyst) return { label: '有催化·缺资金', tone: 'warn' }
   return { label: '仅形态回流', tone: 'neutral' }
 }
@@ -77,9 +86,9 @@ export function Component() {
   }, [calm, moved])
 
   /**
-   * 四因子命中结构 —— 回答「这批回流信号的质量如何」。
+   * 五因子命中结构 —— 回答「这批回流信号的质量如何」。
    *
-   * 四项分别对应脚本的四因子：催化新 / 资金回流 / 阶段处于爆发位 / 大盘配合。
+   * 五项分别对应脚本的五因子：催化新 / 资金回流 / 阶段处于爆发位 / 大盘配合 / **K线止跌**。
    * 柱高是**命中该因子的题材数**（不是分值），故用中性蓝统一着色 ——
    * 计数没有「好坏」语义，染红染绿都是过度解读。
    */
@@ -88,6 +97,7 @@ export function Component() {
     return [
       { label: '催化新', value: cnt((c) => c.catalyst_fresh), tone: 'mid' as const },
       { label: '资金回流', value: cnt((c) => c.confidence_factors.capital === 'inflow_rising'), tone: 'mid' as const },
+      { label: 'K线止跌', value: cnt((c) => String(c.confidence_factors.kline ?? '').startsWith('stop_fall')), tone: 'mid' as const },
       { label: '阶段爆发位', value: cnt((c) => c.confidence_factors.phase === 'boom'), tone: 'mid' as const },
       { label: '大盘配合', value: cnt((c) => c.confidence_factors.market === true), tone: 'mid' as const },
       { label: '今日已动', value: moved.length, tone: 'mid' as const },
@@ -104,11 +114,18 @@ export function Component() {
           <StatPair label="数据日" value={d?.date ?? '—'} />
           <StatPair label="候选总数" value={all.length} />
           <StatPair label="资金已回" value={all.filter((c) => c.confidence_factors.capital === 'inflow_rising').length} tone="up" />
+          <StatPair
+            label="K线止跌"
+            value={all.filter((c) => String(c.confidence_factors.kline ?? '').startsWith('stop_fall')).length}
+            tone="up"
+          />
           <StatPair label="新催化" value={all.filter((c) => c.catalyst_fresh).length} />
           <StatPair label="窗口" value={d?.data_meta?.window ?? '—'} />
         </div>
         <p className="text-sub text-[11.5px] leading-relaxed">
-          置信度是四因子加权后的**排序分值**，不是成功率 —— 本页按它排序，但不把它当概率解读。
+          置信度是**五因子**（催化 / 大盘 / 资金 / 相位 / **K线止跌**）加权后的**排序分值**，
+          不是成功率 —— 本页按它排序，但不把它当概率解读。「K线止跌」看的是**该题材龙头个股**
+          的日K（站上MA5 / 近2日不创新低 / 跌幅收窄 / 缩量，四条命中≥2 成立）。
           「今日已动」的题材已失去低吸位置，与「未启动」分开列示。
         </p>
         {!rot.isLoading && !d && <EmptyState text="回流数据未生成" hint="cache/rotation.json 缺失" />}

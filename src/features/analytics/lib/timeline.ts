@@ -1,6 +1,7 @@
 import type { IntradayTimelineEvent, MarketMemory, ZtPoolStock } from '@/shared/api'
 import { round2, type MaybeNum } from '@/shared/lib'
 import { emotionState, eventTier } from './event-text'
+import { SESSION_OPEN } from './snake'
 
 /**
  * 日内炒作时间轴的**纯计算内核** —— 与 React 无关，可单测。
@@ -378,6 +379,60 @@ export function sortIntradaySectorEvents(
 }
 
 /**
+ * 盘中逐事件里的**个股涨停**（`stock_up`）→ 一条可用于**分钟定位**的个股记录。
+ *
+ * ## 为什么需要它（2026-09-22 实测）
+ *
+ * 盘中当日 `zt_history/zt_<今日>.json` 的 `zt_list` **为空**（收盘后才落盘），
+ * 而 `yesterday_zt.json` 的 `date` 是上一个交易日 ⇒ 与所选日不等 ⇒ 时间轴
+ * **一个个股都没有**，只剩「爆发/走强 · 杀跌」这类板块级计数。
+ *
+ * 而 `intraday_timeline_<今日>.jsonl` 的 `stock_up` **逐条带**
+ * `code / name / sector / pct / boards`，且 `at` 就是它被封住的时刻 ——
+ * 正好满足本页对首封时刻（`fbt`）的定位需求。
+ *
+ * ## ⛔ 两条硬规则（都有实测依据）
+ *
+ * 1. **`at < 09:25` 一律丢弃**：守护进程会在 **00:03** 一次性补写**昨日收盘**快照
+ *    （实测 2026-09-22 共 64 条、含 26 条 `stock_up`）—— 混入就会把昨日封板的票
+ *    画到今天凌晨的轴上。
+ * 2. `sector` 字段的**取值是题材名**（医药 / 房地产 / 国产芯片 …），
+ *    ⛔ 不是 `zt_list` 里的行业（医疗服务 / 中药）。故返回值命名为 `theme`。
+ *
+ * 返回 `null` = 该事件不是可定位的个股涨停（→ 调用方跳过）。
+ */
+export function intradayStockUp(e: IntradayTimelineEvent): {
+  code: string
+  name: string
+  /** ⚠️ 题材名（非行业） */
+  theme: string
+  pct: number
+  boards: number
+  /** 首封时刻 `HHMMSS`（由事件 `at` 推出） */
+  fbt: string
+} | null {
+  if (e.kind !== 'stock_up') return null
+  const fbt = String(e.at ?? '')
+    .slice(11, 19)
+    .replace(/:/g, '')
+  if (fbt.length < 6) return null
+  // 字典序比较即可（等长 HHMMSS）
+  if (fbt < '092500') return null
+  const code = String(e.code ?? '').trim()
+  if (!code) return null
+  const n = Number(String(e.boards ?? '').match(/\d+/)?.[0] ?? '')
+  return {
+    code,
+    name: String(e.name ?? '').trim(),
+    theme: String(e.sector ?? '').trim(),
+    pct: Number(e.pct ?? 0),
+    // 盘中的 `boards` 常为空串/缺省 → 记 1 板（⛔ 不退化成 0：「0 板」是错值）
+    boards: Number.isFinite(n) && n > 0 ? n : 1,
+    fbt,
+  }
+}
+
+/**
  * 时间轴的一个「分钟槽」—— 页面的一个固定宽卡。
  *
  * ⛔ 注意 `.at` 只是**排序键与槽键**：槽内每条记录（个股 / 事件）各有自己的发生时刻，
@@ -503,12 +558,50 @@ export function buildTimelineSlots(
     }
   }
 
-  // ── 盘中逐事件：按分钟并入同一批槽（2026-09-17 用户「合进我的时间轴里面」）──
+  // ── 盘中逐事件：按分钟**并入已存在的槽**（2026-09-17 用户「合进我的时间轴里面」）──
   const DOWN = new Set(['sector_down', 'limit_down_new', 'broken_new'])
+  /**
+   * ⛔ **不建槽**的事件类型（2026-09-22 用户「时间轴的普通卡没有数据啊」）。
+   *
+   * 实测病灶：`zt_total` 是**每分钟一条的「全市场涨停总数」播报**（今日 66/230 条），
+   * 它占满了降序首屏 —— 用户打开时间轴看到的前 12 个块全是「个股 0 / 事件 1」，
+   * 于是判断「普通卡没有数据」。而它既不是个股、也不是题材/板块事件，
+   * 只是**统计口径**（该值已由顶部「涨停家数」KPI 承担展示）。
+   *
+   * 同理 `stock_up`：它已被 `intradayStockUp` 转成**结构化的个股行**
+   * （带板数/题材/涨停原因），再作为事件渲染一次就是**同一时刻的重复**。
+   *
+   * ⛔ 这里只影响**时间轴的槽投影**，原始事件流一条不改 ——
+   * `IntradayMoodCard`（盘中页情绪曲线）走的 `api.intradayTimeline()` **不经过本函数**，
+   * `zt_total` 在那里仍是涨停数序列的唯一来源。
+   */
+  const NO_SLOT = new Set(['zt_total', 'stock_up'])
+  /**
+   * ⛔⛔ **盘中事件只「并入」、绝不「新建」槽**（2026-09-22 用户第二次抓包「普通卡很多空白」）。
+   *
+   * ## 为什么必须这样
+   *
+   * 详情的渲染口径是「**题材 → 该题材的个股**」（用户明确否决了「爆发走强 / 杀跌」这类计数），
+   * 因此一个槽在详情里**只有两种东西可见**：题材区（来自 `mem.event_log` / `pushed_topics`）
+   * 与个股行。若一个槽**只有盘中事件、没有个股**，它在详情里就是**整块空白**
+   * —— 用户看到的就是一屏「普通卡 / 封板 0 · 题材 0」加一片空。
+   *
+   * 实测（真实数据 · 改前）：09-21 = 126 块中 **56 块空白**；09-18 = 98 块中 **45 块**；
+   * 09-17 = 54 块中 **14 块**。改后**全部归零**（09-21 → 70 块 / 0 空白）。
+   *
+   * ⛔ 顺带修掉一类脏数据：守护进程 **00:03** 会补写**昨日收盘**快照，里面同样含
+   *    `sector_up` / `broken_new` —— 它们曾建出 `00:02` / `00:07` 的槽（`SESSION_OPEN` 闸门一并挡掉）。
+   *
+   * 于是**槽的存在性由「事实」决定**：个股落点（`nodes.fbt`）+ 当日记忆事件/推送，
+   * 而不是「某分钟恰好广播了一次板块计数」。
+   */
   for (const e of intraday ?? []) {
+    if (NO_SLOT.has(String(e.kind))) continue
     const t = clockMin(String(e.at ?? '').slice(11, 16))
-    if (t == null) continue
-    const s = ensure(t)
+    // ⛔ `SESSION_OPEN` 前的记录一律丢弃（00:03 补写的昨日收盘快照）
+    if (t == null || t < SESSION_OPEN) continue
+    const s = slots.get(t) // ⛔ 只并入已存在的槽 —— 不 `ensure`
+    if (!s) continue
     ;(DOWN.has(String(e.kind)) ? s.intradayDown : s.intradayUp).push(e)
   }
 

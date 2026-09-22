@@ -109,7 +109,11 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
  * 一个方向（涨 / 跌）分区。
  *
  * 排版顺序：**板块条目在前（按强度降序，卡面只直接展示最强 3 个）**，
- * 非板块条目（涨停总数 / 个股 / 炸板 / 跌停）在其后。
+ * 非板块条目（炸板 / 跌停）在其后。
+ *
+ * ⚠️ 2026-09-22：`zt_total`（每分钟一条的涨停总数播报）与 `stock_up`（个股涨停）
+ * 已在 `buildTimelineSlots` 的 `NO_SLOT` 里被**排除建槽**，本组件不会再收到它们 ——
+ * 前者是统计口径（顶部 KPI 已展示），后者已由 `intradayStockUp` 转成结构化个股行。
  */
 function DirectionSection({
   dir,

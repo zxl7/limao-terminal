@@ -8,6 +8,7 @@ import {
   SLOT_HEIGHT,
   SLOT_VISIBLE_SECTORS,
   type StockThemeTag,
+  type TimelineSlot,
 } from '@/features/analytics'
 import type { IntradayTimelineEvent, ZtPoolStock } from '@/shared/api'
 
@@ -345,27 +346,43 @@ describe('TimelineSlotCard 固定高 / 滚动 / 板块强度排序', () => {
  *   ③ **不丢** —— 超出的板块**仍在 DOM**（下拉可见），非板块条目不受上限影响。
  */
 describe('卡片内板块条目：强度排序 + 最多 3 个', () => {
-  /** 造一个含多板块事件的槽（乱序输入） */
-  function busySlot() {
+  /**
+   * 造一个含多板块事件的槽（乱序输入）。
+   *
+   * ⚠️ 2026-09-22：**直接构造槽字面量**，不再经 `buildTimelineSlots` ——
+   * 该函数已改为「盘中事件**只并入、不新建**槽」（纯事件槽在详情里是整块空白，
+   * 用户两次抓包「普通卡很多空白」）。本组测的是**卡面**的事件块
+   * （`IntradayEventBlock` 的排序 / 截断 / 不丢），与建槽口径无关，故自备槽对象。
+   */
+  function busySlot(): TimelineSlot {
     const ev = (kind: string, name: string, extra: Record<string, unknown>) =>
       ({ at: '2026-09-17 12:06:01', kind, name, ...extra }) as unknown as IntradayTimelineEvent
-    const slots = buildTimelineSlots([], [
+    return {
+      at: 12 * 60 + 6,
+      sectors: [],
+      singles: [],
+      events: null,
+      pushes: null,
+      pushTo: null,
       // 涨侧：故意乱序输入
-      ev('sector_up', '强E', { zt_count: 1 }),
-      ev('sector_up', '强A', { zt_count: 9 }),
-      ev('sector_up', '强D', { zt_count: 3 }),
-      ev('sector_up', '强B', { zt_count: 7 }),
-      ev('sector_up', '强C', { zt_count: 5 }),
-      // 跌侧：故意乱序输入
-      ev('sector_down', '跌D', { pct: -2 }),
-      ev('sector_down', '跌A', { pct: -9 }),
-      ev('sector_down', '跌E', { pct: -1 }),
-      ev('sector_down', '跌B', { pct: -5 }),
-      ev('sector_down', '跌C', { pct: -3 }),
-      // 非板块条目：⛔ 不受「最多 3 个」影响
-      ev('zt_total', '', { total: 33, delta: 2 }),
-    ])
-    return slots[0]
+      intradayUp: [
+        ev('sector_up', '强E', { zt_count: 1 }),
+        ev('sector_up', '强A', { zt_count: 9 }),
+        ev('sector_up', '强D', { zt_count: 3 }),
+        ev('sector_up', '强B', { zt_count: 7 }),
+        ev('sector_up', '强C', { zt_count: 5 }),
+      ],
+      // 跌侧：故意乱序输入；末条为**非板块条目**（⛔ 不受「最多 3 个」上限影响）
+      intradayDown: [
+        ev('sector_down', '跌D', { pct: -2 }),
+        ev('sector_down', '跌A', { pct: -9 }),
+        ev('sector_down', '跌E', { pct: -1 }),
+        ev('sector_down', '跌B', { pct: -5 }),
+        ev('sector_down', '跌C', { pct: -3 }),
+        ev('limit_down_new', '独跌票', { pct: -10 }),
+      ],
+      key: 'slot:726',
+    }
   }
 
   /** 板块名 span（`font-medium` 在本槽内只用于盘中板块条目） */
@@ -406,8 +423,9 @@ describe('卡片内板块条目：强度排序 + 最多 3 个', () => {
       expect(container.textContent).toContain(n)
     }
     // 非板块条目照常（⛔ 不被「板块上限」波及）
-    expect(container.textContent).toContain('涨停总数')
-    expect(container.textContent).toContain('33')
+    // ⚠️ 2026-09-22：fixture 的非板块条目已换为 `limit_down_new`（`zt_total` 不再建槽），
+    //    故断言跟到新的渲染文案「<名称> 跌停」（见 IntradayEventLine 的 kind 分支）。
+    expect(container.textContent).toContain('独跌票')
   })
 })
 

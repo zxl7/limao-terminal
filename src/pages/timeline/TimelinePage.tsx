@@ -7,6 +7,7 @@ import type {
   IntradayTimelineEvent,
   MarketMemory,
   ZtHistoryDay,
+  ZtPoolStock,
 } from '@/shared/api'
 import {
   analyticsQueries,
@@ -16,6 +17,7 @@ import {
   fbtMin,
   fileDate,
   groupTimelineSlots,
+  intradayStockUp,
   isLowStrengthSlot,
   minToClock,
   SegTabs,
@@ -27,6 +29,7 @@ import {
   TimelineSlotCard,
   TimelineSnake,
   type SectorNode,
+  type StockThemeTag,
   type ThemeBurstResult,
   type TimelineSlot,
 } from '@/features/analytics'
@@ -179,8 +182,59 @@ export function Component() {
     return []
   }, [day, yztQ.data])
 
+  /**
+   * **盘中当日的个股流** —— 来自盘中逐事件里的 `stock_up`（2026-09-22 用户
+   * 「我需要看到的是题材、题材爆发以及与题材相关的大量个股」）。
+   *
+   * ## 为什么必须有这一层
+   *
+   * 实测（2026-09-22 盘中）：当日 `zt_history/zt_<今日>.json` 的 `zt_list` **为空**
+   * （收盘后才落盘），而 `yesterday_zt.json` 的 `date` 是**上一个交易日** ⇒ 与所选日
+   * 不相等 ⇒ `stocks` 返回空 ⇒ **时间轴上一个个股都没有**，只剩「爆发/走强·杀跌」这类
+   * 板块级计数。这正是用户当时看到（并否决）的画面。
+   *
+   * 而 `intraday_timeline_<今日>.jsonl` 的 `stock_up` 事件**逐条带**
+   * `code / name / sector(题材名) / pct / boards` —— 且 `at` 就是它的**封板时刻**，
+   * 天然满足 `buildTimeline` 对首封时刻（`fbt`）的定位需求。
+   *
+   * ⛔ 必须排除 `at < 09:25` 的记录：守护进程会在 **00:03** 一次性补写**昨日收盘**快照
+   *    （实测 64 条、含 26 条 `stock_up`）—— 若混入，昨日封板的票会被画到今天凌晨。
+   * ⛔ 同 code 只取**首次**出现（首封即定位）。
+   */
+  const itStocks = useMemo<ZtPoolStock[]>(() => {
+    const out: ZtPoolStock[] = []
+    const seen = new Set<string>()
+    for (const e of itEvents) {
+      const r = intradayStockUp(e)
+      if (!r || seen.has(r.code)) continue
+      seen.add(r.code)
+      out.push({
+        code: r.code,
+        name: r.name,
+        pct: r.pct,
+        price: 0,
+        boards: r.boards,
+        fbt: r.fbt,
+        zbc: 0,
+        hs: 0,
+        // ⚠️ 来源字段叫 `sector`，但**取值是题材名**（医药/房地产/国产芯片…），
+        //    不是 `zt_list` 里的行业（医疗服务/中药）。故同时写进题材归属 `themeTags`。
+        sector: r.theme,
+        seal: 0,
+        cje_yi: 0,
+        zsz_yi: 0,
+        is_20cm: r.pct >= 19,
+      })
+    }
+    return out
+  }, [itEvents])
+
   /** ⛔ 科创板无交易权限 —— 全页统一剔除 */
-  const visible = useMemo(() => stocks.filter((s) => !isStarMarket(s.code)), [stocks])
+  const visible = useMemo(() => {
+    // 盘中当日无 `zt_list` → 回落到盘中逐事件的个股（否则整页无个股）
+    const base = stocks.length > 0 ? stocks : itStocks
+    return base.filter((s) => !isStarMarket(s.code))
+  }, [stocks, itStocks])
 
   const mem: MarketMemory | null | undefined = useMemo(() => {
     const list = (memQ.data ?? []).filter((f) => !!f.data)
@@ -268,6 +322,34 @@ export function Component() {
   )
 
   /**
+   * 个股 → 题材归属（Code → themes）—— 详情「题材主轴」的分组依据。
+   *
+   * 两个来源合并：
+   *   ① `bursts.tags`（题材事件 + 决策档案 `hot_spots` 的成员表）—— 覆盖窄（实测 20/102）；
+   *   ② **盘中逐事件的 `stock_up.sector`** —— 该字段取值是**题材名**（医药/房地产/国产芯片…），
+   *      当日盘中封板的票几乎都有 → 这是「与题材相关的大量个股」的主要来源。
+   *
+   * ⚠️ 必须**复制** `bursts.tags` 的条目再改（那是一个共享 Map，直接 push 会污染上游）。
+   */
+  const themeTags = useMemo(() => {
+    const m = new Map<string, StockThemeTag>()
+    for (const [code, v] of bursts.tags) {
+      m.set(code, { themes: [...v.themes], leaderOf: [...v.leaderOf] })
+    }
+    for (const e of itEvents) {
+      const r = intradayStockUp(e)
+      if (!r || !r.theme) continue
+      const cur = m.get(r.code)
+      if (!cur) {
+        m.set(r.code, { themes: [r.theme], leaderOf: [] })
+        continue
+      }
+      if (!cur.themes.includes(r.theme)) cur.themes.push(r.theme)
+    }
+    return m
+  }, [bursts.tags, itEvents])
+
+  /**
    * 所选日的**最近一个盘中采样点**（非完整交易日用）—— 提供涨停家数 / 最高板。
    *
    * ⛔ 不借「今天」的实时值：那是另一个日期的数据，混进来就是串线。
@@ -345,7 +427,8 @@ export function Component() {
           />
           <StatPair
             label="最早首封"
-            value={isFullDay && firstMin != null ? minToClock(firstMin) : '—'}
+            /* 2026-09-22：盘中个股流补上后（`itStocks`），`fbt` 已可用 —— 不再因「非完整交易日」显示「—」 */
+            value={firstMin != null ? minToClock(firstMin) : '—'}
             tone="rec"
           />
           <StatPair label="题材线" value={`${bursts.themes.length} 条`} tone="up" />
@@ -376,7 +459,7 @@ export function Component() {
           <TimelineDetailList
             blocks={blocks}
             topBoard={topBoard}
-            tags={bursts.tags}
+            tags={themeTags}
             reasonByCode={reasonByCode}
             themeInfo={themeInfo}
             activeKey={activeKey}
@@ -408,7 +491,7 @@ export function Component() {
               <TimelineSnake
                 blocks={blocks}
                 topBoard={topBoard}
-                tags={bursts.tags}
+                tags={themeTags}
                 reasonByCode={reasonByCode}
                 themeInfo={themeInfo}
                 focusKey={activeKey}
@@ -424,7 +507,7 @@ export function Component() {
                         key={b.key}
                         block={b}
                         topBoard={topBoard}
-                        tags={bursts.tags}
+                        tags={themeTags}
                         reasonByCode={reasonByCode}
                         themeInfo={themeInfo}
                       />
@@ -433,7 +516,7 @@ export function Component() {
                         key={b.key}
                         block={b}
                         topBoard={topBoard}
-                        tags={bursts.tags}
+                        tags={themeTags}
                         reasonByCode={reasonByCode}
                         themeInfo={themeInfo}
                       />
@@ -442,7 +525,7 @@ export function Component() {
                         key={b.key}
                         slot={b.slot}
                         topBoard={topBoard}
-                        tags={bursts.tags}
+                        tags={themeTags}
                         reasonByCode={reasonByCode}
                         themeInfo={themeInfo}
                       />

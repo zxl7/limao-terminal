@@ -195,27 +195,38 @@ describe('TimelineSnake · 悬停即明细（⛔ 无需点击）', () => {
     expect(dlg.textContent).not.toContain('其余')
   })
 
-  it('③ 盘中板块事件也**不截断**（>3 个全部列出）', () => {
+  it('③ ⛔ 2026-09-22 起：详情**不再渲染**盘中板块事件（用户否决「爆发/走强 · 杀跌」计数）', () => {
     const many = Array.from({ length: 6 }, (_, i) => ie('sector_up', `板块${i}`, { zt_count: 6 - i }))
     const blocks = [normalBlock(10 * 60, slot(10 * 60, { intradayUp: many }))]
     const { container } = render(<TimelineSnake blocks={blocks} {...props} width={W} {...instant} />)
     fireEvent.mouseEnter(nodeAt(container, '10:00'))
     const dlg = dialogOf(container)!
-    for (let i = 0; i < 6; i++) expect(dlg.textContent).toContain(`板块${i}`)
+    // 用户原话：「我不喜欢看到现在什么的爆发走强，杀跌这些数量」
+    expect(dlg.textContent).not.toContain('爆发 / 走强')
+    expect(dlg.textContent).not.toContain('杀跌')
+    for (let i = 0; i < 6; i++) expect(dlg.textContent).not.toContain(`板块${i}`)
     expect(dlg.textContent).not.toContain('下拉查看')
   })
 
-  it('④ 明细含该刻个股小计；题材爆发/盘中板块原样解析出来', () => {
+  it('④ 详情含该刻**全部个股**；题材爆发原样解析出来（题材主轴）', () => {
     const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} />)
     fireEvent.mouseEnter(nodeAt(container, '10:00'))
-    expect(dialogOf(container)!.textContent).toContain('当刻 5 只')
-    expect(dialogOf(container)!.textContent).toContain('票电力0')
+    const dlg10 = dialogOf(container)!
+    // 头部统计改走题材维度（⛔ 不再是「行业 N · ↑N/↓N」）
+    expect(dlg10.textContent).toContain('封板 16')
+    expect(dlg10.textContent).not.toContain('↑')
+    // 该刻个股仍**全量**在详情里（本 fixture 无题材标记 → 走「无题材标记」段）
+    expect(dlg10.textContent).toContain('票电力0')
     fireEvent.mouseLeave(nodeAt(container, '10:00'))
     fireEvent.mouseEnter(nodeAt(container, '11:00'))
     const dlg = dialogOf(container)!
+    // 题材爆发仍原样解析（🚀 首爆 + 题材名 + 龙头）
+    expect(dlg.textContent).toContain('🚀 首爆')
     expect(dlg.textContent).toContain('光通信')
     expect(dlg.textContent).toContain('华脉科技')
-    expect(dlg.textContent).toContain('机器人')
+    // ⛔ 但该刻的**盘中板块事件**（机器人走强 / 白银杀跌）不再出现在详情里
+    expect(dlg.textContent).not.toContain('机器人')
+    expect(dlg.textContent).not.toContain('白银')
   })
 
   it('⑤ 移开鼠标 → 自动收起', () => {

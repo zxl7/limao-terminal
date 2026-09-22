@@ -4,7 +4,7 @@ import { SlotBody } from './TimelineSlotCard'
 import { summarizeBlock } from '../lib/block-summary'
 import { minToClock, type TimelineBlock } from '../lib/timeline'
 import { SESSION_CLOSE, SESSION_OPEN } from '../lib/snake'
-import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
+import { groupSlotByTheme, type StockThemeTag, type ThemeBurst } from '../lib/theme-burst'
 
 /**
  * **单个时间轴分块的完整详情**（2026-09-22）—— 双消费者共用同一实现：
@@ -70,10 +70,14 @@ export function BlockDetail({
    *
    * ⚠️ 先把所有槽的票合起来去重再归类，⛔ 不是「每槽题材数相加」（同一题材跨槽会被重复计）。
    */
-  const themeCount = useMemo(() => {
-    const all = slots.flatMap((s) => [...s.sectors.flatMap((g) => g.stocks), ...s.singles])
-    return groupSlotByTheme({ sectors: [{ stocks: all }], singles: [] }, tags, new Set()).groups.length
-  }, [slots, tags])
+  const allStocks = slots.flatMap((s) => [...s.sectors.flatMap((g) => g.stocks), ...s.singles])
+  // ⚠️ 不用 `useMemo`：`slots` 由 `block` 派生、每次渲染都是新数组，包一层只会「永远重算」，
+  //    且会触发 lint 的 `exhaustive-deps` 类告警。归类本身是 O(票数)，可忽略。
+  const themeCount = groupSlotByTheme(
+    { sectors: [{ stocks: allStocks }], singles: [] },
+    tags,
+    new Set(),
+  ).groups.length
 
   const headInner: ReactNode = (
     <>
@@ -131,6 +135,7 @@ export function BlockDetail({
               showTime={slots.length > 1}
               showAllSectors
               showAllEvents
+              themeGrouped
             />
           </div>
         ))}
