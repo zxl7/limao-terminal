@@ -187,6 +187,20 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache/decision_log', dirPattern: '^\\d{4}-\\d{2}-\\d{2}$', file: 'manifest.json', mode: 'latest', cadence: 'daily',
     desc: '存档清单（来源清单 sources / 摘要 summary / 缺口 gaps）',
   },
+  /**
+   * 09:25 池内裁决**终态**（`wealth_code/core/pool_call.py` 产出）。
+   *
+   * ⚠️ 与 `/api/ai/view` 的区别（⛔ 两者不可混用）：
+   *   · `ai_view`  = 前一交易日**盘后**写的预案（`bias`：focus/normal/avoid），是**输入**；
+   *   · `pool_call`= 当日 **09:25 竞价后**的定音（`view`：participate/watch/skip + `quota_rank`），是**结论**。
+   *   两者的日期键也不同：`ai_view.date` 与 `pool_call.trade_date` 同为**执行日**（对应关系成立）。
+   *
+   * 交易台账/判断明细展示**执行结果时必须读本路由**，否则会显示「昨天的预案」而非「今晨实际怎么做的」。
+   */
+  '/api/decision/pool-call': {
+    dir: 'wealth_code/cache', pattern: '^pool_call-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 3, cadence: 'daily',
+    desc: '09:25 池内裁决终态（昨日预案 bias × 今晨竞价 → view 定音 + 买入名额序 + 竞价涨幅/量能）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 八、AI 判断平行台账（2026-09-10 用户定 · 两本独立账）

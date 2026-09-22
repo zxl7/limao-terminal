@@ -254,6 +254,17 @@ export function timelineNodeKey(n: TimelineNode): string {
   }
 }
 
+/**
+ * 分块 key → **稳定 DOM 锚点 id**（2026-09-22）。
+ *
+ * 左栏详情列表与右侧蛇形轴共用同一实现（⛔ 两处各写一份必然错位）。
+ * `block.key` 含 `:`（如 `normal:600`）在 HTML5 id 里合法，但会被 CSS 选择器误解析，
+ * 故统一替换为 `_` —— 取值一律走 `getElementById`（不做选择器拼接）。
+ */
+export function timelineAnchorId(blockKey: string): string {
+  return `tl-${blockKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+}
+
 // ════════════════════════════════════════════════════════════════
 // 展示投影：把「板块聚类」重投到「分钟槽」
 //

@@ -31,6 +31,9 @@ export { CardArchiveView, cardDate, type ArchiveCard } from './components/CardAr
 // 财富密码每日决策档案（`wealth_code_candidates_v1`）
 export { DossierView } from './components/DossierView'
 
+// AI 台账「判断明细」= AI 判断 × 尾盘财富密码接力卡真实字段（区间/量能/指标/标签/理由）
+export { AiJudgeDetail, type JudgeCall, type JudgeRow } from './components/AiJudgeDetail'
+
 // 自动化任务台账解析（`config/tasks.yaml` 原文 → 条目 · 只解析所需子集）
 export { parseTaskLedger } from './lib/task-ledger'
 
@@ -54,6 +57,7 @@ export {
   SLOT_VISIBLE_SECTORS,
   sortIntradaySectorEvents,
   sortSlotSectors,
+  timelineAnchorId,
   timelineNodeKey,
   type EventNode,
   type PushNode,
@@ -132,6 +136,12 @@ export { summarizeBlock, SUMMARY_CAP, type BlockSummary } from './lib/block-summ
 
 // 蛇形时间轴（一条线横走→弯→反向 · hover 浮层 + 点击详情）
 export { TimelineSnake } from './components/TimelineSnake'
+
+// 单个时间轴分块的**完整详情**（右侧 hover 浮层 + 左栏详情列表共用同一实现）
+export { BlockDetail, blockRangeText, KIND_LABEL } from './components/BlockDetail'
+
+// 左栏「节点详情」虚拟列表（纵向倒序 · @tanstack/react-virtual 窗口化渲染）
+export { TimelineDetailList } from './components/TimelineDetailList'
 
 // 盘中情绪走势（涨停 / 炸板率两条实时曲线 · 30s 轮询）
 export { IntradayMoodCard } from './components/IntradayMoodCard'

@@ -26,14 +26,17 @@ import { TABS } from '@/app/AppShell'
  *
  * 来源：脚本遍历「页面 → query → endpoint → 路由 → cadence」全链路（2026-09-15）。
  * 与 `routes.ts` 的实时路由逐条对应：
- *   /api/market/latest      → / 盘中实时、/mainline 主线题材、/record 数据记录
- *   /api/market/prev        → /record 数据记录
+ *   /api/market/latest      → / 盘中实时、/mainline 主线题材
  *   /api/theme/rotation     → /rotation 题材轮动、/reflow 题材回流、/flow 资金流向
- *   /api/audit/log          → /ops 运维审计
  *   /api/emotion/zt-history → /timeline 日内时间轴（含 `zt_list.fbt` 与 intraday_points）
  *                             ⚠️ 该页归类为「实时」是**页面级决策**而非路由 cadence 推导：
  *                             zt-history 路由本身是 daily，但页面读的 audit.jsonl 是
  *                             intraday，且它的用途是盘中随盘推进地看「今天怎么走到现在」。
+ *
+ * ⚠️ 2026-09-22 审计：`/record`（数据记录）、`/ops`（运维审计）**已迁入「数据」段**
+ *    （用户明确要求「数据记录 / 运维审计 / 同花顺数据 移到数据模块」）。
+ *    二者虽含 intraday 路由，但页面主体是**日频台账/审计**，按「短线交易优先级」不属实时段
+ *    —— 再次印证：cadence 是**路由级**属性，导航段是**页面级**决策。
  */
 const REALTIME_TABS = [
   '/',
@@ -42,8 +45,6 @@ const REALTIME_TABS = [
   '/mainline',
   '/reflow',
   '/flow',
-  '/record',
-  '/ops',
 ] as const
 
 /** 段序 —— 实时段置首是本次改动的核心，顺序即契约 */
@@ -80,14 +81,17 @@ describe('导航顺序 —— 实时优先', () => {
     expect(TABS[0].label).toBe('盘中实时')
   })
 
-  it('「实时」段内按短线交易优先级排序 —— 盘面 → 题材资金 → 数据运维', () => {
-    // 题材与资金类（盘中决策直接消费）必须排在数据/运维类之前
-    const idx = (p: string) => REALTIME_TABS.indexOf(p as (typeof REALTIME_TABS)[number])
-    for (const trading of ['/rotation', '/mainline', '/reflow', '/flow']) {
-      for (const ops of ['/record', '/ops']) {
-        expect(idx(trading), `${trading} 应排在 ${ops} 之前`).toBeLessThan(idx(ops))
-      }
-    }
+  it('「实时」段顺序 = 声明的短线优先级（顺序即契约 · ⛔ 不许重排）', () => {
+    // 首页（盘中实时）恒在首位；其后 时间轴 → 题材轮动/主线 → 回流/资金。
+    // ⛔ 2026-09-22 起数据/运维类（/record·/ops）已移出实时段，不再参与本排序。
+    expect([...REALTIME_TABS]).toEqual([
+      '/',
+      '/timeline',
+      '/rotation',
+      '/mainline',
+      '/reflow',
+      '/flow',
+    ])
   })
 
   it('路径唯一 —— 重复会让同一页出现两个 Tab 且高亮错乱', () => {

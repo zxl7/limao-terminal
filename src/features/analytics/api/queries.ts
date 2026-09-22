@@ -173,6 +173,20 @@ export const analyticsQueries = {
       queryFn: api.decisionManifest,
       staleTime: DAILY_STALE,
     }),
+  /**
+   * 09:25 池内裁决**终态**（近 3 期）。
+   *
+   * ⚠️ 节拍比一般日频数据紧一档：该文件**当日 09:25 才生成** —— 若沿用 5 分钟 staleTime
+   *    且打开页面时缓存里还是昨天的，会一直看不到今晨裁决。故给 `intradayPollMs`
+   *    （盘中 5 分钟 / 非盘中不轮询），保证 09:25 后自动补上。
+   */
+  decisionPoolCall: () =>
+    queryOptions({
+      queryKey: ['decision', 'pool-call'] as const,
+      queryFn: api.decisionPoolCall,
+      refetchInterval: intradayPollMs,
+      staleTime: 60_000,
+    }),
 
   // ══════════════ AI 判断平行台账 ══════════════
   /** AI 判断（参与/放弃/观察） */

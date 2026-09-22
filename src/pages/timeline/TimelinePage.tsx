@@ -21,6 +21,7 @@ import {
   SegTabs,
   SHAPE_META,
   StatPair,
+  TimelineDetailList,
   TimelineLinkageCard,
   TimelineMergedCard,
   TimelineSlotCard,
@@ -82,8 +83,13 @@ export function Component() {
   const itQ = useQuery(analyticsQueries.intradayTimeline())
   const [dayFile, setDayFile] = useState('')
   /**
-   * 时间轴排版（2026-09-17）：`snake` = 蛇形折线（默认，一条线横走→弯→反向）；
-   * `cards` = 卡片流（原版）。⛔ 两视图共用同一批分块与排序内核，切换不改结论。
+   * 左栏「时间轴」节点组件当前选中的节点（2026-09-22 用户定：左节点列表 / 右蛇形时间线）。
+   * 点击左栏节点 → 右侧蛇形轴上对应节点**弹出明细**（`focusKey` 透传给 `TimelineSnake`）。
+   */
+  const [activeKey, setActiveKey] = useState('')
+  /**
+   * 右侧时间轴排版：`snake` = 蛇形折线（默认 · 一条线横走→弯→反向）；`cards` = 卡片流。
+   * ⛔ 两视图共用同一批分块与排序内核，切视图不改结论。
    */
   const [view, setView] = useState<'snake' | 'cards'>('snake')
 
@@ -249,10 +255,12 @@ export function Component() {
   const themeEventCount = bursts.themedCount + bursts.riskCount
 
   /**
-   * 题材名 → 当日全貌 —— **只给 hover 明细用**（催化原文 / 涨停成员 / 观测时刻）。
+   * 题材名 → 当日全貌（催化原文 / 涨停成员 / 观测时刻）。
    *
-   * 2026-09-20：这些信息原先放在独立的「🚀 题材爆发」大卡里，与时间轴内容重复。
-   * 现改为**挂到时间轴节点上**（卡面仍只留题材名 + 家数 + 龙头，详情里才展开），该卡已删除。
+   * 2026-09-20：这些信息原先放在独立的「🚀 题材爆发」大卡里，与时间轴内容重复 → 撤卡，
+   * 改为**挂到节点详情上**（卡面只留题材名 + 家数 + 龙头，详情里才展开）。
+   * 2026-09-22：左栏成为常驻详情区 → 直接下传给详情卡（`themeInfo` prop），
+   * 不再依赖 hover 面板（蛇形轴已撤出本页）。
    */
   const themeInfo = useMemo(
     () => new Map(bursts.themes.map((t) => [t.theme, t])),
@@ -290,6 +298,9 @@ export function Component() {
     .map((s) => fbtMin(s.fbt))
     .filter((x): x is number => x != null)
     .reduce<number | null>((m, v) => (m == null || v < m ? v : m), null)
+
+  /** 点击左栏节点：置为选中 —— 透传给 `TimelineSnake` 的 `focusKey` → 右侧轴上对应节点弹明细。 */
+  const pickNode = (key: string) => setActiveKey(key)
 
   return (
     <div className="flex flex-col gap-3">
@@ -349,131 +360,154 @@ export function Component() {
       </Card>
 
       {/* 🚀 题材爆发 —— 2026-09-20 用户定调：**这张独立大卡已删除**。
-          题材信息一律挂到时间轴节点上：节点竖条**紫色** + 轴上直接标板块名 +
-          hover 详情里展开「催化原文 / 当日涨停成员 / 观测时刻」（数据经 `themeInfo` 注入）。
+          题材信息一律挂到时间轴节点上：轴内节点标题材名（紫）+ hover 明细展开
+          「催化原文 / 当日涨停成员 / 观测时刻」（数据经 `themeInfo` 注入）。
           ⛔ 不要在页面里重新长出一张题材清单卡。 */}
 
-      {/* ── 主体：三类展示分块（联动聚合 / 普通独立 / 低频合并）
-          ⚠️ 两种排版（2026-09-17）：🐍 蛇形轴（默认 · 一条线横走→弯→反向）｜🃏 卡片流（原版）
-          ⛔ 两者**同一批分块、同一批排序内核** —— 切视图只改呈现，不改任何结论。── */}
-      <Card
-        title="时间轴"
-        extra={
-          <div className="flex items-center gap-2">
-            <SegTabs
-              items={[
-                { key: 'snake', label: '时间轴' },
-                { key: 'cards', label: '卡片流' },
-              ]}
-              value={view}
-              onChange={(k) => setView(k as 'snake' | 'cards')}
-            />
-            <CardBadge>
-              {blocks.length} 张卡 · {slots.length} 个时刻槽
-            </CardBadge>
-          </div>
-        }
-      >
-        {/* ── 🐍 蛇形轴（默认）：一条线横走 → 弯 → 反向横走；悬停节点即出完整明细（无需点击）── */}
-        {view === 'snake' ? (
-          <TimelineSnake
+      {/* ── 主体：**左＝节点完整详情（15%·虚拟列表） / 右＝完整蛇形时间线**（2026-09-22 用户定稿）
+          · 左（15%）：`TimelineDetailList` —— **每个节点一条完整详情**（倒序 · 虚拟列表窗口化渲染 ·
+            自身滚动 · sticky）；内容与右侧 hover 浮层**同源**（都走 `BlockDetail`，全量不截断）；
+          · 右（其余）：**完整「时间轴」卡**（🐍 蛇形轴默认 / 🃏 卡片流可切）+ 行业级集群 + 无时间坐标；
+          · 点击左栏条目 → `activeKey` 透传 `TimelineSnake` 的 `focusKey` → 右侧轴上对应节点**弹出明细**。
+          ⛔ 左栏是「详情」，⛔ 不是时间轴导航、也不是卡片墙。── */}
+      <div className="flex gap-3 items-start max-xl:flex-col">
+        {/* ── 左 15%：**每个节点的完整详情**（虚拟列表 · 倒序 · 点击联动右侧轴）── */}
+        <div className="xl:w-[15%] xl:flex-none xl:sticky xl:top-3 max-xl:w-full min-w-0">
+          <TimelineDetailList
             blocks={blocks}
             topBoard={topBoard}
             tags={bursts.tags}
             reasonByCode={reasonByCode}
             themeInfo={themeInfo}
+            activeKey={activeKey}
+            onPick={pickNode}
           />
-        ) : (
-          <>
-            {/* ── 🃏 卡片流（原版 · 保留为可逆视图）：左→右铺开、满了自动换行
-                （⛔ 不用 grid —— grid 会把同一行的卡片拉成等高，短卡下方留大片空白）
-                ⚠️ 卡片**固定高 240px** → 即便用 flex 也天然等高，换行后行列整齐。 */}
-            <div className="flex flex-wrap items-start content-start gap-3 min-w-0">
-              {blocks.map((b) =>
-                b.kind === 'linkage' ? (
-                  <TimelineLinkageCard
-                    key={b.key}
-                    block={b}
-                    topBoard={topBoard}
-                    tags={bursts.tags}
-                    reasonByCode={reasonByCode}
-                  />
-                ) : b.kind === 'merged' ? (
-                  <TimelineMergedCard
-                    key={b.key}
-                    block={b}
-                    topBoard={topBoard}
-                    tags={bursts.tags}
-                    reasonByCode={reasonByCode}
-                  />
-                ) : (
-                  <TimelineSlotCard
-                    key={b.key}
-                    slot={b.slot}
-                    topBoard={topBoard}
-                    tags={bursts.tags}
-                    reasonByCode={reasonByCode}
-                  />
-                ),
-              )}
-            </div>
-            {blocks.length === 0 && (
-              <div className="text-sub text-[12px] py-2">当日无可定位到分钟的记录</div>
-            )}
-          </>
-        )}
-      </Card>
-
-      {/* ── 行业级集群（辅口径）：题材榜之外的完整视角 · ⛔ 全天汇总，非时间定位 ── */}
-      <Card
-        title="行业级集群"
-        extra={<CardBadge>{tally.sectorTotal} 个行业</CardBadge>}
-      >
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-          <span className={cn('text-[12.5px]', SHAPE_META.burst.cls)}>
-            🚀 爆发 {tally.burst.length}
-          </span>
-          <span className={cn('text-[12.5px]', SHAPE_META.spread.cls)}>
-            〰 扩散 {tally.spread.length}
-          </span>
-          <span className="text-[12.5px] text-sub">· 成对 {tally.pair.length}</span>
-          <span className="text-[12.5px] text-sub">单票 {tally.single} 只</span>
         </div>
-        {tally.burst.length + tally.spread.length > 0 && (
-          <div className="mt-1.5 flex flex-col gap-1">
-            {[...tally.burst, ...tally.spread].map((s) => (
-              <div key={s.sector} className="flex items-baseline gap-2 text-[12px]">
-                <span className={cn('flex-none', SHAPE_META[s.shape].cls)}>
-                  {SHAPE_META[s.shape].icon}
-                </span>
-                <span className="text-txt font-semibold flex-none">{s.sector}</span>
-                <span className="num text-sub flex-none">{s.stocks.length} 只</span>
-                <span className="num text-sub flex-none">
-                  {minToClock(s.at)}→{minToClock(s.to)}
-                </span>
-                <span className="num text-sub flex-none">跨 {s.to - s.at} 分</span>
-                <span className="text-sub truncate">
-                  {s.shape === 'burst' ? '短时集群封板' : '全天持续有新票加入'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
 
-      {looseStocks.length > 0 && (
-        <Card title="无时间坐标" extra={<CardBadge tone="warn">{looseStocks.length} 只</CardBadge>}>
-          <div className="flex flex-wrap gap-x-2.5 gap-y-1">
-            {looseStocks.map((s) => (
-              <span key={s.code} className="text-[12px] text-txt">
-                {s.name}
-                <span className="num text-sub ml-1">{s.boards}板</span>
-                <span className="text-sub ml-1">{s.sector}</span>
+        {/* ── 右：完整蛇形时间线 + 行业集群 + 无时间坐标 ── */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3">
+          <Card
+            title="时间轴"
+            extra={
+              <div className="flex items-center gap-2">
+                <SegTabs
+                  items={[
+                    { key: 'snake', label: '时间轴' },
+                    { key: 'cards', label: '卡片流' },
+                  ]}
+                  value={view}
+                  onChange={(k) => setView(k as 'snake' | 'cards')}
+                />
+                <CardBadge>
+                  {blocks.length} 张卡 · {slots.length} 个时刻槽
+                </CardBadge>
+              </div>
+            }
+          >
+            {view === 'snake' ? (
+              <TimelineSnake
+                blocks={blocks}
+                topBoard={topBoard}
+                tags={bursts.tags}
+                reasonByCode={reasonByCode}
+                themeInfo={themeInfo}
+                focusKey={activeKey}
+              />
+            ) : (
+              <>
+                {/* 🃏 卡片流：左→右铺开、满了自动换行（⛔ 不用 grid —— 会拉成等高留空白）
+                    ⚠️ 卡片固定 240px 高 → flex 下天然等高，换行后行列整齐。 */}
+                <div className="flex flex-wrap items-start content-start gap-3 min-w-0">
+                  {blocks.map((b) =>
+                    b.kind === 'linkage' ? (
+                      <TimelineLinkageCard
+                        key={b.key}
+                        block={b}
+                        topBoard={topBoard}
+                        tags={bursts.tags}
+                        reasonByCode={reasonByCode}
+                        themeInfo={themeInfo}
+                      />
+                    ) : b.kind === 'merged' ? (
+                      <TimelineMergedCard
+                        key={b.key}
+                        block={b}
+                        topBoard={topBoard}
+                        tags={bursts.tags}
+                        reasonByCode={reasonByCode}
+                        themeInfo={themeInfo}
+                      />
+                    ) : (
+                      <TimelineSlotCard
+                        key={b.key}
+                        slot={b.slot}
+                        topBoard={topBoard}
+                        tags={bursts.tags}
+                        reasonByCode={reasonByCode}
+                        themeInfo={themeInfo}
+                      />
+                    ),
+                  )}
+                </div>
+                {blocks.length === 0 && (
+                  <div className="text-sub text-[12px] py-2">当日无可定位到分钟的记录</div>
+                )}
+              </>
+            )}
+          </Card>
+
+          {/* ── 行业级集群（辅口径）：题材榜之外的完整视角 · ⛔ 全天汇总，非时间定位 ── */}
+          <Card title="行业级集群" extra={<CardBadge>{tally.sectorTotal} 个行业</CardBadge>}>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
+              <span className={cn('text-[12.5px]', SHAPE_META.burst.cls)}>
+                🚀 爆发 {tally.burst.length}
               </span>
-            ))}
-          </div>
-        </Card>
-      )}
+              <span className={cn('text-[12.5px]', SHAPE_META.spread.cls)}>
+                〰 扩散 {tally.spread.length}
+              </span>
+              <span className="text-[12.5px] text-sub">· 成对 {tally.pair.length}</span>
+              <span className="text-[12.5px] text-sub">单票 {tally.single} 只</span>
+            </div>
+            {tally.burst.length + tally.spread.length > 0 && (
+              <div className="mt-1.5 flex flex-col gap-1">
+                {[...tally.burst, ...tally.spread].map((s) => (
+                  <div key={s.sector} className="flex items-baseline gap-2 text-[12px]">
+                    <span className={cn('flex-none', SHAPE_META[s.shape].cls)}>
+                      {SHAPE_META[s.shape].icon}
+                    </span>
+                    <span className="text-txt font-semibold flex-none">{s.sector}</span>
+                    <span className="num text-sub flex-none">{s.stocks.length} 只</span>
+                    <span className="num text-sub flex-none">
+                      {minToClock(s.at)}→{minToClock(s.to)}
+                    </span>
+                    <span className="num text-sub flex-none">跨 {s.to - s.at} 分</span>
+                    <span className="text-sub truncate">
+                      {s.shape === 'burst' ? '短时集群封板' : '全天持续有新票加入'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {looseStocks.length > 0 && (
+            <Card
+              title="无时间坐标"
+              extra={<CardBadge tone="warn">{looseStocks.length} 只</CardBadge>}
+            >
+              <div className="flex flex-wrap gap-x-2.5 gap-y-1">
+                {looseStocks.map((s) => (
+                  <span key={s.code} className="text-[12px] text-txt">
+                    {s.name}
+                    <span className="num text-sub ml-1">{s.boards}板</span>
+                    <span className="text-sub ml-1">{s.sector}</span>
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

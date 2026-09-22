@@ -51,8 +51,8 @@ interface TabDef {
  * 剩下 14 个页面全是日频/历史档，无论名字多像实时（如「盘中实时」以外的情绪周期、
  * 龙虎榜）都属历史性数据。
  *
- * ⛔ 不要凭页面标题判断实时性 —— 「数据记录」听着像运维，实际读 `latest`/`prev`
- * 两个实时路由；「情绪周期」听着像实时，实际是日频 5 日汇总。
+ * ⛔ 不要凭页面标题判断实时性 —— 「情绪周期」听着像实时，实际是日频 5 日汇总；
+ * 「数据记录 / 运维审计 / 同花顺数据」听着像实时/外部源，实际已归「数据」段（日频存档类）。
  *
  * ## 历史段的相对顺序保持不变
  *
@@ -69,8 +69,6 @@ export const TABS: readonly TabDef[] = [
   { to: '/mainline', label: '主线题材', group: '实时' },
   { to: '/reflow', label: '题材回流', group: '实时' },
   { to: '/flow', label: '资金流向', group: '实时' },
-  { to: '/record', label: '数据记录', group: '实时' },
-  { to: '/ops', label: '运维审计', group: '实时' },
 
   // ── 段2 · 盘面定性（日频）──
   { to: '/emotion', label: '情绪周期', group: '盘面' },
@@ -83,7 +81,6 @@ export const TABS: readonly TabDef[] = [
   { to: '/lhb', label: '龙虎榜', group: '题材' },
   { to: '/carrier', label: '载体追踪', group: '题材' },
   { to: '/risk', label: '风险监控', group: '题材' },
-  { to: '/hithink', label: '同花顺数据', group: '题材' },
 
   // ── 段4 · 决策与战绩（日频）──
   { to: '/ai', label: 'AI台账', group: '决策' },
@@ -93,6 +90,9 @@ export const TABS: readonly TabDef[] = [
   { to: '/auction', label: '竞价决策', group: '决策' },
 
   // ── 段5 · 数据与运维（日频）──
+  { to: '/record', label: '数据记录', group: '数据' },
+  { to: '/ops', label: '运维审计', group: '数据' },
+  { to: '/hithink', label: '同花顺数据', group: '数据' },
   { to: '/stack', label: '数据堆叠', group: '数据' },
   { to: '/archive', label: '决策存档', group: '数据' },
   { to: '/cards', label: '卡片原文', group: '数据' },

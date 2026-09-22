@@ -15,7 +15,7 @@ import { IntradayMoodCard, analyticsQueries } from '@/features/analytics'
  *   1. **不重复** —— 同一只票不因跨 `leaders` / `early` / 多题材而重复上屏；
  *   2. **不虚标** —— 未封板只说「未封板强势」，⛔ 不说「可买」；题材表不宣称「主线」；
  *   3. **不假实时** —— 走势图标**真实基准日**与**最后观测时刻**，
- *      非交易时段 ⛔ 不标「盘中实时」；无逐事件时明确空态，⛔ 不退化成假 0。
+ *      非交易时段 ⛔ 不标「盘中记录」；无逐事件时明确空态，⛔ 不退化成假 0。
  */
 
 const stock = (code: string, name: string, extra: Partial<Leader> = {}): Leader => ({
@@ -84,23 +84,23 @@ describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
     ev('2020-01-02 14:57:28', 'zt_total', { total: 79 }),
   ]
 
-  it('画涨停 / 跌停（左轴 · 同量纲）与炸板率（右轴），并标出真实基准日与最后观测', () => {
+  it('画涨停 / 跌停（左轴 · 同量纲）与炸板累计比（右轴），并标出真实基准日与最后观测', () => {
     const { container } = mount({}, PAST)
     expect(container.textContent).toContain('最近交易日 · 01-02')
     expect(container.textContent).toContain('最后观测 14:57:28')
     // 图例：涨停 ＋ 跌停（左轴 · 同为家数）· 炸板率（右轴 · 百分比量纲）
     expect(container.textContent).toContain('涨停')
     expect(container.textContent).toContain('跌停')
-    expect(container.textContent).toContain('炸板率（右轴）')
+    expect(container.textContent).toContain('炸板累计比（右轴）')
     // ⛔ 跌停必须留在**左轴**（与涨停同量纲）：挪到右轴会与百分比造出「跌停 3 只 vs 炸板 40%」的伪对比
     expect(container.textContent).not.toContain('跌停（右轴）')
     // 走势图已渲染
     expect(container.querySelector('svg')).not.toBeNull()
   })
 
-  it('⛔ 不假实时：过去的基准日不得标「盘中实时」，也不含未来刻度读数', () => {
+  it('⛔ 不假实时：过去的基准日不得标「盘中记录」，也不含未来刻度读数', () => {
     const { container } = mount({}, PAST)
-    expect(container.textContent).not.toContain('盘中实时')
+    expect(container.textContent).not.toContain('盘中记录')
     expect(container.textContent).not.toContain('30s')
   })
 
@@ -109,7 +109,7 @@ describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
     expect(container.textContent).toContain('无盘中逐事件')
     expect(container.textContent).toContain('暂无盘中逐事件记录')
     // 没有序列就不得画图（图上任何一条线都意味着有数据）
-    expect(container.textContent).not.toContain('炸板率（右轴）')
+    expect(container.textContent).not.toContain('炸板累计比（右轴）')
     expect(container.textContent).not.toContain('0%')
   })
 
@@ -119,7 +119,7 @@ describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
   })
 
   /**
-   * 「盘中实时」标注口径（2026-09-21 实测踩到 · ⛔ 别再只判时段）。
+   * 「盘中记录」标注口径（2026-09-21 实测踩到 · ⛔ 别再只判时段）。
    *
    * 事故：卡片原来只判「此刻在交易时段」→ 周一早盘打开页面时，**往日基准日**
    * （今天的首轮 JSONL 还没落盘 → 基准日 = 昨天）被标成「盘中实时」，与用户
@@ -127,19 +127,19 @@ describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
    */
   const bjAt = (h: number, mi: number) => new Date(Date.UTC(2026, 8, 21, h - 8, mi))
 
-  it('⛔ 交易时段内但基准日是往日 → 只标「最近交易日」，不得标「盘中实时」', () => {
+  it('⛔ 交易时段内但基准日是往日 → 只标「最近交易日」，不得标「盘中记录」', () => {
     vi.useFakeTimers()
     vi.setSystemTime(bjAt(10, 30)) // 周一 10:30 · 正在交易时段
     try {
       const { container } = mount({}, PAST)
       expect(container.textContent).toContain('最近交易日 · 01-02')
-      expect(container.textContent).not.toContain('盘中实时')
+      expect(container.textContent).not.toContain('盘中记录')
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('✅ 基准日=今天 且 在交易时段 → 才标「盘中实时」', () => {
+  it('✅ 基准日=今天 且 在交易时段 → 才标「盘中记录」', () => {
     vi.useFakeTimers()
     vi.setSystemTime(bjAt(10, 30))
     try {
@@ -147,7 +147,7 @@ describe('盘中情绪走势（涨停 + 跌停 + 炸板率）', () => {
         ev('2026-09-21 09:31:00', 'zt_total', { total: 20 }),
         ev('2026-09-21 10:00:00', 'broken_new', { name: 'X' }),
       ])
-      expect(container.textContent).toContain('盘中实时')
+      expect(container.textContent).toContain('盘中记录')
       expect(container.textContent).toContain('09-21')
       expect(container.textContent).toContain('最后观测 10:00:00')
     } finally {

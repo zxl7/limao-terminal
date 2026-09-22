@@ -34,6 +34,7 @@ import type {
   EruptionDay,
   FeedbackMatrix,
   LearningConfig,
+  PoolCallFile,
   PromoBacktest,
   RuleConfigFile,
   ShortSpiritConfig,
@@ -125,6 +126,8 @@ export interface RouteTypeMap {
   '/api/decision/archive': DatedFile<DecisionDossier>[]
   '/api/decision/zt-pool': ZtPoolSnapshot
   '/api/decision/manifest': DecisionManifest
+  /** 09:25 池内裁决终态（`view` 定音 + 买入名额序 · ⛔ 非昨日预案 `bias`） */
+  '/api/decision/pool-call': DatedFile<PoolCallFile>[]
 
   // ── 八、AI 判断平行台账 ──
   '/api/ai/view': DatedFile<AiViewFile>[]
@@ -293,6 +296,14 @@ export const api = {
   decisionZtPool: () => fetchRoute('/api/decision/zt-pool'),
   /** 存档清单（完整性 / gaps） */
   decisionManifest: () => fetchRoute('/api/decision/manifest'),
+  /**
+   * 09:25 池内裁决**终态**（近 3 期）。
+   *
+   * ⛔ 与 `aiView` 不可互换：`aiView` 是**前一交易日盘后**的预案（输入），
+   *    本路由是**当日 09:25 竞价后**的定音（结论：view + 买入名额序）。
+   *    展示「今晨实际怎么做的」必须用本路由。
+   */
+  decisionPoolCall: () => fetchRoute('/api/decision/pool-call'),
 
   // ── 八、AI 判断平行台账 ──
   /** AI 判断（参与/放弃/观察 + 理由） */

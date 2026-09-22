@@ -13,7 +13,7 @@ import {
 } from '../lib/timeline'
 import type { ZtPoolStock } from '@/shared/api'
 import type { StockThemeTag } from '../lib/theme-burst'
-import { slotThemeMarks, type ThemeBurst } from '../lib/theme-burst'
+import { groupSlotByTheme, slotThemeMarks, type ThemeBurst } from '../lib/theme-burst'
 
 /**
  * 时间轴「分钟槽」卡片 —— **固定宽 × 固定高 × 内部滚动**。
@@ -236,6 +236,97 @@ function SectorSlotGroup({
 }
 
 /**
+ * 槽内「某**题材**当刻封板」的分组块 —— **详情模式专用**（2026-09-22 用户定）。
+ *
+ * 用户原话：「我需要看到的是题材、题材爆发以及与题材相关的大量个股，
+ * 我不喜欢看到现在什么的爆发走强，杀跌这些数量。」
+ *
+ * 与 `SectorSlotGroup`（行业分组 · 卡面用）的分工：
+ *   · 本组件以**题材**为主轴，并补出**该题材当日全部涨停成员**（「大量个股」的来源）；
+ *   · 行业分组仍服务于 240px 卡面的紧凑呈现，⛔ 两者不互相取代。
+ *
+ * ⛔ 「当日其余涨停成员」必须**排除本槽已列出的票**，否则同一只票在同一条详情里出现两次。
+ */
+function ThemeSlotGroup({
+  theme,
+  stocks,
+  burst,
+  topBoard,
+  tags,
+  reasonByCode,
+  themeInfo,
+}: {
+  theme: string
+  stocks: ZtPoolStock[]
+  /** 本槽这一刻该题材是否为「新主线崛起」→ 题材名用紫 + 🚀 */
+  burst: boolean
+  topBoard: number
+  tags: Map<string, StockThemeTag>
+  reasonByCode: Map<string, string>
+  themeInfo?: Map<string, ThemeBurst>
+}) {
+  const t = themeInfo?.get(theme)
+  const inSlot = new Set(stocks.map((s) => s.code))
+  const restMembers = (t?.members ?? []).filter((m) => !inSlot.has(m.code))
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
+        {burst && <span className="text-[11px] flex-none">🚀</span>}
+        <span
+          className={cn(
+            'text-[12.5px] font-semibold break-all min-w-0',
+            burst ? 'text-rec' : 'text-txt',
+          )}
+        >
+          {theme}
+        </span>
+        <span className="num text-[11px] text-sub flex-none">当刻 {stocks.length} 只</span>
+        {t && t.members.length > 0 && (
+          <span className="num text-[10.5px] text-sub flex-none" title="该题材当日涨停池成员总数">
+            当日 {t.members.length} 只
+          </span>
+        )}
+        {t?.currentLeader && (
+          <span className="text-[10.5px] text-lead flex-none">龙 {t.currentLeader}</span>
+        )}
+      </div>
+
+      {t?.catalyst && (
+        <div className="text-[11px] text-txt break-all min-w-0">催化：{t.catalyst}</div>
+      )}
+
+      <div className="grid gap-x-2 gap-y-0.5 min-w-0">
+        {(() => {
+          const seen = new Map<string, number>()
+          return stocks.map((s) => {
+            // 内容签名（题材+代码+首封）+ 出现序号：同刻同股多条记录也不丢、不撞键
+            const sig = `thm:${theme}:${s.code}:${s.fbt ?? ''}`
+            const n = seen.get(sig) ?? 0
+            seen.set(sig, n + 1)
+            return (
+              <StockRow
+                key={`${sig}#${n}`}
+                s={s}
+                topBoard={topBoard}
+                tags={tags}
+                reasonByCode={reasonByCode}
+              />
+            )
+          })
+        })()}
+      </div>
+
+      {restMembers.length > 0 && (
+        <div className="text-[10.5px] text-sub break-all min-w-0">
+          当日其余涨停成员：
+          <span className="text-txt">{restMembers.map((m) => m.name).join('、')}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * 事件原文分段的渲染配色。
  *
  * ⛔ **主角是内容，不是标签**（用户 2026-09-17：「降低『系统观测』的视觉权重……
@@ -440,6 +531,7 @@ export function SlotBody({
   showTime = false,
   showAllSectors = false,
   showAllEvents = false,
+  themeGrouped = false,
 }: {
   slot: TimelineSlot
   topBoard: number
@@ -456,9 +548,26 @@ export function SlotBody({
   showTime?: boolean
   showAllSectors?: boolean
   showAllEvents?: boolean
+  /**
+   * **详情模式**：个股按**题材**分组（而非行业），并补出该题材当日全部涨停成员；
+   * 同时**不渲染**盘中「爆发/走强 · 杀跌」事件块。
+   *
+   * ⚠️ 与 `themeInfo` 的区别：`themeInfo` 只是「有没有题材全貌数据」，本 prop 是
+   *    「展示主轴换成题材」。二者在本项目里**同时为真**（`BlockDetail` 一起传），
+   *    但语义独立 —— ⛔ 不要用 `themeInfo` 的存在性代替本 prop。
+   */
+  themeGrouped?: boolean
 }) {
   /** 🚀 题材爆发 / ⚠️ 题材衰竭 —— 本页的**核心诉求**：每个时间节点哪些题材起、哪些题材落 */
   const marks = slotThemeMarks(slot.events, slot.pushes)
+
+  /**
+   * 详情模式的题材分组（2026-09-22 用户「我要题材 + 题材相关的大量个股」）。
+   * `null` = 卡面路径，走原「行业分组」渲染。
+   */
+  const themeGroups = themeGrouped
+    ? groupSlotByTheme(slot, tags, new Set(marks.burst.map((b) => b.theme)))
+    : null
   const bursts = withKeys(marks.burst, (b) => b.theme)
   const rotateds = withKeys(marks.rotated, (r) => r.theme)
   const fades = withKeys(marks.fade, (f) => f.label)
@@ -570,9 +679,53 @@ export function SlotBody({
         </div>
       )}
 
-      {/* ── 盘中逐事件（🔴 涨 / 🟢 跌）—— 2026-09-17 合进时间轴 ── */}
-      <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
+      {/* ── 盘中逐事件（🔴 爆发/走强 · 🟢 杀跌/炸板/跌停）—— 2026-09-17 合进时间轴 ──
+          ⛔ **详情模式刻意不渲染**：2026-09-22 用户「我不喜欢看到现在什么的**爆发走强、
+             杀跌这些数量**」—— 详情改以**题材 → 该题材个股**铺开（见下方 `themeGroups` 分支）。
+             卡面（240px）仍是「当刻发生了什么」的全景，保留该块。── */}
+      {!themeGroups && (
+        <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
+      )}
 
+      {themeGroups ? (
+        /* ── 详情模式：**题材主轴** —— 题材 → 该题材当刻个股 → 该题材当日全部涨停成员 ── */
+        <>
+          {themeGroups.groups.map((g) => (
+            <ThemeSlotGroup
+              key={`thm:${slot.at}:${g.theme}`}
+              theme={g.theme}
+              stocks={g.stocks}
+              burst={g.burst}
+              topBoard={topBoard}
+              tags={tags}
+              reasonByCode={reasonByCode}
+              themeInfo={themeInfo}
+            />
+          ))}
+          {themeGroups.unthemed.length > 0 && (
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <div className="text-[10.5px] text-sub">
+                无题材标记 {themeGroups.unthemed.length} 只
+              </div>
+              <div className="grid gap-x-2 gap-y-0.5 min-w-0">
+                {withKeys(
+                  themeGroups.unthemed,
+                  (s) => `unthm:${slot.at}:${s.code}:${s.fbt ?? ''}`,
+                ).map(({ key, item }) => (
+                  <StockRow
+                    key={key}
+                    s={item}
+                    topBoard={topBoard}
+                    tags={tags}
+                    reasonByCode={reasonByCode}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
       {/* 行业内个股分区：**强度降序**，卡面直接给出最强 N 个（同刻同行业合并为一组） */}
       {topSectors.map((g, i) => (
         <SectorSlotGroup
@@ -629,6 +782,9 @@ export function SlotBody({
         </div>
       )}
 
+        </>
+      )}
+
       {/* 事件分区（同刻合并 · 默认只留真信号，机器噪声收进「另有 N 条」） */}
       {slot.events && <EventSlot slot={slot} unfold={showAllEvents} />}
 
@@ -652,12 +808,15 @@ export function TimelineSlotCard({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
   variant = 'normal',
 }: {
   slot: TimelineSlot
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  /** 详情模式：题材名 → 当日全貌（催化原文 / 涨停成员 / 观测时刻）。左栏常驻详情传入。 */
+  themeInfo?: Map<string, ThemeBurst>
   variant?: 'normal' | 'linkage'
 }) {
   const stockCount = slot.sectors.reduce((n, g) => n + g.count, 0) + slot.singles.length
@@ -667,7 +826,13 @@ export function TimelineSlotCard({
       ariaLabel={`${minToClock(slot.at)} 当刻封板 ${stockCount} 只 · 板块 ${slot.sectors.length} 个`}
       head={<SlotHead slot={slot} sectorCount={slot.sectors.length} />}
     >
-      <SlotBody slot={slot} topBoard={topBoard} tags={tags} reasonByCode={reasonByCode} />
+      <SlotBody
+        slot={slot}
+        topBoard={topBoard}
+        tags={tags}
+        reasonByCode={reasonByCode}
+        themeInfo={themeInfo}
+      />
     </CardShell>
   )
 }
@@ -683,11 +848,13 @@ export function TimelineLinkageCard({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
 }: {
   block: Extract<TimelineBlock, { kind: 'linkage' }>
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  themeInfo?: Map<string, ThemeBurst>
 }) {
   return (
     <CardShell
@@ -712,6 +879,7 @@ export function TimelineLinkageCard({
             topBoard={topBoard}
             tags={tags}
             reasonByCode={reasonByCode}
+            themeInfo={themeInfo}
             showTime
           />
         </div>
@@ -731,11 +899,13 @@ export function TimelineMergedCard({
   topBoard,
   tags,
   reasonByCode,
+  themeInfo,
 }: {
   block: Extract<TimelineBlock, { kind: 'merged' }>
   topBoard: number
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
+  themeInfo?: Map<string, ThemeBurst>
 }) {
   return (
     <CardShell
@@ -767,6 +937,7 @@ export function TimelineMergedCard({
             topBoard={topBoard}
             tags={tags}
             reasonByCode={reasonByCode}
+            themeInfo={themeInfo}
             showTime
           />
         </div>

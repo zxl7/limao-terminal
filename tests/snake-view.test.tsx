@@ -613,3 +613,33 @@ describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含�
     expect(nodeAt(container, '10:00').textContent, '普通时刻标签让位').toBe('')
   })
 })
+
+describe('TimelineSnake · 外部聚焦（左栏节点列表点击联动 · 2026-09-22）', () => {
+  it('① 传入 focusKey → 无需 hover 即弹出该节点明细', () => {
+    // threeBlocks() 的第二块 at=11*60=660 → key `normal:660`
+    const { container } = render(
+      <TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} focusKey="normal:660" />,
+    )
+    const dlg = dialogOf(container)
+    expect(dlg, 'focusKey 未打开明细').toBeTruthy()
+    expect(dlg!.getAttribute('aria-label')).toContain('11:00')
+  })
+
+  it('② focusKey 不传 / 为空串 → 不空弹（行为与改动前完全一致）', () => {
+    const a = render(<TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} />)
+    expect(dialogOf(a.container)).toBeNull()
+    const b = render(
+      <TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} focusKey="" />,
+    )
+    expect(dialogOf(b.container)).toBeNull()
+  })
+
+  it('③ hover 优先于 focusKey：悬停别的节点即切到它', () => {
+    const { container } = render(
+      <TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} focusKey="normal:600" />,
+    )
+    expect(dialogOf(container)?.getAttribute('aria-label')).toContain('10:00')
+    fireEvent.mouseEnter(nodeAt(container, '11:00'))
+    expect(dialogOf(container)?.getAttribute('aria-label')).toContain('11:00')
+  })
+})

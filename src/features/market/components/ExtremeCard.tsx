@@ -24,10 +24,11 @@ import { marketQueries } from '../api/queries'
  * 需要板数细节请看「昨日涨停反馈」卡的核按钮明细（那份带 prev_boards 与均线破位）。
  */
 export function ExtremeCard() {
-  const { data } = useQuery(marketQueries.latest())
+  const { data, isPending, isError } = useQuery(marketQueries.latest())
   const ld = data?.limit_down
   const broken = data?.broken
 
+  // 只有后台明确返回零值才能断言无风险，缺字段不能当作零。
   const ldNames = ld?.names ?? []
   const brokenNames = broken?.names ?? []
 
@@ -41,20 +42,21 @@ export function ExtremeCard() {
         </span>
       }
     >
+      {isError && <p role="status" className="text-[11px] text-warn">{data ? '极值数据更新失败，保留上次数据' : '极值数据加载失败'}</p>}
       <div className="flex flex-col gap-2">
         <NameGroup
           label="跌停"
           hint="按封单额排序 · 无代码详情"
           names={ldNames}
           chipClass="bg-down-soft text-down"
-          emptyText="今日无跌停"
+          emptyText={isPending ? '正在加载跌停数据…' : isError && !data ? '暂无法确认跌停状态' : ld?.count === 0 ? '当前快照无跌停' : ld?.count != null ? '跌停名单未提供' : '跌停数据未提供'}
         />
         <NameGroup
           label="炸板"
           hint="曾涨停后打开 · 承接不足"
           names={brokenNames}
           chipClass="bg-line-faint text-down"
-          emptyText="今日无炸板"
+          emptyText={isPending ? '正在加载炸板数据…' : isError && !data ? '暂无法确认炸板状态' : broken?.count === 0 ? '当前快照无炸板' : broken?.count != null ? '炸板名单未提供' : '炸板数据未提供'}
         />
       </div>
     </Card>

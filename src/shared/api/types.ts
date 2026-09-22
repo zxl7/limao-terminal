@@ -1552,6 +1552,13 @@ export interface AiViewItem {
   factors: Record<string, unknown>
   /** AI 自定高开上限。⚠️ 生效值恒取用户纪律 5%（见 ai_caliber.USER_ENTRY_MAX_GAP_PCT） */
   entry_max_gap: number
+  /** 盘后预案档：focus 重点看 / normal 一般 / avoid 回避（09:25 池内裁决据此排序与否决） */
+  bias?: string
+  /**
+   * ⛔ 越权兜底留痕（2026-09-22）：非空 = 该票的 `bias` 与**机械证据**冲突（或已被降级）。
+   * 例：`AI 判 normal，但机械证据显示是强龙（接力池第1·09:25秒板·带动5家）→ 与接力池排名背离，请复核`
+   */
+  bias_warning?: string | null
 }
 
 export interface AiViewFile {
@@ -1559,6 +1566,65 @@ export interface AiViewFile {
   decision_date: string
   /** code → 判断 */
   views: Record<string, AiViewItem>
+}
+
+// ── 09:25 池内裁决终态（wealth_code/core/pool_call.py · `pool_call-<执行日>.json`）──
+
+/**
+ * 单个标的的**今晨裁决结果**。
+ *
+ * ⚠️ 与 `AiViewItem` 的关键区别：本结构的 `view` 是**竞价后定音**（实际怎么做），
+ * 而 `bias` 只是**昨日盘后预案档**（输入）。展示「这笔交易到底做没做」必须读 `view`。
+ */
+export interface PoolCallView {
+  code: string
+  name: string
+  /** 今晨竞价涨幅 %（缺竞价数据时为 null） */
+  gap_pct: number | null
+  /** 竞价落在哪：ok 区间内 / above 超上限 / below 低于下沿 / unknown 无量价 */
+  zone: string
+  /** 昨日盘后预案档（focus 重点看 / normal 一般 / avoid 回避）—— **输入**，非结论 */
+  bias: string
+  /** 今晨竞价成交额（亿） */
+  amount_yi: number | null
+  /** 该票要求的量能线（亿） */
+  need_yi: number | null
+  theme_name: string
+  boards: number
+  /** 该票是否为所在方向的核心（核心不受跟风闸限制） */
+  line_is_core: boolean
+  /** 同方向核心票（用于判断龙头/跟风），无则为 null */
+  line_core: { code: string; name: string; boards: number; broken: boolean } | null
+  /** 在自身方向内的排名（1 = 龙一） */
+  line_rank: number
+  /** 终态：participate 参与 / watch 观察 / skip 放弃 */
+  view: string
+  /** 买入名额序（1 起；仅 participate 有，其余为 null） */
+  quota_rank: number | null
+  /** 裁决理由（短句，含竞价涨幅与区间判定） */
+  reason: string
+}
+
+export interface PoolCallFile {
+  /** 执行日（= `ai_view.date`；前一交易日盘后写的预案在这天执行） */
+  trade_date: string
+  enabled: boolean
+  /** 当日取向：attack / selective / defend … */
+  stance: string
+  /** 买入名额上限 */
+  quota: number
+  /** code → 裁决终态 */
+  views: Record<string, PoolCallView>
+  meta: {
+    caliber: string
+    stance: string
+    quota: number
+    pool_size: number
+    /** 实际成交（名额内）的 code 列表 */
+    participate: string[]
+    /** 裁决执行时刻 */
+    call_at: string
+  }
 }
 
 export interface AiDecisionEntry {

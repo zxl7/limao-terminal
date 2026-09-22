@@ -120,23 +120,24 @@ async function renderIntraday() {
 }
 
 describe('盘中实时页 · PC 大屏布局不变量', () => {
-  it('左 60% / 右 40% 两栏：左栏 4 张 2×2 均分，右栏 4 张纵向（2026-09-21 用户定稿）', async () => {
+  it('左 60% / 中 30% / 右 10% 三栏：左 4 张 2×2 均分，中 3 张纵向，右为信号 rail（2026-09-22 定稿）', async () => {
     const c = await renderIntraday()
     const zones = c.querySelector('.intraday-zones') as HTMLElement | null
-    expect(zones, '未找到两栏容器 `.intraday-zones` —— 退回单列会让表格挤成两行').toBeTruthy()
-    // ⛔⛔ 窄屏单栏必须是 `max-xl:flex-col`（与 `xl:flex-row` 媒体互斥）。
-    //    裸 `flex-col` 在同层同权下**排在 `xl:flex-row` 之后** → 所有宽度都竖排（真实事故）。
+    expect(zones, '未找到三栏容器 `.intraday-zones` —— 退回单列会让表格挤成两行').toBeTruthy()
+    // ⛔⛔ 窄屏单栏必须是 `max-xl:flex-col`（与 `xl` 媒体查询互斥）。
+    //    裸 `flex-col` 在同层同权下**排在宽屏规则之后** → 所有宽度都竖排（真实事故）。
     expect(zones?.className, '窄屏单栏应用 max-xl:flex-col').toContain('max-xl:flex-col')
-    expect(zones?.className, '宽屏横排').toContain('xl:flex-row')
+    expect(zones?.className, '宽屏横排').toContain('flex')
     expect(
       zones?.className.split(/\s+/),
-      '⛔ 不得出现裸 flex-col —— 它会覆盖 xl:flex-row，使两栏永远堆叠',
+      '⛔ 不得出现裸 flex-col —— 它会让三栏永远堆叠',
     ).not.toContain('flex-col')
 
     const cols = [...zones!.children] as HTMLElement[]
-    expect(cols, '两栏 = 左 + 右').toHaveLength(2)
+    expect(cols, '三栏 = 左 + 中 + 右').toHaveLength(3)
     expect(cols[0].className, '左栏应占 60%').toContain('xl:w-[60%]')
-    expect(cols[1].className, '右栏应占 40%').toContain('xl:w-[40%]')
+    expect(cols[1].className, '中栏应占 30%').toContain('xl:w-[30%]')
+    expect(cols[2].className, '右栏应占 10%').toContain('xl:w-[10%]')
 
     // 左栏：4 张卡在一个 2 列均分网格里
     const leftGrid = cols[0].querySelector('div[class*="grid"]') as HTMLElement | null
@@ -144,23 +145,31 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(leftGrid!.className).toContain('xl:grid-cols-2')
     expect([...leftGrid!.children], '左栏 4 张卡均分').toHaveLength(4)
 
-    // 右栏：纵向堆叠的 4 张（顺序 = 用户实际调定的顺序；测试跟随，⛔ 不反向覆盖用户的调整）
-    const rightTitles = [...cols[1].querySelectorAll('.panel-title')].map((e) => e.textContent ?? '')
-    expect(rightTitles).toHaveLength(4)
-    for (const [i, t] of ['昨日涨停反馈', '连板天梯', '极值名单', '短线精灵'].entries()) {
-      expect(rightTitles[i], `右栏第 ${i + 1} 张应是「${t}」`).toContain(t)
+    // 中栏：纵向堆叠的 3 张（顺序 = 用户实际调定的顺序；测试跟随，⛔ 不反向覆盖用户的调整）
+    const midTitles = [...cols[1].querySelectorAll('.panel-title')].map((e) => e.textContent ?? '')
+    expect(midTitles).toHaveLength(3)
+    for (const [i, t] of ['昨日涨停反馈', '连板天梯', '极值名单'].entries()) {
+      expect(midTitles[i], `中栏第 ${i + 1} 张应是「${t}」`).toContain(t)
     }
-    // 全页仍是 8 张卡：左 4 + 右 4
-    expect(c.querySelectorAll('.panel-title')).toHaveLength(8)
+
+    // 右栏**本身**即信号 rail（`SignalRail` 根节点带 `.signal-rail`，非 Card → 不计入 panel-title）
+    expect(cols[2].classList.contains('signal-rail'), '右栏应是信号 rail').toBe(true)
+
+    // 全页共 7 张 Card：左 4 + 中 3（信号 rail 不是 Card）
+    expect(c.querySelectorAll('.panel-title')).toHaveLength(7)
   })
 
   it('⚡ 短线精灵渲染「当日沉淀」（signals_today）—— 刷新后列表不空，且剔除科创板', async () => {
     const c = await renderIntraday()
-    const panel = [...c.querySelectorAll('.panel')].find((p) =>
-      (p.querySelector('.panel-title')?.textContent ?? '').includes('短线精灵'),
-    ) as HTMLElement | undefined
-    expect(panel, '未找到短线精灵卡').toBeTruthy()
-    const txt = panel!.textContent ?? ''
+    // 2026-09-22：短线精灵已迁入右栏 `SignalRail`（非 Card → 无 `.panel-title`）
+    const panel = c.querySelector('.signal-rail') as HTMLElement | null
+    expect(panel, '未找到信号 rail（`.signal-rail`）').toBeTruthy()
+    /* ⛔ 代码只渲染在 `title` 属性里（紧凑窄列不铺代码）—— 断言必须把 title 一并纳入，
+       否则「只在沉淀里的信号是否渲染」这条硬锁永远落空（文本里根本没有代码）。 */
+    const txt =
+      (panel!.textContent ?? '') +
+      ' ' +
+      [...panel!.querySelectorAll('[title]')].map((e) => e.getAttribute('title') ?? '').join(' ')
 
     /* 数据与渲染**同真同假**：当日有沉淀 → 必须渲染出条目；
        ⛔ 不得退回「本轮 signals 为空 ⇒ 空态」——那正是用户抓包的「一刷新就空」。
@@ -196,14 +205,14 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(css, '缺少 --breakpoint-4xl —— 4xl: 前缀的类全部静默失效').toContain('--breakpoint-4xl')
   })
 
-  it('两栏主体位于首屏，情绪通栏不再占用盘中页首行', async () => {
+  it('三栏主体位于首屏，情绪通栏不再占用盘中页首行', async () => {
     const c = await renderIntraday()
     const root = c.firstElementChild as HTMLElement
     expect(root.className, '根容器应是纵向 flex（通栏由 flex 自然铺满）').toContain('flex-col')
-    // 情绪指挥条已上移顶栏 header，盘中页首屏主体应直接是两栏工作内容
+    // 情绪指挥条已上移顶栏 header，盘中页首屏主体应直接是三栏工作内容
     expect(
       root.querySelector('.intraday-zones'),
-      '首屏缺少两栏分区 —— 工作内容不是首屏主体',
+      '首屏缺少三栏分区 —— 工作内容不是首屏主体',
     ).toBeTruthy()
   })
 })
@@ -248,9 +257,12 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     for (const old of ['早鸟埋伏', '主线热度', '次日预期', '板块增减']) {
       expect(titles.some((title) => title.includes(old))).toBe(false)
     }
-    for (const title of ['盘中情绪走势', '题材强度', '昨日涨停反馈', '核心标的', '板块资金', '短线精灵', '连板天梯', '极值名单']) {
+    // 7 张 Card 各恰好一次（短线精灵 2026-09-22 起迁入右栏 rail，非 Card → 不在此列）
+    for (const title of ['盘中情绪走势', '题材强度', '昨日涨停反馈', '核心标的', '板块资金', '连板天梯', '极值名单']) {
       expect(titles.filter((text) => text.includes(title)), `「${title}」应恰好出现一次`).toHaveLength(1)
     }
+    // 短线精灵 = 右栏 rail（承载短线精灵，非 Card）
+    expect(c.querySelector('.signal-rail'), '短线精灵应迁入右栏 rail').toBeTruthy()
     // ⛔ 盘中实时页不放日内时间轴（用户 2026-09-20 定调：时间轴归 /timeline）
     expect(titles.some((title) => title.includes('时间轴'))).toBe(false)
     /* 题材表：数据与渲染**同真同假** —— 盘前约 09:06 后端会把 `market/latest` 重置

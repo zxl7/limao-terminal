@@ -88,6 +88,10 @@ export default defineConfig({
     // 与 Vue 版（5180）错开，两版可同时运行对照
     port: 5181,
     strictPort: false,
+    // 监听所有网卡 + 放行穿透域名（ngrok/cloudflared 免费域名随机，true=放行全部 host）
+    // 仅用于本地 dev + 临时穿透；生产由 serve.py 提供（白名单制）
+    host: true,
+    allowedHosts: true,
   },
   build: {
     outDir: 'dist',

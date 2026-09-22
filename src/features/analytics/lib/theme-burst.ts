@@ -1,4 +1,4 @@
-import type { MarketMemory } from '@/shared/api'
+import type { MarketMemory, ZtPoolStock } from '@/shared/api'
 import { clockMin } from './timeline'
 
 /**
@@ -426,6 +426,89 @@ export function slotThemeMarks(
     .map((p) => ({ name: p.name, pushCount: p.push_count ?? null }))
 
   return { burst, rotated, fade, pushed }
+}
+
+/** 详情模式下的一个「题材块」 */
+export interface SlotThemeGroup {
+  theme: string
+  /** 本槽内归属该题材的票（去重后，保持传入顺序） */
+  stocks: ZtPoolStock[]
+  /** 该题材在**本槽这一刻**是否为「新主线崛起」（🚀 首爆） */
+  burst: boolean
+}
+
+/**
+ * **把槽内个股按题材归组** —— 详情模式（左栏节点详情 / 轴上 hover 浮层）的展示主轴。
+ *
+ * ## 为什么需要它（2026-09-22 用户明确）
+ *
+ * 用户原话：「我需要看到的是**题材、题材爆发以及与题材相关的大量个股**，
+ * 我不喜欢看到现在什么的**爆发走强、杀跌这些数量**。」
+ *
+ * 详情此前的个股是按 **`zt_list[].sector`（行业）** 分组的 —— 而 A 股的炒作单位是**题材**
+ * （见本文件头注：「炒作从来不在行业层面发生」）。于是「光通信 7 只」被摊成
+ * 「通信设备 3 只 + 电子元件 2 只 + …」，用户看不到题材层的事实。
+ *
+ * ## 归类口径
+ *
+ * · **主轴 = `tags[code].themes[0]`** —— `buildThemeBursts` 按事件出现顺序追加，
+ *   第一个即**最早被系统观测到的归属**。⛔ 不把一只票复制到它所属的每个题材下，
+ *   否则同一只票会在详情里重复出现 N 次、把「大量个股」灌成噪声。
+ *   （票的其它题材归属仍由 `StockRow` 的题材 chip 如实显示，信息不丢。）
+ * · **无题材标记的票**归入 `unthemed` —— ⛔ 不丢、不硬塞给某个题材。
+ * · 同 `code + fbt` 只归一次（病态输入下同刻同股多条记录时不重复计数）。
+ *
+ * ## 排序（稳定）
+ *
+ * ① `burst` 爆发题材优先 → ② 本槽家数降序 → ③ 组内最高板降序 → ④ 题材名升序。
+ * ⛔ 纯函数：返回新数组，不改动入参。
+ *
+ * ⚠️ 参数用**结构类型**而非 `TimelineSlot` —— 与 `isLowStrengthSlot` 同一理由：
+ *    不在 `timeline.ts ↔ theme-burst.ts` 之间引入类型循环。
+ */
+export function groupSlotByTheme(
+  slot: {
+    sectors: ReadonlyArray<{ stocks: ZtPoolStock[] }>
+    singles: ZtPoolStock[]
+  },
+  tags: Map<string, StockThemeTag>,
+  burstThemes: ReadonlySet<string>,
+): { groups: SlotThemeGroup[]; unthemed: ZtPoolStock[] } {
+  const byTheme = new Map<string, ZtPoolStock[]>()
+  const unthemed: ZtPoolStock[] = []
+  const seen = new Set<string>()
+
+  for (const s of [...slot.sectors.flatMap((g) => g.stocks), ...slot.singles]) {
+    const sig = `${s.code}#${s.fbt ?? ''}`
+    if (seen.has(sig)) continue
+    seen.add(sig)
+    const themes = tags.get(s.code)?.themes ?? []
+    if (themes.length === 0) {
+      unthemed.push(s)
+      continue
+    }
+    const primary = themes[0]
+    const arr = byTheme.get(primary)
+    if (arr) arr.push(s)
+    else byTheme.set(primary, [s])
+  }
+
+  const maxBoards = (g: SlotThemeGroup) =>
+    g.stocks.reduce((m, s) => Math.max(m, Number(s.boards) || 0), 0)
+
+  const groups: SlotThemeGroup[] = [...byTheme.entries()].map(([theme, stocks]) => ({
+    theme,
+    stocks,
+    burst: burstThemes.has(theme),
+  }))
+  groups.sort(
+    (a, b) =>
+      Number(b.burst) - Number(a.burst) ||
+      b.stocks.length - a.stocks.length ||
+      maxBoards(b) - maxBoards(a) ||
+      a.theme.localeCompare(b.theme, 'zh-Hans-CN'),
+  )
+  return { groups, unthemed }
 }
 
 /**

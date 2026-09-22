@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/shared/lib'
 import { useChartWidth } from '@/shared/ui'
-import { SlotBody } from './TimelineSlotCard'
+import { BlockDetail, blockRangeText, KIND_LABEL } from './BlockDetail'
 import { summarizeBlock, type BlockSummary } from '../lib/block-summary'
 import { minToClock, SLOT_VISIBLE_SECTORS, type TimelineBlock } from '../lib/timeline'
 import {
   clockOfAxis,
   layoutSnake,
   snakePos,
-  SESSION_CLOSE,
-  SESSION_OPEN,
   SNAKE_BAR_MAX_H,
   SNAKE_BAR_W,
   SNAKE_NODE_W,
@@ -57,12 +55,6 @@ const DETAIL_FLIP_Y = 300
 
 /** 时间刻度：整点 + 下午半点 —— 给「横轴读到哪一段」一个参照 */
 const TICK_MINUTES = [10 * 60, 11 * 60, 13 * 60 + 30, 14 * 60, 14 * 60 + 30, 15 * 60]
-
-const KIND_LABEL: Record<TimelineBlock['kind'], string> = {
-  linkage: '🚀 板块联动',
-  normal: '普通卡',
-  merged: '📎 低频合并',
-}
 
 /**
  * 竖条颜色 = 该刻**性质**（与 A 股语义一致：涨红 / 跌绿 / **题材紫** / 普通灰）。
@@ -171,17 +163,7 @@ function HoverDetail({
   onEnter: () => void
   onLeave: () => void
 }) {
-  // cap 给大值 = 不截断（摘要只用于浮层的**计数行**，列表本身由 SlotBody 全量渲染）
-  const summary = summarizeBlock(block, 999)
-  const slots = block.kind === 'normal' ? [block.slot] : block.slots
-  const range =
-    summary.to === summary.at
-      ? minToClock(summary.at)
-      : `${minToClock(summary.at)}~${minToClock(summary.to)}`
-  // 节点偏下 → 浮层往上放（否则会超出画布底部）
-  /** 盘外记录（超出交易时段）→ 必须在浮层里当场说明，否则会被误读成盘中记录 */
-  const outside =
-    summary.at < SESSION_OPEN ? 'pre' : summary.at > SESSION_CLOSE ? 'post' : null
+  /** 节点偏下 → 浮层往上放（否则会超出画布底部） */
   const above = y > Math.max(DETAIL_FLIP_Y, height * 0.42)
   const left = Math.min(
     Math.max(x, DETAIL_W / 2 + 8),
@@ -198,44 +180,19 @@ function HoverDetail({
         transform: above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
       }}
       role="dialog"
-      aria-label={`${range} 明细`}
+      aria-label={`${blockRangeText(block)} 明细`}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <header className="flex-none flex items-baseline gap-2 flex-wrap border-b border-line-faint px-2.5 py-2 min-w-0">
-        <span className="num text-[14px] font-semibold text-txt">{range}</span>
-        <span className="text-[11px] px-1 rounded-sm bg-line-faint text-sub">
-          {KIND_LABEL[block.kind]}
-        </span>
-        <span className="text-sub text-[11px] min-w-0 break-all">
-          {summary.slotCount} 个时刻 · 封板 {summary.stockCount} 只 · 行业 {summary.sectorCount} 个 ·
-          盘中板块 ↑{summary.upSectorCount} / ↓{summary.downSectorCount}
-        </span>
-      </header>
-
-      {outside && (
-        <div className="flex-none border-b border-line-faint px-2.5 py-1 text-[10px] text-warn">
-          {minToClock(summary.at)} {outside === 'post' ? '盘后' : '盘前'}记录
-        </div>
-      )}
-
-      {/* 明细主体：**全量**，超出由浮层自身滚动 */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 flex flex-col gap-2.5 min-w-0">
-        {slots.map((s) => (
-          <div key={s.key} className="rounded-[var(--radius-sm)] border border-line p-2 min-w-0">
-            <SlotBody
-              slot={s}
-              topBoard={topBoard}
-              tags={tags}
-              reasonByCode={reasonByCode}
-              themeInfo={themeInfo}
-              showTime={slots.length > 1}
-              showAllSectors
-              showAllEvents
-            />
-          </div>
-        ))}
-      </div>
+      {/* ⛔ 明细内容**只此一处**（`BlockDetail`）—— 与左栏详情列表共用，防两处漂移 */}
+      <BlockDetail
+        block={block}
+        topBoard={topBoard}
+        tags={tags}
+        reasonByCode={reasonByCode}
+        themeInfo={themeInfo}
+        scrollBody
+      />
     </div>
   )
 }
@@ -254,6 +211,7 @@ export function TimelineSnake({
   tags,
   reasonByCode,
   themeInfo,
+  focusKey,
   width,
   hoverOpenDelayMs = 110,
   hoverCloseDelayMs = 160,
@@ -264,6 +222,12 @@ export function TimelineSnake({
   reasonByCode: Map<string, string>
   /** 题材名 → 当日全貌（催化 / 成员 / 观测时刻）—— 只在 hover 明细里展开 */
   themeInfo?: Map<string, ThemeBurst>
+  /**
+   * 外部聚焦的节点 key（2026-09-22）—— 左栏节点列表点击时传入，
+   * 打开/强调对应节点的明细（与 hover 共用同一 `openKey` 状态）。
+   * ⛔ 可选：不传则行为与改动前完全一致（纯 hover 驱动）。
+   */
+  focusKey?: string
   width?: number
   hoverOpenDelayMs?: number
   hoverCloseDelayMs?: number
@@ -272,7 +236,17 @@ export function TimelineSnake({
   const W = width ?? measured
   const layout = useMemo(() => layoutSnake({ marks: blocks.map((b) => b.at), width: W }), [blocks, W])
 
-  const [openKey, setOpenKey] = useState<string | null>(null)
+  /**
+   * hover 打开的节点（内部状态）。
+   * ⛔ 外部聚焦（左栏点击传入的 `focusKey`）**不写进这份 state** ——
+   *    改由渲染期派生 `openKey`（见下），否则要在 effect 里 setState，React Compiler 会拦。
+   */
+  const [hoverKey, setHoverKey] = useState<string | null>(null)
+  /**
+   * 实际打开的节点 = hover 优先，否则回落到外部聚焦。
+   * `focusKey` 为空串/undefined 时回落 `null`（首次渲染不凭空空弹）。
+   */
+  const openKey = hoverKey ?? (focusKey || null)
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -290,9 +264,9 @@ export function TimelineSnake({
     (key: string) => {
       clearTimers()
       if (hoverOpenDelayMs > 0) {
-        openTimer.current = setTimeout(() => setOpenKey(key), hoverOpenDelayMs)
+        openTimer.current = setTimeout(() => setHoverKey(key), hoverOpenDelayMs)
       } else {
-        setOpenKey(key)
+        setHoverKey(key)
       }
     },
     [clearTimers, hoverOpenDelayMs],
@@ -302,9 +276,9 @@ export function TimelineSnake({
   const leaveNode = useCallback(() => {
     clearTimers()
     if (hoverCloseDelayMs > 0) {
-      closeTimer.current = setTimeout(() => setOpenKey(null), hoverCloseDelayMs)
+      closeTimer.current = setTimeout(() => setHoverKey(null), hoverCloseDelayMs)
     } else {
-      setOpenKey(null)
+      setHoverKey(null)
     }
   }, [clearTimers, hoverCloseDelayMs])
 

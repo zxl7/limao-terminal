@@ -27,7 +27,7 @@ import { defenseTone, feedbackTone } from '../model/labels'
  *    广度指标，说明「不只是涨停股的事，全市场是否也在退」。
  */
 export function FeedbackCard() {
-  const { data: fb } = useQuery(marketQueries.feedback())
+  const { data: fb, isPending, isError } = useQuery(marketQueries.feedback())
 
   /** 晋级率动态阀门（前 10 交易日截尾均值，缺失回退 25 —— 与原系统一致） */
   const gate = fb?.trend?.promotion_gate_10d ?? 25
@@ -52,61 +52,64 @@ export function FeedbackCard() {
         )
       }
     >
+      {isError && <p role="status" className="text-[11px] text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
+      {fb?.generated_ts && <div className="num text-[10.5px] text-sub mb-2">数据时间 {fb.generated_ts}</div>}
       {fb && !fb.error ? (
         <>
+          {/* 缺失指标使用中性色，避免把未知状态表达为改善。 */}
           <KpiStrip min={92}>
             <Kpi
               label="晋级率"
               value={fb.promote_rate ?? '—'}
               unit="%"
-              tone={promWarn ? 'down' : 'up'}
+              tone={fb.promote_rate == null ? 'sub' : promWarn ? 'down' : 'up'}
               sub={`阀门 ${gate.toFixed(1)}%`}
             />
             <Kpi
               label="连板晋级"
               value={fb.lb_promote_rate ?? '—'}
               unit="%"
-              tone={fb.lb_promote_rate != null && fb.lb_promote_rate < 30 ? 'down' : 'up'}
+              tone={fb.lb_promote_rate == null ? 'sub' : fb.lb_promote_rate < 30 ? 'down' : 'up'}
               sub={fb.lb_prev_count != null ? `昨连板 ${fb.lb_prev_count} 只` : undefined}
             />
             <Kpi
               label="核按钮"
               value={fb.nuke_count ?? '—'}
               unit="只"
-              tone={feedbackTone(nukeWarn)}
+              tone={fb.nuke_count == null ? 'sub' : feedbackTone(nukeWarn)}
               sub="≥3 视为恶化"
             />
             <Kpi
               label="炸板率"
               value={fb.broken_rate ?? '—'}
               unit="%"
-              tone={feedbackTone(breakWarn)}
-              sub=">30% 封板质差"
+              tone={fb.broken_rate == null ? 'sub' : feedbackTone(breakWarn)}
+              sub="当前快照 · >30% 封板质差"
             />
             <Kpi
               label="均涨幅"
               value={fb.avg_pct ?? '—'}
               unit="%"
-              tone={fb.avg_pct != null && fb.avg_pct < 0 ? 'down' : 'up'}
+              tone={fb.avg_pct == null ? 'sub' : fb.avg_pct < 0 ? 'down' : 'up'}
               sub="昨涨停今日平均"
             />
             <Kpi
               label="上涨占比"
               value={fb.up_rate ?? '—'}
               unit="%"
-              tone={fb.up_rate != null && fb.up_rate < 50 ? 'down' : 'up'}
+              tone={fb.up_rate == null ? 'sub' : fb.up_rate < 50 ? 'down' : 'up'}
               sub="全市场广度"
             />
             <Kpi
               label="最高板"
               value={`${fb.prev_max_boards ?? '—'}→${fb.now_max_boards ?? '—'}`}
-              tone={fb.max_trend != null && fb.max_trend < 0 ? 'down' : 'up'}
-              sub={fb.max_trend != null && fb.max_trend < 0 ? '高度压缩' : '高度维持'}
+              tone={fb.max_trend == null ? 'sub' : fb.max_trend < 0 ? 'down' : 'up'}
+              sub={fb.max_trend == null ? '高度趋势未提供' : fb.max_trend < 0 ? '高度压缩' : '高度维持'}
             />
             <Kpi
               label="情绪分"
               value={fb.sentiment_score ?? '—'}
-              tone={scoreClass === 'up' ? 'up' : scoreClass === 'down' ? 'down' : 'mid'}
+              tone={fb.sentiment_score == null ? 'sub' : scoreClass === 'up' ? 'up' : scoreClass === 'down' ? 'down' : 'mid'}
               sub={fb.sentiment_label || '0–10 口径'}
             />
             <Kpi
@@ -175,7 +178,7 @@ export function FeedbackCard() {
       ) : fb?.error ? (
         <p className="text-[12px] text-down py-2">反馈矩阵异常：{fb.error}</p>
       ) : (
-        <p className="text-[12px] text-sub py-2">等待反馈数据…</p>
+        <p className="text-[12px] text-sub py-2">{isPending ? '正在加载反馈数据…' : isError ? '暂无法确认反馈状态' : '反馈数据未提供'}</p>
       )}
     </Card>
   )

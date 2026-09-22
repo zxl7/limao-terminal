@@ -4,92 +4,79 @@ import { BarList, Card, type BarListItem } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
 
-/**
- * 板块资金流向 + 跌幅榜（`latest.sector_risk`）—— 盘中「钱从哪走、往哪去」。
- *
- * ## 为什么用双向条（`bipolar`）而不是两个单列榜
- *
- * 流入与流出是同一枚硬币的两面：只有把它们画在**同一条零线两侧**，
- * 「今天净流入最多的板块 44.6 亿 vs 净流出最多的 -116.4 亿」这个量级对比
- * 才一眼可见。分成两张单列榜时，两条榜各自归一，视觉上会变成「都差不多」。
- *
- * ## ⚠️ 取数口径
- *
- * `flow_yi` 只有 `inflow_top` / `outflow_top` 带（脚本已换算成亿元）；
- * `declining` 里的条目只有 `main_inflow` 原始字节数（且实测**字符串/数字两种形态
- * 都出现过**）—— 所以跌幅榜只用 `pct` 着色，不去算金额，避免踩到形态差异。
- * 缺失一律传 `null` 给 BarList：**`null` 是断点，不是 0**。
- */
+/** 板块资金与弱势板块均来自主快照，不额外请求或重算后台强弱口径。 */
 export function SectorFlowCard() {
   const { data } = useQuery(marketQueries.latest())
   const risk = data?.sector_risk
-  const WINDOW = 9
 
-  const flowItems: BarListItem[] = [
-    ...(risk?.inflow_top ?? []),
-    ...(risk?.outflow_top ?? []),
-  ]
-    .map((s) => ({
+  // 分别取上游两侧榜单，避免合并降序截断后流出板块全部消失。
+  const flowGroups = [
+    { label: '主力流入', tone: 'text-up', rows: risk?.inflow_top ?? [] },
+    { label: '主力流出', tone: 'text-down', rows: risk?.outflow_top ?? [] },
+  ].map((group) => ({
+    ...group,
+    items: group.rows.filter((s) => s.flow_yi != null).slice(0, 5).map((s): BarListItem => ({
       label: s.name,
       value: s.flow_yi ?? null,
-      note: s.is_focus ? '关注' : undefined,
       sub: s.pct != null ? fmtPct(s.pct, 1) : undefined,
-    }))
-    .filter((it) => it.value != null)
-    .sort((a, b) => (b.value as number) - (a.value as number))
-    .slice(0, WINDOW)
-
+    })),
+  }))
+  // 两侧共用金额尺度，条长才能直接比较流入与流出的量级。
+  const flowMax = Math.max(0, ...flowGroups.flatMap((group) => group.items.map((item) => Math.abs(item.value ?? 0))))
   const declining = [...(risk?.declining ?? [])]
     .sort((a, b) => a.pct - b.pct)
     .slice(0, 10)
 
   return (
-    <Card
-      title="💰 板块资金与弱势板块"
-      extra={
-        <span className="text-[11px] font-normal text-sub">
-          弱势阈值 {risk?.threshold != null ? `${risk.threshold}%` : '—'}
-          {risk?.count != null && ` · ${risk.count} 个`}
-        </span>
-      }
-    >
-      {flowItems.length > 0 ? (
-        <BarList
-          items={flowItems}
-          format={fmtYi}
-          bipolar
-          barHeight={13}
-          labelWidth={82}
-          emptyText="板块资金未落盘"
-        />
-      ) : (
-        <p className="text-[12px] text-sub py-1.5">板块资金数据未落盘（盘中早段常见）</p>
-      )}
+    <Card title="💰 板块资金与弱势板块" extra={<span className="text-[10.5px] font-normal text-sub">主力净额 · 亿元</span>}>
+      <div className="space-y-2.5">
+        {flowGroups.map((group) => (
+          <div key={group.label} role="group" aria-label={group.label}>
+            <div className="mb-1.5 flex items-center justify-between text-[10.5px]">
+              <span className={cn('font-medium', group.tone)}>{group.label}</span>
+              <span className="text-sub">前 {group.items.length} 项</span>
+            </div>
+            <BarList
+              items={group.items}
+              format={fmtYi}
+              max={flowMax}
+              bipolar
+              barHeight={16}
+              labelWidth={112}
+              emptyText={`暂无${group.label}数据`}
+            />
+          </div>
+        ))}
+      </div>
 
-      {declining.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-line">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[10.5px] text-sub flex-none">跌幅榜</span>
+      <div className="mt-3 pt-2 border-t border-line">
+        <div className="mb-1.5 flex items-baseline justify-between gap-2 flex-wrap">
+          <span className="text-[11px] font-medium text-txt">弱势板块 · 跌幅榜</span>
+          <span className="text-[10.5px] text-sub">
+            阈值 {risk?.threshold != null ? `${risk.threshold}%` : '—'}
+            {risk?.count != null && ` · ${risk.count} 个`}
+          </span>
+        </div>
+        {declining.length > 0 ? (
+          <div className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-2">
             {declining.map((s) => (
-              <span
-                key={s.name}
-                className={cn(
-                  'badge',
-                  s.is_focus ? 'bg-up-soft text-up' : 'bg-line-faint text-sub',
-                )}
-              >
-                {s.name}
-                <b className={cn('num ml-1', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</b>
-              </span>
+              <div key={s.name} className={cn(
+                'flex min-w-0 items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[11px]',
+                s.is_focus ? 'bg-warn-soft' : 'bg-line-faint',
+              )}>
+                <span className="min-w-0 truncate text-txt" title={s.name}>{s.name}</span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <b className={cn('num', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</b>
+                </span>
+              </div>
             ))}
           </div>
-          {declining.some((s) => s.is_focus) && (
-            <div className="text-[10.5px] text-sub mt-1">
-              青底 = 重点关注板块（CPO / 光模块 / PCB / 半导体 / 算力 / 通信）走弱
-            </div>
-          )}
-        </div>
-      )}
+        ) : (
+          <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-[11px] text-sub">
+            {risk?.ok ? '当前快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
+          </p>
+        )}
+      </div>
     </Card>
   )
 }

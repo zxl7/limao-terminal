@@ -1,48 +1,63 @@
-import { EbbBanner, ExtremeCard, FeedbackCard, LadderCard, LeadersCard, SectorFlowCard, SignalsCard, ThemeTopCard, marketQueries } from '@/features/market'
+import { useQuery } from '@tanstack/react-query'
+import { EbbBanner, ExtremeCard, FeedbackCard, LadderCard, LeadersCard, SectorFlowCard, SignalRail, ThemeTopCard, marketQueries } from '@/features/market'
 import { IntradayMoodCard } from '@/features/analytics'
-import { Zone, ZoneRow } from '@/shared/ui'
+import { Zone } from '@/shared/ui'
+import { cn } from '@/shared/lib'
 import { queryClient } from '@/shared/api'
 
 export async function loader() {
-  await queryClient.ensureQueryData(marketQueries.latest())
+  // 预取失败交给页面状态提示，避免主快照缺失使整个应用进入根错误页。
+  await queryClient.prefetchQuery(marketQueries.latest())
   return null
 }
 
 /**
  * 盘中实时 —— 全站唯一「所有数据都是 intraday 节拍」的页面。
  *
- * ## 版面：左 60% / 右 40% 两栏（用户 2026-09-21 定稿）
+ * ## 版面：左主区 / 中反馈区 / 最右固定信号 rail（2026-09-22 定稿，三栏）
  *
  * ```
- * ┌─────────────── 左 60% ───────────────┬──────── 右 40% ────────┐
- * │ 📈 盘中情绪走势 ｜ 🔥 题材强度        │ 📊 昨日涨停反馈        │
- * │ ────────────────┼──────────────────  │ 🪜 连板天梯            │
- * │ 核心标的        ｜ 💰 板块资金与弱势   │ 🧊 极值名单            │
- * │                                   │ ⚡ 短线精灵            │
- * └───────────────────────────────────┴───────────────────────┘
+ * ┌──────── 左 60% ────────┬── 中 30% ──┬ 最右 rail 10% ──┐
+ * │ 2×2 网格              │ 反馈与信号  │ ⚡ 信号（固定）  │
+ * │ (情绪/题材/标的/资金) │ 连板/极值   │ 短线精灵按type着色│
+ * └───────────────────────┴────────────┴─────────────────┘
  * ```
  *
- * · **左栏 4 张 = 2×2 均分**（`grid xl:grid-cols-2`）—— 都是「当刻盘面与标的」，需要宽度
- *   （情绪曲线、题材表、核心标的表、资金条）→ 每张约占页面 30% 宽；
- * · **右栏 4 张 = 纵向堆叠** —— 昨日涨停反馈 / 连板天梯 / 极值名单 / 短线精灵（2026-09-21 调定）；
- * · `<xl` 退化为单栏（`flex-col`）—— 窄屏强塞两栏会把表格挤成两行。
+ * · **左栏 4 张 = 2×2 均分**（`grid xl:grid-cols-2`）—— 都是「当刻盘面与标的」，需要宽度；
+ * · **中栏 = 反馈与信号(FeedbackCard) + 连板天梯 + 极值名单** —— 纵向堆叠；
+ * · **最右「信号」rail = 固定 10% 窄列**（`SignalRail`）—— 只放紧凑版短线精灵列表，
+ *   按信号 `type` 着色（涨停/接近涨停=红、快速拉升=紫、打开涨停板=橙、打开跌停=青）。
+ *   09-22 起**不再折叠**、**不再显示反馈 4 数字条**（与中区 FeedbackCard 重复）。
  *
  * ⚠️ 左栏内部**不能用 `Board`** —— 它按**视口**断点给列数（≥1920 直接 4 列），
- *    放进 60% 宽的栏里会得到 4 张 ~270px 的窄卡（表格必挤）。栏内均分用显式 2 列网格。
+ *    放进栏里会得到 4 张 ~270px 的窄卡（表格必挤）。栏内均分用显式 2 列网格。
+ * ⛔ 窄屏三栏退化为 `flex-col`（`max-xl:flex-col`）—— 窄屏强塞多栏会把表格挤成两行。
  */
+const ZONE_MAIN = 'xl:w-[60%]'
+const ZONE_MID = 'xl:w-[30%]'
+const ZONE_RAIL = 'xl:w-[10%]'
+
 export function Component() {
+  const { data, isPending, isError } = useQuery(marketQueries.latest())
+
   return (
     <div className="flex flex-col gap-3">
+      {(isPending || isError || !data) && (
+        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-[12px] text-warn">
+          {isPending ? '正在加载主快照…' : isError ? data ? '主快照更新失败，相关卡片保留上次数据；空白项不能视为零值。' : '主快照加载失败，暂无法确认盘面与风险状态。' : '主快照尚未提供，暂无法确认盘面与风险状态。'}
+        </p>
+      )}
       {/* 退潮预警通栏 —— 层级高于所有卡片（有预警才渲染，无预警不占位）。
           其余情绪维度（情绪分 / 三大指数 / 涨停·跌停·炸板·封板率 / 最高板 /
           涨跌家数 / 成交额）已全部上移到全局顶栏 header，本页不重复渲染。 */}
       <EbbBanner />
 
       {/* ⛔ 不要在这里加裸 `flex-col`：Tailwind v4 产物里它与 `xl:flex-row` 同层同权、
-          且排在后者之后 ⇒ 所有宽度都会变竖排（2026-09-21 实测事故：两栏上下堆叠）。
-          `ZoneRow` 已内置 `max-xl:flex-col`（媒体查询互斥，安全）。 */}
-      <ZoneRow className="intraday-zones">
-        <Zone label="盘面与标的" dot="bg-up" className="xl:w-[60%]">
+          且排在后者之后 ⇒ 所有宽度都会变竖排（2026-09-21 实测事故）。
+          `max-xl:flex-col`（媒体查询互斥，安全）表达「窄屏竖排 / 宽屏横排」。 */}
+      {/* `intraday-zones` = 三栏容器的**稳定测试钩子**（布局不变量由 `intraday-board.test.tsx` 锁） */}
+      <div className="intraday-zones flex gap-3 items-start max-xl:flex-col">
+        <Zone label="盘面与标的" dot="bg-up" className={cn('min-w-0', ZONE_MAIN)}>
           <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
             <IntradayMoodCard />
             <ThemeTopCard />
@@ -51,13 +66,14 @@ export function Component() {
           </div>
         </Zone>
 
-        <Zone label="反馈与信号" dot="bg-down" className="xl:w-[40%]">
+        <Zone label="反馈与信号" dot="bg-down" className={cn('min-w-0', ZONE_MID)}>
           <FeedbackCard />
           <LadderCard />
           <ExtremeCard />
-          <SignalsCard />
         </Zone>
-      </ZoneRow>
+
+        <SignalRail className={cn('min-w-0', ZONE_RAIL)} />
+      </div>
     </div>
   )
 }
