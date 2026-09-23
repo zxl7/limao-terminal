@@ -32,6 +32,8 @@ export const router = createBrowserRouter([
       { index: true, lazy: () => import('@/pages/intraday/IntradayPage') },
       // 日内炒作时间轴 —— 盘中产物（zt_history/audit 盘中持续写），不过要等收盘才有完整 zt_list
       { path: 'timeline', lazy: () => import('@/pages/timeline/TimelinePage') },
+      // 赚钱/亏钱效应研判 —— 当日双轴走实时（30s），历史与推演走日频
+      { path: 'effect', lazy: () => import('@/pages/effect/EffectPage') },
       { path: 'emotion', lazy: () => import('@/pages/emotion/EmotionPage') },
       { path: 'board-core', lazy: () => import('@/pages/board-core/BoardCorePage') },
       { path: 'promotion', lazy: () => import('@/pages/promotion/PromotionPage') },

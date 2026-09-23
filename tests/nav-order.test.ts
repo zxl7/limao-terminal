@@ -41,6 +41,7 @@ import { TABS } from '@/app/AppShell'
 const REALTIME_TABS = [
   '/',
   '/timeline',
+  '/effect',
   '/rotation',
   '/mainline',
   '/reflow',

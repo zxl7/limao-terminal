@@ -72,6 +72,7 @@ function installDataFetch() {
 const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['intraday', () => import('@/pages/intraday/IntradayPage')],
   ['timeline', () => import('@/pages/timeline/TimelinePage')],
+  ['effect', () => import('@/pages/effect/EffectPage')],
   ['emotion', () => import('@/pages/emotion/EmotionPage')],
   ['board-core', () => import('@/pages/board-core/BoardCorePage')],
   ['promotion', () => import('@/pages/promotion/PromotionPage')],

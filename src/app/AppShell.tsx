@@ -65,6 +65,7 @@ export const TABS: readonly TabDef[] = [
   // ── 段1 · 实时（cadence=intraday）· 按短线交易优先级 ──
   { to: '/', label: '盘中实时', end: true, group: '实时' },
   { to: '/timeline', label: '日内时间轴', group: '实时' },
+  { to: '/effect', label: '赚钱效应', group: '实时' },
   { to: '/rotation', label: '题材轮动', group: '实时' },
   { to: '/mainline', label: '主线题材', group: '实时' },
   { to: '/reflow', label: '题材回流', group: '实时' },

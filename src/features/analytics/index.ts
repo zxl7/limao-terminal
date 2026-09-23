@@ -161,3 +161,31 @@ export {
   type EventSegKind,
   type EventTier,
 } from './lib/event-text'
+
+// ── 赚钱效应 / 亏钱效应（2026-09-23 立项 · 纯计算内核 + 展示件）──
+// 权威设计：狸猫猎手/config/design_赚钱效应亏钱效应_EffectEngine.md
+export {
+  boardsDistribution,
+  buildEffectAxes,
+  buildEffectHistory,
+  buildScenarios,
+  projectNextDay,
+  stageOfBoards,
+  STAGE_MIN_SAMPLE,
+  type AxisLevel,
+  type EffectAxes,
+  type EffectAxis,
+  type EffectHistoryPoint,
+  type EffectReading,
+  type EffectScenario,
+  type NextDayProjection,
+  type StageProjection,
+  type Tier,
+} from './lib/effect'
+export {
+  EffectAxesCard,
+  EffectScenarioCard,
+  EffectTrendCard,
+  EffectWindowCard,
+  NextDayProjectionCard,
+} from './components/EffectCards'
