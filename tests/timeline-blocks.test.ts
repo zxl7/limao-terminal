@@ -86,41 +86,61 @@ describe('⛔ 盘中逐事件并入主时间轴（2026-09-17 用户「合进我�
       pushes: [],
     }).nodes
 
-  it('⛔ 2026-09-22：盘中事件**只并入、不新建**槽（无个股落点 = 无槽）', () => {
-    // 用户第二次抓包「普通卡很多空白」→ 详情只渲染「题材 + 个股」，
-    // 纯事件槽在详情里就是整块空白（实测 09-21 = 126 块里 56 块空白）。
+  it('涨停总数减少归跌侧，同分钟已有个股不重复展示', () => {
+    const slots = buildTimelineSlots(nodesAt(['131005']), [
+      itev('2026-09-17 13:10:05', 'zt_total', {
+        total: 30, delta: -1, removed: [{ code: '601', name: '开板股' }],
+      }),
+      itev('2026-09-17 13:10:05', 'stock_up', { code: '600' }),
+    ])
+    expect(slots[0].intradayDown[0].delta).toBe(-1)
+    expect(slots[0].intradayUp).toEqual([])
+  })
+
+  it('⛔ 2026-09-22：纯盘中事件也独立建槽', () => {
+    // 本次恢复完整盘中信息，纯事件分钟也必须有可见详情。
     const slots = buildTimelineSlots(nodesAt([]), [
       itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
       itev('2026-09-17 13:12:40', 'broken_new', { name: '中材科技' }),
     ])
-    expect(slots, '没有个股落点就不该有槽').toEqual([])
+    expect(slots.map((s) => s.at)).toEqual([790, 792])
+    expect(slots[1].intradayDown[0].name).toBe('中材科技')
   })
 
-  it('🔒 不变量：槽集合**只由 nodes 决定**，与盘中事件无关（杜绝空白块）', () => {
+  it('🔒 不变量：个股与盘中事件共同构成时间轴', () => {
     const nodes = nodesAt(['131005', '131240'])
     const bare = buildTimelineSlots(nodes, [])
     const withEvents = buildTimelineSlots(nodes, [
       itev('2026-09-17 13:10:05', 'sector_up', { name: '光通信', zt_count: 5 }),
       itev('2026-09-17 13:12:40', 'broken_new', { name: '中材科技' }),
       itev('2026-09-17 13:15:00', 'sector_down', { name: '白银' }), // ⛔ 无落点的分钟
-      itev('2026-09-17 13:20:00', 'zt_total', { total: 33 }), // ⛔ 播报类
+      itev('2026-09-17 13:20:00', 'zt_total', {
+        total: 33, delta: 1, added: [{ code: '603626', name: '科森科技' }],
+      }),
     ])
     expect(
       withEvents.map((s) => s.at),
-      '事件不得新增任何槽（否则详情出现空白块）',
-    ).toEqual(bare.map((s) => s.at))
+      '独立盘中事件必须保留分钟落点',
+    ).toEqual([...bare.map((s) => s.at), 795, 800])
   })
 
-  it('⛔ 2026-09-22：统计播报与个股事件**不并入**（zt_total / stock_up）', () => {
-    // `zt_total` 是每分钟一条的「全市场涨停总数」播报（统计口径，顶部 KPI 已展示）；
-    // `stock_up` 已被 `intradayStockUp` 转成结构化个股行，再作事件渲染即同一时刻重复。
+  it('涨停变化必须带完整归因，且同分钟 stock_up 不重复展示', () => {
     const slots = buildTimelineSlots(nodesAt(['131005']), [
-      itev('2026-09-17 13:10:05', 'zt_total', { total: 33 }),
+      itev('2026-09-17 13:10:05', 'zt_total', {
+        total: 33, delta: 1, added: [{ code: '603626', name: '科森科技' }],
+      }),
       itev('2026-09-17 13:10:20', 'stock_up', { code: '603626' }),
     ])
     expect(slots).toHaveLength(1)
-    expect(slots[0].intradayUp, '两类都不该进事件流').toEqual([])
+    expect(slots[0].intradayUp.map((e) => e.kind)).toEqual(['zt_total'])
     expect(slots[0].intradayDown).toEqual([])
+  })
+
+  it('旧涨停计数没有个股明细时不建节点', () => {
+    const slots = buildTimelineSlots(nodesAt([]), [
+      itev('2026-09-17 13:10:05', 'zt_total', { total: 33, delta: 1 }),
+    ])
+    expect(slots).toEqual([])
   })
 
   it('盘中事件并入**同一分钟**的已有槽（个股落点建槽）', () => {

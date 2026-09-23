@@ -170,7 +170,7 @@ describe('groupSlotByTheme · 题材归组（纯函数）', () => {
   })
 })
 
-describe('BlockDetail · 详情走题材主轴（⛔ 不走行业、不显示走强杀跌计数）', () => {
+describe('BlockDetail · 详情走题材主轴，并保留盘中事实', () => {
   it('④ 渲染题材 + 该题材当刻个股 + 催化 + 当日全部成员', () => {
     const { container } = render(<BlockDetail block={block()} {...detailProps} />)
     const txt = container.textContent ?? ''
@@ -190,12 +190,12 @@ describe('BlockDetail · 详情走题材主轴（⛔ 不走行业、不显示走
     expect(rest, '⛔ 本槽已列出的票不得在其余成员里重复').not.toContain('甲药')
   })
 
-  it('⑤ ⛔ 不渲染盘中「爆发/走强 · 杀跌」事件块，也不显示 ↑N/↓N', () => {
+  it('⑤ 盘中走强和风险事件在详情中完整展示，头部仍使用题材维度', () => {
     const { container } = render(<BlockDetail block={block()} {...detailProps} />)
     const txt = container.textContent ?? ''
-    expect(txt, '用户明确否决不能出现').not.toContain('爆发 / 走强')
-    expect(txt, '用户明确否决不能出现').not.toContain('杀跌 / 炸板 / 跌停')
-    expect(txt, '⛔ 事件块的「板块 N 个」计数不应出现').not.toContain('板块 1 个')
+    expect(txt, '盘中走强区缺失').toContain('盘中走强与涨停变化')
+    expect(txt, '盘中走弱区缺失').toContain('盘中走弱与风险变化')
+    expect(txt, '盘中板块计数缺失').toContain('板块 1 个')
     expect(txt, '⛔ 头部 ↑N/↓N 应换成题材维度').not.toContain('↑')
     expect(txt, '⛔ 头部 ↑N/↓N 应换成题材维度').not.toContain('↓')
     expect(txt, '头部应显示题材数').toContain('题材 2')
@@ -221,6 +221,6 @@ describe('卡面回归 · 240px 卡片仍走行业分组（⛔ 题材主轴只�
     )
     const txt = container.textContent ?? ''
     expect(txt, '卡面应保留行业分组（题材主轴仅详情用）').toContain('含题材')
-    expect(txt, '卡面应保留盘中事件块').toContain('爆发 / 走强')
+    expect(txt, '卡面应保留盘中事件块').toContain('盘中走强与涨停变化')
   })
 })

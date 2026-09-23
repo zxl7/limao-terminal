@@ -195,8 +195,8 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
 
   /** 造一份含「跨分钟情绪回摆」的事件流（⛔ 单卡内去重是无效的，必须跨槽累积） */
   const RAW = [
-    EV('09:09', '市场情绪由「亢奋」转为「分歧」', '情绪'), // 分歧 首次 → signal
-    EV('09:09', '涨停广度骤变 89 → 0', '广度'), // 归零 → noise
+    EV('09:19', '市场情绪由「亢奋」转为「分歧」', '情绪'), // 分歧 首次 → signal
+    EV('09:19', '涨停广度骤变 89 → 0', '广度'), // 归零 → noise
     EV('09:25', '市场情绪由「分歧」转为「修复」', '情绪'), // 修复 首次 → signal
     EV('09:32', '市场情绪由「修复」转为「分歧」', '情绪'), // 回摆 → noise
     EV('09:47', '新主线崛起：玻璃基板封装 涨停3只，龙头 三峡新材', '玻璃基板封装'), // 题材 → noise
@@ -211,9 +211,9 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
   it('★ 跨槽按时间累积：同一状态第二次出现即折叠（⛔ 卡内去重做不到这件事）', () => {
     const slots = build()
     const at = (m: number) => slots.find((s) => s.at === m)
-    // 09:09：「分歧」是首次出现 → **保留**；广度归零 → 折叠（只有第 2 条）
-    expect(at(9 * 60 + 9)?.foldedIdx).toEqual([1])
-    expect(at(9 * 60 + 9)?.events).toHaveLength(2) // ⛔ 保留的那条不被删除
+    // 09:19：「分歧」是首次出现 → **保留**；广度归零 → 折叠（只有第 2 条）
+    expect(at(9 * 60 + 19)?.foldedIdx).toEqual([1])
+    expect(at(9 * 60 + 19)?.events).toHaveLength(2) // ⛔ 保留的那条不被删除
     expect(at(9 * 60 + 25)?.foldedIdx, '修复首次 → 不折叠').toBeUndefined()
     expect(at(9 * 60 + 32)?.foldedIdx, '分歧回摆 → 折叠').toEqual([0])
     expect(at(9 * 60 + 47)?.foldedIdx, '题材类 → 折叠').toEqual([0])
@@ -224,8 +224,8 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
     const slots = build()
     expect(slots.flatMap((s) => s.events ?? [])).toHaveLength(RAW.length)
     // 被折叠的那些仍在数组里
-    const s0909 = slots.find((s) => s.at === 9 * 60 + 9)!
-    expect(s0909.events).toHaveLength(2)
+    const s0919 = slots.find((s) => s.at === 9 * 60 + 19)!
+    expect(s0919.events).toHaveLength(2)
   })
 
   it('★ 全局守恒：signal 数 + 折叠数 === 总条数（不丢不重）', () => {

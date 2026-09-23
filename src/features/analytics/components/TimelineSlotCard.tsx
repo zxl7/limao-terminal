@@ -550,7 +550,7 @@ export function SlotBody({
   showAllEvents?: boolean
   /**
    * **详情模式**：个股按**题材**分组（而非行业），并补出该题材当日全部涨停成员；
-   * 同时**不渲染**盘中「爆发/走强 · 杀跌」事件块。
+   * 同时展示盘中涨跌与板块波动明细。
    *
    * ⚠️ 与 `themeInfo` 的区别：`themeInfo` 只是「有没有题材全貌数据」，本 prop 是
    *    「展示主轴换成题材」。二者在本项目里**同时为真**（`BlockDetail` 一起传），
@@ -679,13 +679,8 @@ export function SlotBody({
         </div>
       )}
 
-      {/* ── 盘中逐事件（🔴 爆发/走强 · 🟢 杀跌/炸板/跌停）—— 2026-09-17 合进时间轴 ──
-          ⛔ **详情模式刻意不渲染**：2026-09-22 用户「我不喜欢看到现在什么的**爆发走强、
-             杀跌这些数量**」—— 详情改以**题材 → 该题材个股**铺开（见下方 `themeGroups` 分支）。
-             卡面（240px）仍是「当刻发生了什么」的全景，保留该块。── */}
-      {!themeGroups && (
-        <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
-      )}
+      {/* 涨跌事实在普通卡与完整详情均展示，不能因缺少个股而隐藏整段盘中记录。 */}
+      <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
 
       {themeGroups ? (
         /* ── 详情模式：**题材主轴** —— 题材 → 该题材当刻个股 → 该题材当日全部涨停成员 ── */

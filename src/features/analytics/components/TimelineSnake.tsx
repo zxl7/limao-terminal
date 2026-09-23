@@ -66,10 +66,11 @@ const TICK_MINUTES = [10 * 60, 11 * 60, 13 * 60 + 30, 14 * 60, 14 * 60 + 30, 15 
  */
 function barTone(s: BlockSummary, block: TimelineBlock): string {
   if (block.kind === 'linkage') return 'bg-up'
-  if (s.fade.length > 0 || s.downSectorCount > 0) return 'bg-down'
+  if (s.fade.length > 0 || s.downSectorCount > 0 || s.otherDownCount > 0) return 'bg-down'
   if (s.burst.length > 0) return 'bg-rec'
   // 仅龙头轮动的题材 → **淡紫**（弱一档：题材被观测到，但不是新崛起）
   if (s.rotated.length > 0) return 'bg-rec/40'
+  if (s.upSectorCount > 0 || s.otherUpCount > 0) return 'bg-up/70'
   if (block.kind === 'merged') return 'bg-line-strong'
   return 'bg-sub'
 }
@@ -78,6 +79,8 @@ function barTone(s: BlockSummary, block: TimelineBlock): string {
 function activityOf(s: BlockSummary): number {
   return (
     s.stockCount +
+    s.otherUpCount +
+    s.otherDownCount +
     s.upSectorCount +
     s.downSectorCount +
     s.burst.length * 3 +
@@ -106,7 +109,7 @@ function isNotable(s: BlockSummary, block: TimelineBlock): boolean {
     s.rotated.length > 0 ||
     s.fade.length > 0 ||
     s.sectorCount >= SLOT_VISIBLE_SECTORS ||
-    s.upSectorCount + s.downSectorCount >= 2
+    s.upSectorCount + s.downSectorCount >= 1
   )
 }
 
@@ -406,7 +409,11 @@ export function TimelineSnake({
                     strong: false,
                     text: `${summary.rotated[0].theme}${summary.rotated.length > 1 ? `+${summary.rotated.length - 1}` : ''}`,
                   }
-                : null
+                : summary.upSectors.length > 0
+                  ? { strong: false, text: `${summary.upSectors[0].name}走强` }
+                  : summary.downSectors.length > 0
+                    ? { strong: false, text: `${summary.downSectors[0].name}走弱` }
+                    : null
           return (
             <button
               key={block.key}

@@ -22,7 +22,7 @@ import { groupSlotByTheme, type StockThemeTag, type ThemeBurst } from '../lib/th
 /** 分块类型标签（轴上 aria、浮层头、左栏详情头共用） */
 export const KIND_LABEL: Record<TimelineBlock['kind'], string> = {
   linkage: '🚀 板块联动',
-  normal: '普通卡',
+  normal: '盘中动态',
   merged: '📎 低频合并',
 }
 
@@ -86,7 +86,7 @@ export function BlockDetail({
         {KIND_LABEL[block.kind]}
       </span>
       <span className="num text-sub text-[10.5px] min-w-0 break-all">
-        封板 {summary.stockCount} · 题材 {themeCount}
+        {summary.stockCount > 0 && <>封板 {summary.stockCount} · </>}题材 {themeCount} · 盘中记录 {summary.upSectorCount + summary.downSectorCount + summary.otherUpCount + summary.otherDownCount}
       </span>
     </>
   )
@@ -120,12 +120,12 @@ export function BlockDetail({
       {/* 明细主体：**全量**。`scrollBody` = 浮动层（自身滚动）；否则自然增高（左栏列表滚动） */}
       <div
         className={cn(
-          'p-2 flex flex-col gap-2 min-w-0',
+          'p-2 flex flex-col gap-2 min-w-0 bg-line-faint/30',
           scrollBody && 'flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 gap-2.5',
         )}
       >
         {slots.map((s) => (
-          <div key={s.key} className="rounded-[var(--radius-sm)] border border-line p-1.5 min-w-0">
+          <div key={s.key} className="rounded-[var(--radius-sm)] border border-line bg-card p-2 min-w-0 shadow-sm">
             <SlotBody
               slot={s}
               topBoard={topBoard}

@@ -1,5 +1,5 @@
 import { cn } from '@/shared/lib'
-import type { IntradayTimelineEvent } from '@/shared/api'
+import type { IntradayLimitUpStock, IntradayTimelineEvent } from '@/shared/api'
 import { SLOT_VISIBLE_SECTORS, sortIntradaySectorEvents } from '../lib/timeline'
 
 /**
@@ -54,22 +54,26 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
   switch (e.kind) {
     case 'zt_total':
       return (
-        <span className="text-[11.5px] text-txt">
-          涨停总数 <span className="num font-semibold">{e.total ?? '—'}</span>
-          {e.delta != null && e.delta !== 0 && (
-            <span className={cn('num ml-1', e.delta > 0 ? 'text-up' : 'text-down')}>
-              {e.delta > 0 ? '+' : ''}
-              {e.delta}
-            </span>
-          )}
-        </span>
+        <div className="flex flex-col gap-1 text-[11.5px] text-txt">
+          <span>
+            涨停总数 <span className="num font-semibold">{e.total ?? '—'}</span>
+            {e.delta != null && e.delta !== 0 && (
+              <span className={cn('num ml-1', e.delta > 0 ? 'text-up' : 'text-down')}>
+                {e.delta > 0 ? '+' : ''}
+                {e.delta}
+              </span>
+            )}
+          </span>
+          {e.delta != null && e.delta > 0 && <LimitUpStocks label="新增封板" stocks={e.added} tone="up" />}
+          {e.delta != null && e.delta < 0 && <LimitUpStocks label="打开涨停" stocks={e.removed} tone="down" />}
+        </div>
       )
     case 'sector_up':
       return (
         <span className="text-[11.5px] text-up">
           <span className="font-medium">{e.name}</span>
           <span className="num text-sub ml-1">{e.zt_count == null ? '—' : `${e.zt_count}只`}</span>
-          {e.delta != null && <span className="num text-sub ml-1">+{e.delta}</span>}
+          {e.delta != null && <span className="num text-up ml-1">新增 {e.delta} 只</span>}
         </span>
       )
     case 'stock_up':
@@ -105,15 +109,39 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
   }
 }
 
+/** 涨停总数变动的可核对个股明细；上游缺失时该节点已在投影层跳过。 */
+function LimitUpStocks({
+  label,
+  stocks,
+  tone,
+}: {
+  label: string
+  stocks: IntradayLimitUpStock[] | null | undefined
+  tone: 'up' | 'down'
+}) {
+  if (!stocks?.length) return null
+  return (
+    <div className="flex flex-wrap gap-x-2 gap-y-0.5 pl-1.5">
+      <span className={cn('text-[10.5px] font-medium', tone === 'up' ? 'text-up' : 'text-down')}>{label}</span>
+      {stocks.map((stock) => (
+        <span key={stock.code} className="text-[11px] text-txt">
+          <span className="font-medium">{stock.name || stock.code}</span>
+          <span className="num ml-1 text-sub">{stock.code}</span>
+          {stock.sector && <span className="ml-1 text-sub">{stock.sector}</span>}
+          {stock.boards != null && stock.boards !== '' && <span className="num ml-1 text-sub">{stock.boards}</span>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /**
  * 一个方向（涨 / 跌）分区。
  *
  * 排版顺序：**板块条目在前（按强度降序，卡面只直接展示最强 3 个）**，
  * 非板块条目（炸板 / 跌停）在其后。
  *
- * ⚠️ 2026-09-22：`zt_total`（每分钟一条的涨停总数播报）与 `stock_up`（个股涨停）
- * 已在 `buildTimelineSlots` 的 `NO_SLOT` 里被**排除建槽**，本组件不会再收到它们 ——
- * 前者是统计口径（顶部 KPI 已展示），后者已由 `intradayStockUp` 转成结构化个股行。
+ * 同分钟的市场总量变化、个股与板块事件共同展示，结构化个股由投影层避免重复。
  */
 function DirectionSection({
   dir,
@@ -141,7 +169,7 @@ function DirectionSection({
   const rest = sectors.slice(cap)
 
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div className={cn("flex flex-col gap-1 min-w-0 rounded-sm border-l-2 px-2 py-1.5", dir === "up" ? "bg-up-soft/40 border-up/40" : "bg-down-soft/40 border-down/40")}>
       <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
         {label}
         {sectors.length > 0 && (
@@ -197,9 +225,9 @@ export function IntradayEventBlock({
   if (up.length === 0 && down.length === 0) return null
   return (
     <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
-      {up.length > 0 && <DirectionSection dir="up" label="🔴 爆发 / 走强" events={up} showAll={showAll} />}
+      {up.length > 0 && <DirectionSection dir="up" label="盘中走强与涨停变化" events={up} showAll={showAll} />}
       {down.length > 0 && (
-        <DirectionSection dir="down" label="🟢 杀跌 / 炸板 / 跌停" events={down} showAll={showAll} />
+        <DirectionSection dir="down" label="盘中走弱与风险变化" events={down} showAll={showAll} />
       )}
     </div>
   )

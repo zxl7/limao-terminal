@@ -1,7 +1,7 @@
 import type { IntradayTimelineEvent, MarketMemory, ZtPoolStock } from '@/shared/api'
 import { round2, type MaybeNum } from '@/shared/lib'
 import { emotionState, eventTier } from './event-text'
-import { SESSION_OPEN } from './snake'
+import { SESSION_OPEN, SESSION_CLOSE } from './snake'
 
 /**
  * 日内炒作时间轴的**纯计算内核** —— 与 React 无关，可单测。
@@ -138,6 +138,13 @@ const KIND_ORDER: Record<TimelineNode['kind'], number> = {
   push: 3,
 }
 
+/**
+ * 时间轴只展示交易时段内的真实盘面：守护在午夜、09:00 左右重置的旧快照不能被夹到轴起点。
+ */
+function inTimelineSession(min: number): boolean {
+  return min >= SESSION_OPEN && min <= SESSION_CLOSE
+}
+
 function shapeOf(count: number, spanMin: number): SectorShape {
   if (count < BURST_MIN_STOCKS) return 'pair'
   return spanMin <= BURST_WINDOW_MIN ? 'burst' : 'spread'
@@ -162,13 +169,13 @@ export function buildTimeline(input: {
 }): { nodes: TimelineNode[]; looseStocks: ZtPoolStock[] } {
   const { stocks, events, pushes } = input
 
-  /** 有 fbt 的才有时间坐标；没有的进 looseStocks */
+  /** 有交易时段内 fbt 的才有时间坐标；无时刻的进 looseStocks，盘前/盘后旧值直接不展示。 */
   const placed: Array<{ t: number; s: ZtPoolStock }> = []
   const looseStocks: ZtPoolStock[] = []
   for (const s of stocks) {
     const t = fbtMin(s.fbt)
     if (t == null) looseStocks.push(s)
-    else placed.push({ t, s })
+    else if (inTimelineSession(t)) placed.push({ t, s })
   }
 
   // ── 按板块聚类（同名板块归一块；块内按首封时刻升序）──
@@ -203,7 +210,7 @@ export function buildTimeline(input: {
   const evByMin = new Map<number, MarketMemory['event_log']>()
   for (const e of events) {
     const at = clockMin(e.time)
-    if (at == null) continue
+    if (at == null || !inTimelineSession(at)) continue
     const g = evByMin.get(at)
     if (g) g.push(e)
     else evByMin.set(at, [e])
@@ -214,7 +221,7 @@ export function buildTimeline(input: {
   const puTo = new Map<number, number>()
   for (const p of pushes) {
     const at = clockMin(p.first_pushed)
-    if (at == null) continue
+    if (at == null || !inTimelineSession(at)) continue
     const to = clockMin(p.last_pushed) ?? at
     const g = puByMin.get(at)
     if (g) g.push(p)
@@ -561,48 +568,40 @@ export function buildTimelineSlots(
   // ── 盘中逐事件：按分钟**并入已存在的槽**（2026-09-17 用户「合进我的时间轴里面」）──
   const DOWN = new Set(['sector_down', 'limit_down_new', 'broken_new'])
   /**
-   * ⛔ **不建槽**的事件类型（2026-09-22 用户「时间轴的普通卡没有数据啊」）。
-   *
-   * 实测病灶：`zt_total` 是**每分钟一条的「全市场涨停总数」播报**（今日 66/230 条），
-   * 它占满了降序首屏 —— 用户打开时间轴看到的前 12 个块全是「个股 0 / 事件 1」，
-   * 于是判断「普通卡没有数据」。而它既不是个股、也不是题材/板块事件，
-   * 只是**统计口径**（该值已由顶部「涨停家数」KPI 承担展示）。
-   *
-   * 同理 `stock_up`：它已被 `intradayStockUp` 转成**结构化的个股行**
-   * （带板数/题材/涨停原因），再作为事件渲染一次就是**同一时刻的重复**。
-   *
-   * ⛔ 这里只影响**时间轴的槽投影**，原始事件流一条不改 ——
-   * `IntradayMoodCard`（盘中页情绪曲线）走的 `api.intradayTimeline()` **不经过本函数**，
-   * `zt_total` 在那里仍是涨停数序列的唯一来源。
+   * 涨停总数只能在有完整个股差分时显示：旧日志只有计数，无法证明是哪几只封板/开板，不能作为节点。
    */
-  const NO_SLOT = new Set(['zt_total', 'stock_up'])
-  /**
-   * ⛔⛔ **盘中事件只「并入」、绝不「新建」槽**（2026-09-22 用户第二次抓包「普通卡很多空白」）。
-   *
-   * ## 为什么必须这样
-   *
-   * 详情的渲染口径是「**题材 → 该题材的个股**」（用户明确否决了「爆发走强 / 杀跌」这类计数），
-   * 因此一个槽在详情里**只有两种东西可见**：题材区（来自 `mem.event_log` / `pushed_topics`）
-   * 与个股行。若一个槽**只有盘中事件、没有个股**，它在详情里就是**整块空白**
-   * —— 用户看到的就是一屏「普通卡 / 封板 0 · 题材 0」加一片空。
-   *
-   * 实测（真实数据 · 改前）：09-21 = 126 块中 **56 块空白**；09-18 = 98 块中 **45 块**；
-   * 09-17 = 54 块中 **14 块**。改后**全部归零**（09-21 → 70 块 / 0 空白）。
-   *
-   * ⛔ 顺带修掉一类脏数据：守护进程 **00:03** 会补写**昨日收盘**快照，里面同样含
-   *    `sector_up` / `broken_new` —— 它们曾建出 `00:02` / `00:07` 的槽（`SESSION_OPEN` 闸门一并挡掉）。
-   *
-   * 于是**槽的存在性由「事实」决定**：个股落点（`nodes.fbt`）+ 当日记忆事件/推送，
-   * 而不是「某分钟恰好广播了一次板块计数」。
-   */
+  const verifiedZtChange = (e: IntradayTimelineEvent): boolean => {
+    const delta = e.delta
+    if (e.kind !== 'zt_total' || typeof delta !== 'number' || !Number.isInteger(delta) || delta === 0) return false
+    const added = Array.isArray(e.added) ? e.added : []
+    const removed = Array.isArray(e.removed) ? e.removed : []
+    const hasCodes = (rows: typeof added) => rows.every((row) => typeof row?.code === 'string' && row.code.length > 0)
+    if (!hasCodes(added) || !hasCodes(removed)) return false
+    return delta > 0
+      ? added.length === delta && removed.length === 0
+      : removed.length === -delta && added.length === 0
+  }
+  const ztCodesByMinute = new Map<number, Set<string>>()
   for (const e of intraday ?? []) {
-    if (NO_SLOT.has(String(e.kind))) continue
+    if (!verifiedZtChange(e)) continue
     const t = clockMin(String(e.at ?? '').slice(11, 16))
-    // ⛔ `SESSION_OPEN` 前的记录一律丢弃（00:03 补写的昨日收盘快照）
-    if (t == null || t < SESSION_OPEN) continue
-    const s = slots.get(t) // ⛔ 只并入已存在的槽 —— 不 `ensure`
-    if (!s) continue
-    ;(DOWN.has(String(e.kind)) ? s.intradayDown : s.intradayUp).push(e)
+    if (t == null) continue
+    const codes = ztCodesByMinute.get(t) ?? new Set<string>()
+    for (const stock of [...(e.added ?? []), ...(e.removed ?? [])]) codes.add(stock.code)
+    ztCodesByMinute.set(t, codes)
+  }
+  // 所有有时刻的盘中事实独立建槽；个股已在相同分钟结构化展示时才避免重复。
+  for (const e of intraday ?? []) {
+    const t = clockMin(String(e.at ?? '').slice(11, 16))
+    if (t == null || t < SESSION_OPEN || t > SESSION_CLOSE) continue
+    if (e.kind === 'zt_total' && !verifiedZtChange(e)) continue
+    const existing = slots.get(t)
+    if (e.kind === 'stock_up' && e.code && ztCodesByMinute.get(t)?.has(e.code)) continue
+    if (e.kind === 'stock_up' && existing &&
+      [...existing.singles, ...existing.sectors.flatMap((g) => g.stocks)].some((stock) => stock.code === e.code)) continue
+    const s = ensure(t)
+    const down = DOWN.has(String(e.kind)) || (e.kind === 'zt_total' && e.delta != null && e.delta < 0)
+    ;(down ? s.intradayDown : s.intradayUp).push(e)
   }
 
   const sorted = [...slots.values()].sort((a, b) => a.at - b.at)

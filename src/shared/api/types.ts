@@ -2367,9 +2367,24 @@ export interface IntradayTimelineEvent {
   delta?: number | null
   /** 涨停总数（`zt_total`） */
   total?: number | null
+  /**
+   * 涨停总数变化的完整归因名单。仅当上游两轮全量涨停集合可核对，且集合差分与 `delta` 完全一致时存在。
+   * `added` 为新增封板，`removed` 为打开涨停；缺少任一方向明细的旧记录不进入时间轴展示。
+   */
+  added?: IntradayLimitUpStock[] | null
+  removed?: IntradayLimitUpStock[] | null
   /** 主力净流入（元 · `sector_down`） */
   inflow?: number | null
   /** 板块龙头（`sector_up`） */
   leader?: unknown
   [k: string]: unknown
+}
+
+/** 涨停集合差分中的个股最小展示字段（来自上游全量涨停池）。 */
+export interface IntradayLimitUpStock {
+  code: string
+  name: string
+  pct?: number | null
+  boards?: string | number | null
+  sector?: string | null
 }
