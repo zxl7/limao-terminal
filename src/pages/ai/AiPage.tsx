@@ -20,7 +20,7 @@ import {
   pct,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, LineChart, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, stanceText } from '@/shared/lib'
 
 /**
  * AI 台账 —— 数据源 `wealth_code/cache/ai_view/` + `ai_decisions.jsonl` + `ai_nav_history.jsonl`。
@@ -57,13 +57,6 @@ export async function loader() {
   // 「判断」一栏取**今晨 09:25 裁决终态**（实际怎么做），而非昨日盘后预案
   await queryClient.ensureQueryData(analyticsQueries.decisionPoolCall())
   return null
-}
-
-/** 当日取向（`pool_call.stance`）→ 中文 */
-const STANCE_META: Record<string, string> = {
-  attack: '进攻',
-  selective: '精选',
-  defend: '防守',
 }
 
 /** 判断语义 —— 只做三值映射，不给参与/观望加奖惩式措辞 */
@@ -183,6 +176,11 @@ export function Component() {
                   needYi: cv.need_yi,
                   lineRank: cv.line_rank,
                   lineCoreName: cv.line_core?.name ?? null,
+                  leaderRole: cv.leader_role,
+              leaderEvidenceNote: cv.leader_evidence?.note,
+              statusRank: cv.status_rank,
+              mechanicalLeader: cv.mechanical_leader,
+                  mechanicalLeaderNote: cv.mechanical_leader_note,
                   reason: cv.reason,
                 },
               }
@@ -223,8 +221,8 @@ export function Component() {
     <div className="flex flex-col gap-3">
       {/* 概览窄栏（两轨口径提示） + 明细宽栏（逐笔判断记录，多列需横向空间）。
           ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
-      <ZoneRow>
-        <Zone label="台账总览" dot="bg-rec" className="xl:w-[34%]">
+      <ZoneRow className="ai-ledger-layout">
+        <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-2 xl:sticky xl:top-3">
           <Card
             title="🤖 AI 独立台账"
         extra={
@@ -261,18 +259,11 @@ export function Component() {
           ) : (
             <div className="text-sub text-[12px] py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
           )}
-          <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
-            净值起点 1.0，虚线为盈亏分界；完整逐日明细见右侧「净值」标签。
-          </p>
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
-          AI 轨与脚本轨是**两本独立账**（各自起点 1.0、候选集合不同），不可直接比大小 ——
-          脚本轨见「交易战绩」。净值首行由当日 15:30 结算落盘，此前为空属正常时序。
-        </p>
       </Card>
         </Zone>
 
-        <Zone label="判断明细" dot="bg-lead" className="xl:w-[66%]">
+        <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-1">
           <Card
             title="判断明细"
         extra={
@@ -327,7 +318,7 @@ export function Component() {
                       <span>
                         取向{' '}
                         <span className="text-txt">
-                          {STANCE_META[callFile.stance] ?? callFile.stance}
+                          {stanceText(callFile.stance)}
                         </span>
                       </span>
                       <span className="text-sub">|</span>
@@ -352,11 +343,6 @@ export function Component() {
             {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘财富密码接力卡真实字段。
                 ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
             <AiJudgeDetail rows={judgeRows} />
-            <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
-              「判断」取**今晨 09:25 竞价后的裁决终态**（实际做没做 + 买入名额序）；其下的
-              预期开盘区间/竞价量能/维度指标/标签均取**昨日尾盘接力卡**原文（依据）。
-              两段时点不同：接力卡是昨日 15:30 的预案输入，裁决是今晨 09:25 的结论。
-            </p>
           </>
         )}
 

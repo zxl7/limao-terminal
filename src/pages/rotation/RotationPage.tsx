@@ -5,7 +5,7 @@ import type { PoolStock, RotationCandidate, SectorFlowFull } from '@/shared/api'
 import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, capitalText, klineText, phaseText, ztDirText } from '@/shared/lib'
 
 /**
  * 题材轮动 —— 数据源 `cache/rotation.json`（`scripts/theme_rotation.py` 产出）。
@@ -14,7 +14,7 @@ import { cn } from '@/shared/lib'
  *
  * 1. **回流候选**（`candidates`）——「哪些炒过的题材快回来了」。
  *    核心字段是 `cooled_days`（冷却天数）与 `confidence`（置信度）。
- *    `confidence_factors` 把置信度拆成四因子（催化 / 大盘 / 资金 / 阶段），
+ *    `confidence_factors` 把置信度拆成**五因子**（催化 / 大盘 / 资金 / 阶段 / K线止跌），
  *    这是**可核查的**置信度，不是拍脑袋的分数。
  * 2. **板块资金 5 日**（`flow_5d`）——「钱往哪去」。区间累计净额 + 流入天数
  *    比单日净额稳健得多（单日容易被大单扰动）。
@@ -391,9 +391,15 @@ function ReflowRow({ c }: { c: RotationCandidate }) {
           因子：
           <span className={f.catalyst ? 'text-up' : 'text-sub'}>催化 {f.catalyst ? '✓' : '✗'}</span>
           {' · '}
-          <span className={f.capital === 'inflow_rising' ? 'text-up' : 'text-sub'}>资金 {f.capital}</span>
+          <span className={f.capital === 'inflow_rising' ? 'text-up' : 'text-sub'}>
+            资金 {capitalText(f.capital)}
+          </span>
           {' · '}
-          <span className={f.phase === 'boom' ? 'text-up' : 'text-sub'}>阶段 {f.phase}</span>
+          <span className={f.phase === 'boom' ? 'text-up' : 'text-sub'}>阶段 {phaseText(f.phase)}</span>
+          {' · '}
+          <span className={String(f.kline ?? '').startsWith('stop_fall') ? 'text-up' : 'text-sub'}>
+            K线 {klineText(f.kline)}
+          </span>
           {' · '}
           <span className={f.market === false ? 'text-down' : 'text-sub'}>
             大盘 {f.market == null ? '未知' : f.market ? '配合' : '拖累'}
@@ -402,7 +408,7 @@ function ReflowRow({ c }: { c: RotationCandidate }) {
         <span>
           板块构成 主板 {c.board_mix?.main ?? '—'} / 创业 {c.board_mix?.cyb ?? '—'}
         </span>
-        <span>涨停方向 {c.zt_dir || '—'}</span>
+        <span>涨停方向 {ztDirText(c.zt_dir)}</span>
         <span>有效日 {c.zt_valid_days}</span>
       </div>
 

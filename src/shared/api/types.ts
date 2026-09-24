@@ -306,8 +306,8 @@ export interface MarketSnapshot {
 export interface AuctionLive {
   /** 形如 "09:29:14" */
   ts: string
-  /** 股票代码(6位) → 竞价涨幅% */
-  quotes: Record<string, number>
+  /** 股票代码(6位) → 竞价涨幅%；无可用报价时保留 null，不得伪造为 0 */
+  quotes: Record<string, number | null>
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -711,7 +711,16 @@ export interface DossierExpectation {
  *    刻意不做全量映射：原系统仍在演进该结构，全量声明会让「字段增删」
  *    误报成契约破坏，而实际并不影响展示。
  */
+export interface LeaderEvidence {
+  asof?: string
+  continuous_days?: number
+  note?: string
+}
+
 export interface DossierStock {
+  leader_role?: '龙头' | '准龙头' | '跟风' | null
+  leader_evidence?: LeaderEvidence
+  status_rank?: number
   code: string
   name: string
   /** 东财题材名 */
@@ -1563,8 +1572,8 @@ export interface AiViewItem {
   /** 盘后预案档：focus 重点看 / normal 一般 / avoid 回避（09:25 池内裁决据此排序与否决） */
   bias?: string
   /**
-   * ⛔ 越权兜底留痕（2026-09-22）：非空 = 该票的 `bias` 与**机械证据**冲突（或已被降级）。
-   * 例：`AI 判 normal，但机械证据显示是强龙（接力池第1·09:25秒板·带动5家）→ 与接力池排名背离，请复核`
+   * ⛔ 硬否决兜底留痕：仅 `avoid` 无四类硬伤而被降级为 `normal` 时非空。
+   * `normal` 与机械强龙的差异已由 09:25 融合排序处理，只在原始预案、机械事实与最终裁决中留痕，不告警。
    */
   bias_warning?: string | null
 }
@@ -1585,6 +1594,9 @@ export interface AiViewFile {
  * 而 `bias` 只是**昨日盘后预案档**（输入）。展示「这笔交易到底做没做」必须读 `view`。
  */
 export interface PoolCallView {
+  leader_role?: '龙头' | '准龙头' | '跟风' | null
+  leader_evidence?: LeaderEvidence
+  status_rank?: number
   code: string
   name: string
   /** 今晨竞价涨幅 %（缺竞价数据时为 null） */
@@ -1601,6 +1613,10 @@ export interface PoolCallView {
   boards: number
   /** 该票是否为所在方向的核心（核心不受跟风闸限制） */
   line_is_core: boolean
+  /** 机械强龙事实（接力池第1或09:30前封板，且未命中四类硬伤） */
+  mechanical_leader?: boolean
+  /** 机械强龙依据，供预案与09:25排序背离复核 */
+  mechanical_leader_note?: string | null
   /** 同方向核心票（用于判断龙头/跟风），无则为 null */
   line_core: { code: string; name: string; boards: number; broken: boolean } | null
   /** 在自身方向内的排名（1 = 龙一） */

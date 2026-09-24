@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { AiJudgeDetail, type JudgeRow } from '@/features/analytics'
 import type { DossierStock } from '@/shared/api'
 
@@ -12,6 +12,23 @@ import type { DossierStock } from '@/shared/api'
  *
  * 故锁六点：① 名称+代码同时在；② 开盘**区间**（非 5%）；③ 量能；④ 维度指标；⑤ 标签；⑥ 理由。
  */
+
+it('查找与裁决筛选不改变后台顺序，预案不算实际参与', () => {
+  const rows: JudgeRow[] = [
+    { code: '000002', view: 'participate', call: { view: 'watch', statusRank: 2 } },
+    { code: '000001', call: { view: 'participate', statusRank: 1, leaderEvidenceNote: '带动延续' } },
+    { code: '000003', view: 'participate' },
+  ]
+  const { container, getByLabelText, getByText } = render(<AiJudgeDetail rows={rows} />)
+  expect(container.querySelectorAll('article')[0].textContent).toContain('000001')
+  expect(getByText('带动延续')).toBeTruthy()
+  fireEvent.change(getByLabelText('筛选裁决'), { target: { value: 'participate' } })
+  expect(container.querySelectorAll('article')).toHaveLength(1)
+  fireEvent.change(getByLabelText('查找标的'), { target: { value: '000003' } })
+  expect(getByText('没有匹配的标的')).toBeTruthy()
+  fireEvent.change(getByLabelText('筛选裁决'), { target: { value: 'pending' } })
+  expect(container.querySelectorAll('article')).toHaveLength(1)
+})
 
 /** 接力卡单条（只填本测试断言用到的字段，其余用 cast 补齐） */
 const stock = {
@@ -130,7 +147,8 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
     expect(txt).toContain('空间')
     expect(txt).toContain('炸板回封')
     expect(txt).toContain('板块龙')
-    expect(txt).toContain('真龙头(主升)')
+    expect(txt).toContain('龙头')
+    expect(txt).not.toContain('真龙头(主升)')
   })
 
   it('⑥ 显示 AI 理由（含换行分段）', () => {
@@ -217,6 +235,37 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
     expect(txt).toContain('方向内第 1')
     expect(txt).toContain('核心 龙头股份')
     expect(txt).toContain('没超 5% 上限')
+  })
+
+  it('⑪b 机械强龙融合依据必须展示，方便核对normal为何仍排在前面', () => {
+    const { container } = render(
+      <AiJudgeDetail
+        rows={[
+          {
+            ...callRow,
+            call: {
+              ...callRow.call!,
+              mechanicalLeader: true,
+              mechanicalLeaderNote: '接力池第1·09:30秒板·带动6家',
+            },
+          },
+        ]}
+      />,
+    )
+    const txt = container.querySelector('article')?.textContent ?? ''
+    expect(txt).toContain('接力池第1·09:30秒板·带动6家')
+    expect(txt).not.toContain('机械强龙')
+  })
+
+  it('地位排序优先于参与档，且身份只展示三档', () => {
+    const { container } = render(<AiJudgeDetail rows={[
+      { code: '000002', call: { view: 'participate', leaderRole: '跟风', statusRank: 2 } },
+      { code: '000001', call: { view: 'watch', leaderRole: '龙头', statusRank: 1 } },
+    ]} />)
+    const articles = [...container.querySelectorAll('article')]
+    expect(articles[0].textContent).toContain('000001')
+    expect(articles[0].textContent).toContain('龙头')
+    expect(articles[1].textContent).toContain('跟风')
   })
 
   it('⑫ 无终态 → 明说「今晨裁决未落盘」，且不渲染裁决段', () => {

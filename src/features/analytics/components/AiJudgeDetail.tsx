@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { DossierStock } from '@/shared/api'
-import { cn } from '@/shared/lib'
+import { cn, biasText, cardPhaseText, sectorSentimentText, sectorTierText, viewText } from '@/shared/lib'
 // ⚠️ `tone` 别名导入：本文件内 `Chip` 组件有一个同名的 `tone` prop，
 //    直接导入会被 lint 判为「遮蔽外层变量」（实测 1 warning，门禁要求 0）。
 import { n1, n2, pct, rangePct, tone as valueTone } from '../lib/format'
@@ -30,6 +30,9 @@ import { n1, n2, pct, rangePct, tone as valueTone } from '../lib/format'
  * 本结构是**竞价后的定音**（实际做没做 + 买入名额序 + 当时竞价数据）。
  */
 export interface JudgeCall {
+  leaderRole?: '龙头' | '准龙头' | '跟风' | null
+  leaderEvidenceNote?: string
+  statusRank?: number
   /** 终态：participate / watch / skip */
   view: string
   /** 买入名额序（1 起；仅成交票有） */
@@ -46,6 +49,10 @@ export interface JudgeCall {
   lineRank?: number | null
   /** 同方向核心票名称（判断是否跟风用） */
   lineCoreName?: string | null
+  /** 机械强龙事实是否参与了09:25名额排序 */
+  mechanicalLeader?: boolean
+  /** 机械强龙依据（接力池第1 / 09:30秒板 / 带动） */
+  mechanicalLeaderNote?: string | null
   /** 裁决理由（短句） */
   reason?: string
 }
@@ -66,8 +73,8 @@ export interface JudgeRow {
   /** 今晨 09:25 裁决终态 —— 有则以它为准（用户 2026-09-22「应该显示今天 9:25 的」） */
   call?: JudgeCall
   /**
-   * ⛔ `bias` 越权兜底留痕（2026-09-22）—— 非空 = AI 的预案档与接力卡**机械证据**冲突
-   * （或已被降级）。后端 `ai_ledger.ENABLE_BIAS_AVOID_GUARD` 产出。
+   * ⛔ 硬否决兜底留痕：非空 = AI 的 `avoid` 无四类硬伤，已被降级。
+   * `normal` 与机械强龙的差异已融入09:25排序，保留事实留痕但不显示为告警。
    */
   biasWarning?: string
   /** 接力卡里的该标的（接力池 / 观察池）—— 缺失时只渲染 AI 判断那一半 */
@@ -76,17 +83,11 @@ export interface JudgeRow {
   bucketLabel?: string
 }
 
+/** 三值判断的**配色**（文字走 `@/shared/lib` 的 `viewText` —— 白话层单一源，⛔ 不在此回落原 token） */
 const VIEW_META: Record<string, { label: string; cls: string }> = {
   participate: { label: '参与', cls: 'text-up border-up' },
   watch: { label: '观察', cls: 'text-rec border-rec' },
   skip: { label: '放弃', cls: 'text-sub border-line' },
-}
-
-/** 昨日盘后预案档 → 中文（与今晨终态并列展示，便于看「AI 当初怎么想 / 实际怎么做」） */
-const BIAS_META: Record<string, string> = {
-  focus: '重点看',
-  normal: '一般',
-  avoid: '回避',
 }
 
 /** 竞价落点 → 中文标签（A 股语义：涨=红 / 跌=绿） */
@@ -97,17 +98,8 @@ const ZONE_META: Record<string, { label: string; cls: string }> = {
   unknown: { label: '无量价', cls: 'text-sub' },
 }
 
-/** 板块地位 / 情绪 / 高开强度 的中文映射（接力卡用英文枚举） */
-const SECTOR_TIER: Record<string, string> = {
-  dragon: '板块龙',
-  follower: '跟随',
-  lone: '独立',
-}
-const SECTOR_SENTIMENT: Record<string, string> = {
-  high: '情绪高',
-  mid: '情绪中',
-  low: '情绪低',
-}
+/** 板块地位 / 情绪 / 高开强度 的中文映射 —— 见 `@/shared/lib` 的 `plain.ts`（白话层单一源）。
+ *  ⛔ 本文件不再自带映射表：各自一套必然与别处漂移，且缺省回落容易变成「直出原 token」。 */
 
 /** 标签小药丸 */
 function Chip({ children, tone }: { children: ReactNode; tone?: 'rec' | 'sub' }) {
@@ -151,9 +143,8 @@ function dimEntries(v: unknown): Array<{ key: string; label: string; score: numb
 }
 
 /**
- * 排序优先级（2026-09-22 用户「将要参与的给我放到前面」）：
- * **参与 → 观察 → 放弃 → 其他**。⛔ 同档内保持**原有顺序**（`Array.sort` 自 ES2019 起稳定），
- * 即「接力池在前」这一层由上游给出，本层不再重排。
+ * 新数据按后端 status_rank 展示地位顺序，不在前端重算角色或准入。
+ * 历史无排序字段时兼容「参与 → 观察 → 放弃 → 其他」，同档保持原有顺序。
  */
 const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
 
@@ -167,18 +158,45 @@ const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
 const viewOf = (r: JudgeRow) => r.call?.view ?? r.view ?? ''
 
 export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const needle = search.trim().toLowerCase()
   if (!rows.length) {
     return <div className="text-sub text-[12px] py-2">该日无 AI 判断记录</div>
   }
-  const ordered = [...rows].sort((a, b) => (VIEW_ORDER[viewOf(a)] ?? 9) - (VIEW_ORDER[viewOf(b)] ?? 9))
+  const ordered = [...rows].sort((a, b) => {
+    const ar = a.call?.statusRank ?? a.stock?.status_rank
+    const br = b.call?.statusRank ?? b.stock?.status_rank
+    if (ar != null || br != null) return (ar ?? Infinity) - (br ?? Infinity)
+    return (VIEW_ORDER[viewOf(a)] ?? 9) - (VIEW_ORDER[viewOf(b)] ?? 9)
+  })
+  const visible = ordered.filter((r) =>
+    (filter === 'all' || (r.call ? r.call.view : 'pending') === filter) &&
+    (!needle || `${r.code} ${r.stock?.name ?? ''} ${r.stock?.theme_name ?? ''}`.toLowerCase().includes(needle)),
+  )
   return (
     <div className="flex flex-col gap-2">
-      {ordered.map((r) => {
+      <div className="flex flex-wrap items-center gap-2 border-b border-line pb-2">
+        <input aria-label="查找标的" placeholder="名称 / 代码 / 题材" value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="min-w-0 w-48 rounded-sm border border-line bg-card px-2 py-1.5 text-[12px] text-txt focus-visible:outline-2 focus-visible:outline-rec" />
+        <select aria-label="筛选裁决" value={filter} onChange={(event) => setFilter(event.target.value)}
+          className="rounded-sm border border-line bg-card px-2 py-1.5 text-[12px] text-txt">
+          <option value="all">全部裁决</option><option value="participate">参与</option>
+          <option value="watch">观察</option><option value="skip">放弃</option><option value="pending">待裁决</option>
+        </select>
+        <span className="ml-auto text-[11px] text-sub num" aria-live="polite">{visible.length} / {rows.length} 只</span>
+      </div>
+      {!visible.length && <div className="py-8 text-center text-sub text-[12px]">没有匹配的标的</div>}
+      {visible.map((r) => {
         const s = r.stock
         const e = s?.expectation
         const c = r.call
         const finalView = viewOf(r)
-        const m = VIEW_META[finalView] ?? { label: finalView || '—', cls: 'text-sub border-line' }
+        const m = {
+          label: viewText(finalView),
+          cls: VIEW_META[finalView]?.cls ?? 'text-sub border-line',
+        }
         const dims = dimEntries(s?.dim_panel)
         const tags = s?.tags ?? []
         const zone = c?.zone ? ZONE_META[c.zone] : undefined
@@ -210,7 +228,8 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                 {c ? '今晨 09:25 裁决' : '昨日预案·今晨裁决未落盘'}
               </span>
               {c?.quotaRank != null && <Chip tone="rec">买入名额 #{c.quotaRank}</Chip>}
-              {c && r.bias && <Chip>昨预案 {BIAS_META[r.bias] ?? r.bias}</Chip>}
+              {/* 身份统一在下方展示，机械证据融入原有理由，不另增指标。 */}
+              {c && r.bias && <Chip>昨预案 {biasText(r.bias)}</Chip>}
               {r.bucketLabel && <Chip>{r.bucketLabel}</Chip>}
               {s?.boards != null && <Chip>{s.boards}板</Chip>}
               {s?.style_tag && <Chip>{s.style_tag}</Chip>}
@@ -220,7 +239,9 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                   {t}
                 </Chip>
               ))}
-              {e?.dragon_diagnosis?.identity && <Chip>{e.dragon_diagnosis.identity}</Chip>}
+              {(c?.leaderRole ?? s?.leader_role ?? e?.dragon_diagnosis?.identity) && (
+                <Chip>{c?.leaderRole ?? s?.leader_role ?? (e?.dragon_diagnosis?.identity?.startsWith('真龙头') ? '龙头' : e?.dragon_diagnosis?.identity === '准龙头' ? '准龙头' : e?.dragon_diagnosis?.identity?.startsWith('跟风') ? '跟风' : '—')}</Chip>
+              )}
             </div>
 
             {/* ── ⛔ 越权兜底留痕（bias 与机械证据冲突 / 已被降级）—— 必须显眼，否则等于没兜住 ── */}
@@ -251,9 +272,9 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                   )}
                   {c.lineCoreName && <span className="text-sub ml-1.5">核心 {c.lineCoreName}</span>}
                 </Row>
-                {c.reason && (
+                {(c.reason || c.leaderEvidenceNote || c.mechanicalLeaderNote) && (
                   <Row label="裁决语">
-                    <span className="text-txt">{c.reason}</span>
+                    <span className="text-txt">{[c.reason, c.leaderEvidenceNote, c.mechanicalLeaderNote].filter(Boolean).join('；')}</span>
                   </Row>
                 )}
               </div>
@@ -296,16 +317,14 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                         <span className="num text-sub ml-1">炸{e.seal_zbc}</span>
                       )}
                       <span className="text-sub ml-1.5">·</span>
-                      <span className="ml-1.5">{(SECTOR_TIER[e.sector_tier] ?? e.sector_tier) || '—'}</span>
-                      <span className="text-sub ml-1.5">
-                        {(SECTOR_SENTIMENT[e.sector_sentiment] ?? e.sector_sentiment) || ''}
-                      </span>
+                      <span className="ml-1.5">{sectorTierText(e.sector_tier)}</span>
+                      <span className="text-sub ml-1.5">{sectorSentimentText(e.sector_sentiment)}</span>
                       {e.confidence != null && (
                         <span className="num text-sub ml-1.5">
                           置信 {n2(e.confidence)}
                         </span>
                       )}
-                      {e.phase && <span className="text-rec ml-1.5">{e.phase}</span>}
+                      {e.phase && <span className="text-rec ml-1.5">{cardPhaseText(e.phase)}</span>}
                     </Row>
                   </>
                 )}
@@ -355,11 +374,11 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
 
             {/* ── AI 盘后理由（前一交易日 15:30 写 · 长文含换行）──
                 ⚠️ 与上面的「今晨裁决」是两个时点、两套结论 —— 必须标清来源，否则会被误读 */}
-            {r.reason && (
+            {(r.reason || s?.leader_evidence?.note) && (
               <div className="mt-1.5 border-t border-line-faint pt-1.5">
                 <div className="text-[10.5px] text-sub mb-0.5">🤖 AI 盘后理由（昨日 15:30 写）</div>
                 <div className="text-[12px] leading-relaxed text-txt whitespace-pre-wrap break-all">
-                  {r.reason}
+                  {[r.reason, !c && s?.leader_evidence?.note].filter(Boolean).join('\n')}
                 </div>
               </div>
             )}

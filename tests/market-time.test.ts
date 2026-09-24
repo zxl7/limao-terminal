@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { AuctionLiveSchema } from '@/shared/api/schemas'
 import { bjTimeString, inTrading, isTradingDay, sessionName } from '@/shared/lib'
 
 /**
@@ -29,6 +30,16 @@ describe('isTradingDay —— 交易日（周一至周五）', () => {
 
   it('2026-09-20 是周日 → 非交易日', () => {
     expect(isTradingDay(bjAt(2026, 9, 20, 10, 0))).toBe(false)
+  })
+})
+
+describe('AuctionLiveSchema —— 竞价报价可空性', () => {
+  it('无可用报价必须保留 null，不得误报为 0% 或触发契约告警', () => {
+    expect(AuctionLiveSchema.safeParse({ ts: '15:21:16', quotes: { '600664': null } }).success).toBe(true)
+  })
+
+  it('竞价报价只能是数值或 null', () => {
+    expect(AuctionLiveSchema.safeParse({ quotes: { '600664': '0.00' } }).success).toBe(false)
   })
 })
 

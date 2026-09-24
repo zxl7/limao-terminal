@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { DecisionDossier, DossierStock } from '@/shared/api'
-import { cn } from '@/shared/lib'
+import { cn, cardPhaseText } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { DataTable, SegTabs, StatPair, Tag } from './Table'
 import { fmtFbt, n1, n2, pct, rangeLow, rangePct } from '../lib/format'
@@ -177,7 +177,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
           e.phase === '亢奋' || e.phase === '共振' ? 'up' : e.phase === '分歧' || e.phase === '退潮' ? 'down' : 'neutral'
         return (
           <span className="block leading-snug">
-            <Tag tone={tone}>{e.phase || '—'}</Tag>
+            <Tag tone={tone}>{cardPhaseText(e.phase)}</Tag>
             <span className="num text-[11px] text-sub ml-1">{n2(e.confidence)}</span>
             {e.non_tradeable && <Tag tone="down">不可交易</Tag>}
           </span>

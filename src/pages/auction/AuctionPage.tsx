@@ -321,9 +321,14 @@ export function Component() {
                       <span className="text-[13px] text-txt truncate">{q.name}</span>
                       <span className="num text-[11px] text-sub">{q.code}</span>
                     </span>
-                    <span className={cn('num text-[13px] font-medium', q.pct > 0 ? 'text-up' : q.pct < 0 ? 'text-down' : 'text-sub')}>
-                      {q.pct > 0 ? '+' : ''}
-                      {num(q.pct)}%
+                    <span
+                      className={cn(
+                        'num text-[13px] font-medium',
+                        q.pct == null ? 'text-sub' : q.pct > 0 ? 'text-up' : q.pct < 0 ? 'text-down' : 'text-sub',
+                      )}
+                    >
+                      {q.pct != null && q.pct > 0 ? '+' : ''}
+                      {q.pct == null ? '—' : `${num(q.pct)}%`}
                     </span>
                   </li>
                 ))}

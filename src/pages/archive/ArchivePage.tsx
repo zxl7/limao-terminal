@@ -97,11 +97,11 @@ export function Component() {
 
   /** 竞价报价的条目展开（quotes 是 code → 涨幅 的映射） */
   const auctionQuotes = useMemo(() => {
-    const q = (activeAuction?.data as { quotes?: Record<string, number>; ts?: string } | undefined)?.quotes
+    const q = (activeAuction?.data as { quotes?: Record<string, number | null>; ts?: string } | undefined)?.quotes
     if (!q) return []
     return Object.entries(q)
       .map(([code, pctv]) => ({ code, pct: pctv }))
-      .sort((a, b) => b.pct - a.pct)
+      .sort((a, b) => (b.pct ?? -Infinity) - (a.pct ?? -Infinity))
   }, [activeAuction])
 
   /** 板数降序的涨停池明细（本页取的是 decision_log 的 zt_pool，含全量 zt_list） */
@@ -362,7 +362,7 @@ export function Component() {
                   />
                   <StatPair
                     label="高开 ≥5%"
-                    value={auctionQuotes.filter((q) => q.pct >= 5).length}
+                    value={auctionQuotes.filter((q) => q.pct != null && q.pct >= 5).length}
                     tone="up"
                   />
                 </div>
@@ -377,14 +377,20 @@ export function Component() {
                       label: '竞价涨幅',
                       num: true,
                       cell: (q) => (
-                        <span className={cn('font-semibold', q.pct > 0 ? 'text-up' : q.pct < 0 ? 'text-down' : 'text-txt')}>
+                        <span
+                          className={cn(
+                            'font-semibold',
+                            q.pct == null ? 'text-sub' : q.pct > 0 ? 'text-up' : q.pct < 0 ? 'text-down' : 'text-txt',
+                          )}
+                        >
                           {pct(q.pct)}
                         </span>
                       ),
                     },
                     {
                       label: '相对 5% 纪律',
-                      cell: (q) => (q.pct > 5 ? <Tag tone="down">超上限</Tag> : <Tag tone="up">在限内</Tag>),
+                      cell: (q) =>
+                        q.pct == null ? <Tag>无报价</Tag> : q.pct > 5 ? <Tag tone="down">超上限</Tag> : <Tag tone="up">在限内</Tag>,
                     },
                   ]}
                 />

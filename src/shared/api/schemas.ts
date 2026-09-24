@@ -380,8 +380,8 @@ export const FeedbackMatrixSchema = z.object({
 export const AuctionLiveSchema = z.object({
   /** 形如 "09:29:14" */
   ts: s.optional(),
-  /** 股票代码(6位) → 竞价涨幅% */
-  quotes: z.record(s, n).optional(),
+  /** 股票代码(6位) → 竞价涨幅%；无可用报价时为 null，不与 0% 混淆 */
+  quotes: z.record(s, nOrNull).optional(),
 })
 
 // ════════════════════════════════════════════════════════════════
@@ -667,6 +667,9 @@ const DossierExpectation = z
 
 const DossierStock = z
   .object({
+    leader_role: z.enum(['龙头', '准龙头', '跟风']).nullable().optional(),
+    status_rank: n.optional(),
+    leader_evidence: z.object({ asof: s.optional(), continuous_days: n.optional(), note: s.optional() }).optional(),
     code: s.optional(),
     name: s.optional(),
     theme: s.optional(),
