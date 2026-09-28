@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ExtremeCard, FeedbackCard, SignalRail, marketQueries } from '@/features/market'
+import { ExtremeCard, FeedbackCard, SectorFlowCard, SignalRail, marketQueries } from '@/features/market'
 import { IntradayMoodCard, analyticsQueries } from '@/features/analytics'
 import { api, queryClient } from '@/shared/api'
 import { loader } from '@/pages/intraday/IntradayPage'
@@ -18,6 +18,23 @@ function mount(children: ReactNode, key: readonly string[], data?: unknown, fail
 }
 
 describe('首页数据状态不能伪装成无风险', () => {
+  it('板块采集失败时区分上次完整快照与部分数据', () => {
+    const stale = mount(<SectorFlowCard />, marketQueries.latest().queryKey, {
+      sector_risk: { ok: false, stale: true, asof: '2026-09-28T14:20:00+08:00',
+        inflow_top: [{ name: '机器人', pct: 1, flow_yi: 3 }], outflow_top: [], declining: [], count: 0 },
+    })
+    expect(screen.getByText(/展示 14:20:00 的完整板块快照/)).toBeInTheDocument()
+    expect(screen.getByText('机器人')).toBeInTheDocument()
+    stale.unmount()
+
+    mount(<SectorFlowCard />, marketQueries.latest().queryKey, {
+      sector_risk: { ok: false, stale: false, inflow_top: [], outflow_top: [], declining: [] },
+    })
+    expect(screen.getByText('板块数据采集不完整，以下仅为已取得的部分数据。')).toBeInTheDocument()
+    expect(screen.getByText('主力流入数据暂不可用')).toBeInTheDocument()
+    expect(screen.getByText('弱势板块数据暂不可用')).toBeInTheDocument()
+  })
+
   it('极值字段缺失不能显示无跌停、无炸板', () => {
     mount(<ExtremeCard />, marketQueries.latest().queryKey, {})
     expect(screen.getByText('跌停数据未提供')).toBeInTheDocument()
@@ -48,6 +65,25 @@ describe('首页数据状态不能伪装成无风险', () => {
     }, true)
     expect(screen.getByText('风险股')).toBeInTheDocument()
     expect(screen.getByText('极值数据更新失败，保留上次数据')).toBeInTheDocument()
+  })
+
+  it('极值名单保留核按钮逐票价格、均线和破位信息，并区分总数与明细数', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } })
+    client.setQueryData(marketQueries.latest().queryKey, {
+      limit_down: { count: 1, names: ['跌停票'] }, broken: { count: 1, names: ['炸板票'] },
+    })
+    client.setQueryData(marketQueries.feedback().queryKey, {
+      generated_ts: '2026-09-28 10:30:00', nuke_count: 2, broken_rate: 20,
+      nuke_list: [{ code: '000001', name: '核按钮票', pct: -7, price: 8.5, prev_boards: 3,
+        tag: '昨连板', ma5: 9, ma10: 9.2, breakdown: true }],
+    })
+    render(<QueryClientProvider client={client}><ExtremeCard /></QueryClientProvider>)
+    expect(screen.getByText('核按钮票')).toBeInTheDocument()
+    expect(screen.getByText('1/2 只已列出')).toBeInTheDocument()
+    expect(screen.getByText(/现价/)).toBeInTheDocument()
+    expect(screen.getByText('破位（5/10 日线）')).toBeInTheDocument()
+    expect(screen.getByText('跌停票')).toBeInTheDocument()
+    expect(screen.getByText('炸板票')).toBeInTheDocument()
   })
 
   it('反馈请求失败不再永久显示等待', () => {

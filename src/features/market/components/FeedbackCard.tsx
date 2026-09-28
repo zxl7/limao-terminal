@@ -54,6 +54,7 @@ export function FeedbackCard() {
     >
       {isError && <p role="status" className="text-[11px] text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
       {fb?.generated_ts && <div className="num text-[10.5px] text-sub mb-2">数据时间 {fb.generated_ts}</div>}
+      {fb?.market_missing && <p role="status" className="text-[11px] text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
       {fb && !fb.error ? (
         <>
           {/* 缺失指标使用中性色，避免把未知状态表达为改善。 */}
@@ -94,11 +95,11 @@ export function FeedbackCard() {
               sub="昨涨停今日平均"
             />
             <Kpi
-              label="上涨占比"
+              label="昨涨停今上涨占比"
               value={fb.up_rate ?? '—'}
               unit="%"
               tone={fb.up_rate == null ? 'sub' : fb.up_rate < 50 ? 'down' : 'up'}
-              sub="全市场广度"
+              sub="昨日涨停股样本"
             />
             <Kpi
               label="最高板"

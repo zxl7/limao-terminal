@@ -1,4 +1,5 @@
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
+import { TideAlgorithmStrip } from '@/features/market'
 import { TopBar } from './TopBar'
 import { RightRail } from './RightRail'
 import { Sidebar, TopNavFallback } from './Sidebar'
@@ -56,7 +57,7 @@ interface TabDef {
  *
  * ## 历史段的相对顺序保持不变
  *
- * 「盘面 → 题材 → 决策 → 数据」四段内部的先后一律沿用原顺序，
+ * 「盘面 → 决策 → 题材 → 数据」四段内部的先后一律沿用原顺序，
  * 只把其中属于实时的成员**摘出去**前置，不重排其余成员。
  * （如原「题材」段 8 项摘走轮动/主线/回流/资金后，剩爆发史→龙虎榜→载体→风险，
  * 相对次序与原先一致。）
@@ -77,19 +78,19 @@ export const TABS: readonly TabDef[] = [
   { to: '/promotion', label: '连板晋级', group: '盘面' },
   { to: '/gene', label: '股性基因', group: '盘面' },
 
-  // ── 段3 · 题材与资金（日频）──
-  { to: '/eruption', label: '题材爆发史', group: '题材' },
-  { to: '/lhb', label: '龙虎榜', group: '题材' },
-  { to: '/carrier', label: '载体追踪', group: '题材' },
-  { to: '/risk', label: '风险监控', group: '题材' },
-
-  // ── 段4 · 决策与战绩（日频）──
+  // ── 段3 · 决策与战绩（日频）──
   { to: '/ai', label: 'AI台账', group: '决策' },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
   { to: '/auction', label: '竞价决策', group: '决策' },
   { to: '/execution-audit', label: '执行审计', group: '决策' },
+
+  // ── 段4 · 题材与资金（日频）──
+  { to: '/eruption', label: '题材爆发史', group: '题材' },
+  { to: '/lhb', label: '龙虎榜', group: '题材' },
+  { to: '/carrier', label: '载体追踪', group: '题材' },
+  { to: '/risk', label: '风险监控', group: '题材' },
 
   // ── 段5 · 数据与运维（日频）──
   { to: '/record', label: '数据记录', group: '数据' },
@@ -114,6 +115,7 @@ export function AppShell() {
         {/* 主内容区：≥3xl 与 RightRail 并排 */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <main className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 py-3">
+            <TideAlgorithmLayer />
             <Outlet />
           </main>
           <RightRail />
@@ -121,4 +123,16 @@ export function AppShell() {
       </div>
     </div>
   )
+}
+
+/**
+ * 实时与盘面全部 tab 共用同一份潮汐结果。
+ *
+ * 归属仍在市场 feature：AppShell 只根据导航分组决定是否挂载，绝不在页面层复制阈值。
+ */
+function TideAlgorithmLayer() {
+  const { pathname } = useLocation()
+  const group = TABS.find((tab) => tab.to === pathname)?.group
+  if (group !== '实时' && group !== '盘面') return null
+  return <TideAlgorithmStrip group={group} />
 }

@@ -23,6 +23,11 @@ export { SectorFlowCard } from './components/SectorFlowCard'
 export { SectorDeltaCard } from './components/SectorDeltaCard'
 export { ExpectCard } from './components/ExpectCard'
 export { ExtremeCard } from './components/ExtremeCard'
+export { TideCard } from './components/TideCard'
+export { TideAlgorithmStrip } from './components/TideAlgorithmStrip'
+
+// 情绪周期之潮汐算法（候选链路环境门控的终端唯一映射）
+export { buildTideState, tideConflict, type TideRegime, type TideState } from './lib/tide'
 
 // 域内标签工具（页面组装时可能用到）
 export {

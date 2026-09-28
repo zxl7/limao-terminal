@@ -24,6 +24,7 @@ import {
    *  直接导入会触发 no-shadow，且语义也确实不同（那是「序列色调」不是「涨跌色调」）。 */
   tone as toneCls,
 } from '@/features/analytics'
+import { buildTideState, marketQueries, TideCard, tideConflict } from '@/features/market'
 import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn, sentimentClass } from '@/shared/lib'
 
@@ -51,10 +52,14 @@ import { cn, sentimentClass } from '@/shared/lib'
  */
 
 export async function loader() {
-  await queryClient.ensureQueryData(analyticsQueries.emotionSummary5d())
-  await queryClient.ensureQueryData(analyticsQueries.emotionZtHistory())
-  await queryClient.ensureQueryData(analyticsQueries.emotionMemory())
-  await queryClient.ensureQueryData(analyticsQueries.ztYesterday())
+  // 四份日频/归档数据独立产出；任一文件暂缺时保留其余数据与页面内空态。
+  await Promise.allSettled([
+    queryClient.ensureQueryData(analyticsQueries.emotionSummary5d()),
+    queryClient.ensureQueryData(analyticsQueries.emotionZtHistory()),
+    queryClient.ensureQueryData(analyticsQueries.emotionMemory()),
+    queryClient.ensureQueryData(analyticsQueries.ztYesterday()),
+    queryClient.ensureQueryData(marketQueries.feedback()),
+  ])
   return null
 }
 
@@ -81,6 +86,7 @@ export function Component() {
   const ztHist = useQuery(analyticsQueries.emotionZtHistory())
   const memory = useQuery(analyticsQueries.emotionMemory())
   const yzt = useQuery(analyticsQueries.ztYesterday())
+  const feedback = useQuery(marketQueries.feedback())
   const [tab, setTab] = useState<'days' | 'trajectory' | 'intraday'>('days')
   const [memPick, setMemPick] = useState('')
 
@@ -94,6 +100,9 @@ export function Component() {
   const traj = s?.trajectory
   const turn = traj?.turn_signal
   const turnStyle = turn ? (TURN_TONE[turn.dir] ?? TURN_TONE.flat) : null
+  /** 实时潮位严格按候选链路的 feedback_matrix 门控映射，不能拿日频摘要替代。 */
+  const tide = useMemo(() => buildTideState(feedback.data), [feedback.data])
+  const tideDirectionConflict = useMemo(() => tideConflict(tide, turn?.dir), [tide, turn?.dir])
 
   /**
    * 情绪快照（`market_memory_<日期>.json`）—— 盘中「情绪联动」的唯一数据源。
@@ -248,7 +257,7 @@ export function Component() {
             tone={turn?.dir === 'repair' ? 'up' : turn?.dir === 'ebb' ? 'down' : 'sub'}
           />
           <StatPair label="窗口" value={`${s?.window_days ?? '—'} 日`} />
-          <StatPair label="轨迹样本" value={traj?.sentiment_seq.length ?? '—'} />
+          <StatPair label="轨迹样本" value={traj?.sentiment_seq?.length ?? '—'} />
           {turnStyle && (
             <span className={cn('text-[12.5px] font-semibold', turnStyle.cls)}>
               {turnStyle.label}
@@ -265,6 +274,13 @@ export function Component() {
         {!summary.isLoading && !s && (
           <EmptyState text="情绪摘要未生成" hint="cache/emotion_summary_5d.json 缺失" />
         )}
+      </Card>
+
+      <Card
+        title="🌊 盘中潮汐裁决"
+        extra={<CardBadge tone={tide.tone === 'neutral' ? 'neutral' : tide.tone}>{tide.label}</CardBadge>}
+      >
+        <TideCard tide={tide} conflict={tideDirectionConflict} />
       </Card>
 
       {/* ── 情绪轨迹图：把「方向」画出来，而不是只给一个水平值 ── */}
@@ -457,13 +473,13 @@ export function Component() {
               {
                 label: '主导题材',
                 cell: (d) =>
-                  d.main_themes.length ? (
+                  d.main_themes?.length ? (
                     <span className="flex flex-wrap gap-1">
-                      {d.main_themes.slice(0, 4).map((t) => (
+                      {d.main_themes?.slice(0, 4).map((t) => (
                         <Tag key={t}>{t}</Tag>
                       ))}
-                      {d.main_themes.length > 4 && (
-                        <span className="text-sub text-[11px]">+{d.main_themes.length - 4}</span>
+                      {(d.main_themes?.length ?? 0) > 4 && (
+                        <span className="text-sub text-[11px]">+{(d.main_themes?.length ?? 0) - 4}</span>
                       )}
                     </span>
                   ) : (
@@ -478,15 +494,15 @@ export function Component() {
           <div className="flex flex-col gap-2.5">
             {traj ? (
               <>
-                <SeqRow label="情绪分" seq={traj.sentiment_seq.map((v) => n1(v))} tone="sent" />
+                <SeqRow label="情绪分" seq={(traj.sentiment_seq ?? []).map((v) => n1(v))} tone="sent" />
                 <SeqRow
                   label={`MA${traj.ma3_window} 均`}
-                  seq={traj.sentiment_ma3.map((v) => n1(v))}
+                  seq={(traj.sentiment_ma3 ?? []).map((v) => n1(v))}
                   tone="sent"
                 />
-                <SeqRow label="晋级率" seq={traj.promote_seq.map((v) => n1(v))} tone="plain" />
-                <SeqRow label="核按钮" seq={traj.nuke_seq.map((v) => String(v))} tone="nu" />
-                <SeqRow label="涨停数" seq={traj.zt_seq.map((v) => (v == null ? '—' : String(v)))} tone="plain" />
+                <SeqRow label="晋级率" seq={(traj.promote_seq ?? []).map((v) => n1(v))} tone="plain" />
+                <SeqRow label="核按钮" seq={(traj.nuke_seq ?? []).map((v) => String(v))} tone="nu" />
+                <SeqRow label="涨停数" seq={(traj.zt_seq ?? []).map((v) => (v == null ? '—' : String(v)))} tone="plain" />
                 <p className="text-sub text-[11.5px] mt-1 leading-relaxed">
                   序列按时间正序；`—` = 该日字段为空（盘前快照尚未落盘），非 0。
                 </p>
@@ -718,13 +734,13 @@ export function Component() {
                 {/* 情绪事件流 —— 「几点开始转暖/转衰」的唯一来源 */}
                 <div className="border-t border-line-faint pt-2">
                   <div className="text-[11px] text-sub mb-1">
-                    情绪事件流（{mem.event_log.length} 条）
+                    情绪事件流（{(mem.event_log ?? []).length} 条）
                   </div>
-                  {mem.event_log.length === 0 ? (
+                  {(mem.event_log ?? []).length === 0 ? (
                     <div className="text-sub text-[12px]">当日无情绪事件记录</div>
                   ) : (
                     <ul className="flex flex-col max-h-[220px] overflow-y-auto">
-                      {mem.event_log.map((e, i) => (
+                      {(mem.event_log ?? []).map((e, i) => (
                         <li
                           // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：事件流与时间轴严格对齐，同一时刻可能重复同一句话，用内容做 key 反而会撞。
                           key={i}
@@ -748,13 +764,13 @@ export function Component() {
                 {/* 当日推送台账 —— 「今天系统推过什么、推了几次」 */}
                 <div className="border-t border-line-faint pt-2">
                   <div className="text-[11px] text-sub mb-1">
-                    当日推送题材（{mem.pushed_topics.length} 条）
+                    当日推送题材（{(mem.pushed_topics ?? []).length} 条）
                   </div>
-                  {mem.pushed_topics.length === 0 ? (
+                  {(mem.pushed_topics ?? []).length === 0 ? (
                     <div className="text-sub text-[12px]">当日无题材推送</div>
                   ) : (
                     <ul className="flex flex-col gap-1.5">
-                      {mem.pushed_topics.map((t) => (
+                      {(mem.pushed_topics ?? []).map((t) => (
                         <li key={t.name} className="flex flex-col gap-0.5">
                           <div className="flex items-baseline gap-2">
                             <span className="text-[12.5px] font-semibold text-txt">{t.name}</span>

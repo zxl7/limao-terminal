@@ -12,7 +12,7 @@ import { cn } from '@/shared/lib'
  * 在 4K 上缩放后只是「移动端放大」。真正的 PC 终端（同花顺 / TradingView /
  * Bloomberg）是 **左侧栏导航 + 顶栏指挥条 + 满宽多列主区** 三段分区。
  *
- * 侧栏把 21 个入口按「实时 / 盘面 / 题材 / 决策 / 数据」分组，段头小标签 +
+ * 侧栏把 21 个入口按「实时 / 盘面 / 决策 / 题材 / 数据」分组，段头小标签 +
  * 实时段呼吸点，激活态左侧 `--color-up` 红条。改这一段即改变全站 21 页的
  * 导航外观，与页面内容解耦。
  *
@@ -24,7 +24,7 @@ import { cn } from '@/shared/lib'
  */
 
 /** 五段固定顺序（与 TABS 的分组一致，仅用于控制渲染次序与段头） */
-const GROUPS: TabGroup[] = ['实时', '盘面', '题材', '决策', '数据']
+const GROUPS: TabGroup[] = ['实时', '盘面', '决策', '题材', '数据']
 
 /** 段图标 —— 极简线性 SVG（currentColor 跟随侧栏文字色） */
 function GroupIcon({ group }: { group: TabGroup }) {

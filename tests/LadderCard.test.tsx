@@ -4,13 +4,11 @@
  * 覆盖五件事：
  *   1. 基线取 `yesterday_zt`（昨日收盘梯队），⛔ 不取 `latest.ladder`（当日 · 09:00 后被覆盖成空）；
  *   2. **涨停整行红** 这条 A股展示规则仍生效（最高板梯队标红）；
- *   3. 晋级标记走 `promote_codes`（**全量**）—— `promote_list` 截断前 8 不得影响判定；
- *   4. 反馈矩阵对照日 ≠ 梯队基线日时**不标晋级**（防张冠李戴）；
- *   5. 数据缺失 / 404 时降级为空态而非崩溃（盘前真实场景）。
+ *   3. 梯位只按同日逐票封单额 > 0 上移，不用涨停池晋级名单替代；
+ *   4. 反馈矩阵对照日 ≠ 梯队基线日时**不上移**（防张冠李戴）；
+ *   5. 同梯位只按今日首封时间排序，缺今日时间排后；缺数据时降级为空态。
  *
- * ⚠️ 第 3 条是**假阴性回归锁**：`promote_list` 是展示用的 `[:8]` 截断名单，
- *    一旦有人把判定改回用它，第 9 只之后的晋级票会被静默标成「未晋级」——
- *    不报错、不告警，只有这个断言能发现。
+ * ⚠️ 第 3 条锁定本卡的封单判定：涨停池名单与盘口封单口径不能混用。
  */
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
@@ -58,7 +56,7 @@ function yzt(date: string, rows: { code: string; name: string; boards: number }[
 }
 
 /** 昨日涨停反馈矩阵（/api/market/feedback）—— `promote_list` 故意只留 1 条（截断模拟） */
-function fb(prevDate: string, promoteCodes: string[]) {
+function fb(prevDate: string, promoteCodes: string[], sealedCodes = promoteCodes) {
   return {
     generated_ts: '2026-09-21 10:30:00',
     date: '2026-09-21',
@@ -67,6 +65,7 @@ function fb(prevDate: string, promoteCodes: string[]) {
     promote_list: promoteCodes.slice(0, 1).map((c) => ({ code: c, name: c, prev_boards: 2, pct: 10 })),
     promote_count: promoteCodes.length,
     promote_rate: 50,
+    quotes: Object.fromEntries(sealedCodes.map((code) => [code, { pct: 10, seal_yi: 1 }])),
     nuke_list: [],
   }
 }
@@ -97,7 +96,7 @@ describe('LadderCard · 昨日梯队 × 今日晋级', () => {
     vi.restoreAllMocks()
   })
 
-  it('渲染昨日梯队，最高板整行标红，头部给出「基线日 + 晋级 N/M」', async () => {
+  it('按封单移至晋级后的高度，最高梯位标红', async () => {
     mockRoutes({
       [ZT]: yzt('2026-09-18', [
         { code: '001', name: '华瓷股份', boards: 4 },
@@ -111,45 +110,76 @@ describe('LadderCard · 昨日梯队 × 今日晋级', () => {
     render(<LadderCard />, { wrapper: wrapper() })
 
     await waitFor(() => {
-      expect(screen.getByText('4板')).toBeInTheDocument()
+      expect(screen.getByText('5板')).toBeInTheDocument()
     })
 
-    // 最高板（4板）整行获得红色底；2 板行不标红
-    const topRow = screen.getByText('4板').closest('div') as HTMLElement
+    // 最高梯位（5板）整行获得红色底；原 4 板未上移者仍在 4 板行
+    const topRow = screen.getByText('5板').closest('div') as HTMLElement
     expect(topRow.className).toContain('bg-up-soft')
-    const lowerRow = screen.getByText('2板').closest('div') as HTMLElement
+    const lowerRow = screen.getByText('4板').closest('div') as HTMLElement
     expect(lowerRow.className).not.toContain('bg-up-soft')
 
-    // 头部：基线日 + 晋级统计（晋级 2 / 共 4）
+    // 头部：基线日 + 按封单上移数
     const text = document.body.textContent ?? ''
     expect(text).toContain('2026-09-18 梯队')
-    expect(text).toContain('晋级 2/4')
+    expect(text).toContain('封单上移 2 只')
+    expect(topRow.textContent).toContain('华瓷股份')
+    expect(lowerRow.textContent).toContain('锡华科技')
+    expect(screen.getByText('3板').closest('div')?.textContent).toContain('华软科技')
   })
 
-  it('⛔ 晋级判定走全量 promote_codes —— promote_list 截断不影响（假阴性回归锁）', async () => {
-    const rows = ['01', '02', '03', '04', '05', '06'].map((k, i) => ({
-      code: `00000${k}`,
-      name: `票${i + 1}`,
-      boards: 2,
-    }))
-    // 6 只昨日 2 板票，今日 5 只晋级 —— 而 promote_list 只带第 1 只（[:8] 之外的模拟）
+  it('只按封单大于零上移，涨停池晋级名单不能单独触发移动', async () => {
     mockRoutes({
-      [ZT]: yzt('2026-09-18', rows),
-      [FEEDBACK]: fb('2026-09-18', rows.slice(0, 5).map((r) => r.code)),
+      [ZT]: yzt('2026-09-18', [
+        { code: '001', name: '有封单票', boards: 2 },
+        { code: '002', name: '仅池内晋级票', boards: 2 },
+        { code: '003', name: '零封单票', boards: 2 },
+      ]),
+      [FEEDBACK]: {
+        ...fb('2026-09-18', ['002'], ['001']),
+        quotes: {
+          '001': { pct: 10, seal_yi: 1 },
+          '002': { pct: 10, seal_yi: null },
+          '003': { pct: 10, seal_yi: 0 },
+        },
+      },
     })
 
     const { container } = render(<LadderCard />, { wrapper: wrapper() })
-
-    await waitFor(() => {
-      expect(container.textContent).toContain('晋级 5/6')
-    })
-
-    // 5 个 ✓ 标记（若误用截断的 promote_list，这里只会是 1 个）
-    const ticks = [...container.querySelectorAll('span')].filter((el) => el.textContent === '✓')
-    expect(ticks, '✓ 数量应等于全量晋级数（用 promote_list 判定会退化成 1）').toHaveLength(5)
+    await waitFor(() => expect(container.textContent).toContain('封单上移 1 只'))
+    expect(screen.getByText('3板').closest('div')?.textContent).toContain('有封单票')
+    expect(screen.getByText('2板').closest('div')?.textContent).toContain('仅池内晋级票')
+    expect(screen.getByText('2板').closest('div')?.textContent).toContain('零封单票')
   })
 
-  it('⛔ 对照日与梯队基线日不同 → 一个晋级标记都不标（防张冠李戴）', async () => {
+  it('缺少封单行情时保持昨日梯位', async () => {
+    mockRoutes({
+      [ZT]: yzt('2026-09-18', [{ code: '001', name: '待确认票', boards: 2 }]),
+      [FEEDBACK]: { ...fb('2026-09-18', ['001']), quotes: undefined },
+    })
+
+    const { container } = render(<LadderCard />, { wrapper: wrapper() })
+    await waitFor(() => expect(screen.getByText('待确认票')).toBeInTheDocument())
+    expect(screen.getByText('2板').closest('div')?.textContent).toContain('待确认票')
+    expect(container.textContent).not.toContain('封单上移 1 只')
+  })
+
+  it('收盘后当前封单消失，仍保留当日已确认晋级的梯位', async () => {
+    mockRoutes({
+      [ZT]: yzt('2026-09-25', [{ code: '001', name: '收盘晋级票', boards: 3 }]),
+      [FEEDBACK]: {
+        ...fb('2026-09-25', ['001']),
+        quotes: { '001': { pct: 10, seal_yi: null, sealed_today: true, today_fbt: '093002' } },
+      },
+    })
+
+    render(<LadderCard />, { wrapper: wrapper() })
+    await waitFor(() => expect(screen.getByText('收盘晋级票')).toBeInTheDocument())
+    expect(screen.getByText('4板').closest('div')?.textContent).toContain('收盘晋级票')
+    expect(screen.queryByText('封0亿')).not.toBeInTheDocument()
+  })
+
+  it('⛔ 对照日与梯队基线日不同 → 不依据旧封单上移（防张冠李戴）', async () => {
     mockRoutes({
       [ZT]: yzt('2026-09-18', [
         { code: '001', name: '华瓷股份', boards: 4 },
@@ -164,8 +194,8 @@ describe('LadderCard · 昨日梯队 × 今日晋级', () => {
     await waitFor(() => {
       expect(container.textContent).toContain('2026-09-18 梯队')
     })
-    expect(container.textContent).not.toContain('晋级')
-    expect([...container.querySelectorAll('span')].some((el) => el.textContent === '✓')).toBe(false)
+    expect(screen.getByText('4板').closest('div')?.textContent).toContain('华瓷股份')
+    expect(container.textContent).not.toContain('封单上移')
   })
 
   it('首板不进天梯（连板梯队的口径是 ≥2 板）', async () => {
@@ -184,6 +214,49 @@ describe('LadderCard · 昨日梯队 × 今日晋级', () => {
     })
     expect(container.textContent).not.toContain('首板票')
     expect(container.textContent).not.toContain('1板')
+  })
+
+  it('昨首板封单大于零时进入同一张天梯的 2 板行', async () => {
+    mockRoutes({
+      [ZT]: yzt('2026-09-18', [
+        { code: '001', name: '连板票', boards: 3 },
+        { code: '002', name: '首板晋级票', boards: 1 },
+      ]),
+      [FEEDBACK]: fb('2026-09-18', ['002']),
+    })
+
+    render(<LadderCard />, { wrapper: wrapper() })
+    await waitFor(() => expect(screen.getByText('首板晋级票')).toBeInTheDocument())
+    expect(screen.getByText('2板').closest('div')?.textContent).toContain('首板晋级票')
+  })
+
+  it('同梯位按今日首封时间升序，昨日票没有今日时间则排后', async () => {
+    mockRoutes({
+      [ZT]: yzt('2026-09-18', [
+        { code: '001', name: '晚封票', boards: 2 },
+        { code: '002', name: '昨日三板未晋级', boards: 3 },
+        { code: '003', name: '早封票', boards: 2 },
+        { code: '004', name: '今日时间缺失票', boards: 2 },
+      ]),
+      [FEEDBACK]: {
+        ...fb('2026-09-18', []),
+        quotes: {
+          '001': { pct: 10, seal_yi: 1, today_fbt: '100105' },
+          '003': { pct: 10, seal_yi: 1, today_fbt: '092503' },
+          '004': { pct: 10, seal_yi: 1, today_fbt: null },
+        },
+      },
+    })
+
+    render(<LadderCard />, { wrapper: wrapper() })
+    await waitFor(() => expect(screen.getByText('早封票')).toBeInTheDocument())
+    const row = screen.getByText('3板').closest('div')?.textContent ?? ''
+    expect(row.indexOf('早封票')).toBeLessThan(row.indexOf('晚封票'))
+    expect(row.indexOf('晚封票')).toBeLessThan(row.indexOf('昨日三板未晋级'))
+    expect(row.indexOf('昨日三板未晋级')).toBeLessThan(row.indexOf('今日时间缺失票'))
+    expect(row).toContain('09:25:03')
+    expect(row).toContain('10:01:05')
+    expect(row).not.toContain('09:30:00')
   })
 
   it('梯队降序：板数高的在前', async () => {

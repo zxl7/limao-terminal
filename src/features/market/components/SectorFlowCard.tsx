@@ -29,12 +29,17 @@ export function SectorFlowCard() {
 
   return (
     <Card title="💰 板块资金与弱势板块" extra={<span className="text-[10.5px] font-normal text-sub">主力净额 · 亿元</span>}>
+      {risk?.stale ? (
+        <p role="status" className="m-0 mb-2 text-[11px] text-warn">本轮采集不完整，展示 {risk.asof?.slice(11, 19) ?? '上次'} 的完整板块快照。</p>
+      ) : risk?.ok === false ? (
+        <p role="status" className="m-0 mb-2 text-[11px] text-warn">板块数据采集不完整，以下仅为已取得的部分数据。</p>
+      ) : null}
       <div className="space-y-2.5">
         {flowGroups.map((group) => (
           <div key={group.label} role="group" aria-label={group.label}>
             <div className="mb-1.5 flex items-center justify-between text-[10.5px]">
               <span className={cn('font-medium', group.tone)}>{group.label}</span>
-              <span className="text-sub">前 {group.items.length} 项</span>
+              <span className="text-sub">{risk?.ok || risk?.stale ? `前 ${group.items.length} 项` : '数据未齐'}</span>
             </div>
             <BarList
               items={group.items}
@@ -43,7 +48,7 @@ export function SectorFlowCard() {
               bipolar
               barHeight={16}
               labelWidth={112}
-              emptyText={`暂无${group.label}数据`}
+              emptyText={risk?.ok || risk?.stale ? `暂无${group.label}数据` : `${group.label}数据暂不可用`}
             />
           </div>
         ))}
@@ -73,7 +78,7 @@ export function SectorFlowCard() {
           </div>
         ) : (
           <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-[11px] text-sub">
-            {risk?.ok ? '当前快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
+            {risk?.stale ? '上次完整快照暂无达到阈值的弱势板块' : risk?.ok ? '当前快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
           </p>
         )}
       </div>

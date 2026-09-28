@@ -71,12 +71,22 @@ for (const [route, def] of Object.entries(ROUTES)) {
       row.keys = probe && typeof probe === 'object' ? Object.keys(probe).slice(0, 14) : []
     }
 
-    // 记录最新 MTime（取目标文件或目录内最新文件）
+    // 新鲜度取路由实际匹配的文件；cache 目录里其他归档不能代表时间轴的更新时间。
     const abs = path.join(DATA_ROOT, def.file ?? def.dir ?? '')
     let probeAbs = abs
-    if (!def.file) {
+    if (def.dir && def.dirPattern && def.file) {
       try {
-        const names = fs.readdirSync(abs).sort()
+        const dirs = fs.readdirSync(path.join(DATA_ROOT, def.dir))
+          .filter((name) => new RegExp(def.dirPattern).test(name))
+          .sort()
+        if (dirs.length) probeAbs = path.join(DATA_ROOT, def.dir, dirs.at(-1), def.file)
+      } catch {
+        /* 日期目录不存在：mtime 留空 */
+      }
+    } else if (!def.file) {
+      try {
+        const pattern = new RegExp(def.pattern)
+        const names = fs.readdirSync(abs).filter((name) => pattern.test(name)).sort()
         if (names.length) probeAbs = path.join(abs, names.at(-1))
       } catch {
         /* 目录不存在：mtime 留空 */

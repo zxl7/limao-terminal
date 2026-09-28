@@ -87,6 +87,9 @@ const SectorRisk = z.object({
   inflow_top: z.array(SectorFlowLite).optional(),
   outflow_top: z.array(SectorFlowLite).optional(),
   ok: b.optional(),
+  stale: b.optional(),
+  asof: s.optional(),
+  error: s.optional(),
 })
 
 /** ⚠️ stocks 是**字符串数组**（实测），不是对象数组 —— 曾是最容易写错的一处 */
@@ -353,6 +356,9 @@ export const FeedbackMatrixSchema = z.object({
         price: nOrNull.optional(),
         /** 封单额（亿）· 仅真封板时非空 */
         seal_yi: nOrNull.optional(),
+        sealed_today: b.optional(),
+        /** 今日涨停池首封时间；不能使用昨日快照时间代替。 */
+        today_fbt: s.nullish(),
       }),
     )
     .optional(),

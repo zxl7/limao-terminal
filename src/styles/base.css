@@ -12,6 +12,8 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* 页面根层禁止越界回弹；卡片和主内容区仍按各自容器正常滚动。 */
+  overscroll-behavior: none;
 }
 
 body {

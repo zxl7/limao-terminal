@@ -34,6 +34,104 @@ export async function loader() {
   return null
 }
 
+/**
+ * 轮动候选的执行阶段。
+ *
+ * `confidence` 是上游的原始排序分，不能替代低回撤入场判断：当日已爆发、资金走弱或
+ * 大盘拖累的题材，即使分数高也不能排在埋伏机会之前。这里仅消费既有五因子，不改上游策略参数。
+ */
+type RotationStage = {
+  key: 'ambush' | 'confirm' | 'started' | 'invalid' | 'incomplete'
+  label: string
+  tone: 'up' | 'rec' | 'warn' | 'down' | 'neutral'
+  action: string
+  reason: string
+}
+
+function rotationStage(c: RotationCandidate): RotationStage {
+  const f = c.confidence_factors
+  const capitalReady = f.capital === 'inflow_rising'
+  const capitalWeak = ['inflow_fading', 'outflow_widening', 'outflow'].includes(f.capital)
+  const kline = String(f.kline ?? '')
+  const klineReady = kline.startsWith('stop_fall')
+  const klineMissing = !kline || kline === 'no_data'
+  const started = c.today_hot || f.phase === 'boom'
+
+  if (capitalWeak || f.market === false || c.zt_dir === 'falling') {
+    return { key: 'invalid', label: '回流失效', tone: 'down', action: '不介入', reason: '资金转弱、市场拖累或涨停方向转弱' }
+  }
+  if (started) {
+    return { key: 'started', label: '已启动', tone: 'warn', action: '只跟踪', reason: '题材已爆发或今日已动，不再属于提前埋伏' }
+  }
+  if (klineMissing || f.capital === 'no_data') {
+    return { key: 'incomplete', label: '数据待补', tone: 'neutral', action: '不介入', reason: '资金或K线证据缺失，不能把未知当作止跌' }
+  }
+  if (capitalReady && klineReady && c.catalyst_fresh && f.market === true) {
+    return { key: 'ambush', label: '埋伏就绪', tone: 'up', action: '候选优先', reason: '资金转入、K线止跌、催化新鲜，尚未启动' }
+  }
+  return { key: 'confirm', label: '等待确认', tone: 'rec', action: '观察', reason: '尚缺新催化、资金转入、K线止跌或大盘配合中的至少一项' }
+}
+
+const STAGE_ORDER: Record<RotationStage['key'], number> = {
+  ambush: 0,
+  confirm: 1,
+  started: 2,
+  invalid: 3,
+  incomplete: 4,
+}
+
+/**
+ * 题材生命周期只解释题材所处位置；`RotationStage` 单独回答当前是否值得放进埋伏漏斗。
+ * 两者不混用，避免把“爆发扩散”误读成“可提前埋伏”。
+ */
+type ThemeLifecycle = {
+  key: 'potential' | 'start' | 'boom' | 'cooling' | 'reflow-watch' | 'reflow-ambush' | 'reflow-confirm' | 'fade'
+  label: string
+  tone: 'up' | 'rec' | 'warn' | 'down' | 'neutral'
+  description: string
+}
+
+const LIFECYCLE_ORDER: ThemeLifecycle['key'][] = [
+  'potential',
+  'start',
+  'boom',
+  'cooling',
+  'reflow-watch',
+  'reflow-ambush',
+  'reflow-confirm',
+  'fade',
+]
+
+function themeLifecycle(c: RotationCandidate): ThemeLifecycle {
+  const f = c.confidence_factors
+  const phase = c.phase || f.phase
+  const stage = rotationStage(c)
+  const capitalWeak = ['inflow_fading', 'outflow_widening', 'outflow'].includes(f.capital)
+
+  if (capitalWeak || f.market === false || c.zt_dir === 'falling' || phase === 'dead' || phase === 'no-reentry') {
+    return { key: 'fade', label: '退潮失效', tone: 'down', description: '资金撤离或方向走弱，退出轮动观察' }
+  }
+  if (phase === 'boom') {
+    return { key: 'boom', label: '爆发扩散', tone: 'warn', description: '板块已集中走强，只跟踪强度与分歧' }
+  }
+  if (phase === '分歧' || phase === 'cooling') {
+    return { key: 'cooling', label: '分歧冷却', tone: 'neutral', description: '热度回落，等待止跌和资金回流' }
+  }
+  if (phase === 're-entry-candidate') {
+    if (stage.key === 'ambush') {
+      return { key: 'reflow-ambush', label: '回流埋伏', tone: 'up', description: '止跌、资金转入后，尚未启动的优先候选' }
+    }
+    if (c.today_hot) {
+      return { key: 'reflow-confirm', label: '回流确认', tone: 'rec', description: '已有价格响应，验证是否形成新一轮扩散' }
+    }
+    return { key: 'reflow-watch', label: '回流观察', tone: 'rec', description: '原主线出现回流线索，等待关键证据补齐' }
+  }
+  if (c.today_hot || c.zt_dir === 'new' || c.zt_dir === 'rising') {
+    return { key: 'start', label: '启动试盘', tone: 'rec', description: '出现初始价格响应，尚未确认爆发扩散' }
+  }
+  return { key: 'potential', label: '酝酿潜伏', tone: 'neutral', description: '题材仍在沉淀，暂不形成介入结论' }
+}
+
 export function Component() {
   const rot = useQuery(marketQueries.rotation())
   const d = rot.data
@@ -41,10 +139,38 @@ export function Component() {
 
   /** 候选列表：`d?.candidates ?? []` 每次渲染都会生成新数组，故显式 memo 稳定引用 */
   const candidates = useMemo(() => d?.candidates ?? [], [d])
-  /** 置信度降序 —— 与原系统排序口径一致 */
+  /**
+   * 先按执行阶段、再按原始分排序：低回撤埋伏必须排在爆发题材与失效题材之前。
+   * 同阶段仍保留上游 confidence 的相对顺序，避免在终端重写策略权重。
+   */
   const sorted = useMemo(
-    () => [...candidates].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0)),
+    () => [...candidates].sort((a, b) => {
+      const stageGap = STAGE_ORDER[rotationStage(a).key] - STAGE_ORDER[rotationStage(b).key]
+      return stageGap || (b.confidence ?? 0) - (a.confidence ?? 0)
+    }),
     [candidates],
+  )
+  const stageCounts = useMemo(() => {
+    const count = (key: RotationStage['key']) => candidates.filter((c) => rotationStage(c).key === key).length
+    return {
+      ambush: count('ambush'),
+      confirm: count('confirm'),
+      started: count('started'),
+      invalid: count('invalid'),
+      incomplete: count('incomplete'),
+    }
+  }, [candidates])
+  const lifecycleCounts = useMemo(() => {
+    const count = (key: ThemeLifecycle['key']) => candidates.filter((c) => themeLifecycle(c).key === key).length
+    return Object.fromEntries(LIFECYCLE_ORDER.map((key) => [key, count(key)])) as Record<ThemeLifecycle['key'], number>
+  }, [candidates])
+  /** 生命周期顺序展示；同一阶段内仍按原始排序分保留上游相对强弱。 */
+  const lifecycleGroups = useMemo(
+    () => LIFECYCLE_ORDER.map((key) => {
+      const rows = sorted.filter((c) => themeLifecycle(c).key === key)
+      return rows.length ? { lifecycle: themeLifecycle(rows[0]), rows } : null
+    }).filter((group): group is { lifecycle: ThemeLifecycle; rows: RotationCandidate[] } => group != null),
+    [sorted],
   )
 
   const mc = d?.market_context
@@ -100,13 +226,17 @@ export function Component() {
           <CardBadge
             tone={sentiment == null ? 'neutral' : sentiment >= 6 ? 'up' : sentiment <= 2 ? 'down' : 'neutral'}
           >
-            情绪 {n1(sentiment)} · 涨停 {mc?.zt_count_today ?? '—'}
+            轮动快照 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}
           </CardBadge>
         }
       >
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
           <StatPair label="数据日" value={d?.date ?? '—'} />
           <StatPair label="回流候选" value={candidates.length} />
+          <StatPair label="埋伏就绪" value={stageCounts.ambush} tone="up" />
+          <StatPair label="等待确认" value={stageCounts.confirm} tone="rec" />
+          <StatPair label="已启动" value={stageCounts.started} tone="warn" />
+          <StatPair label="回流失效" value={stageCounts.invalid} tone="down" />
           <StatPair label="晋级率" value={mc ? `${n1(mc.promote_rate)}%` : '—'} />
           <StatPair
             label="核按钮"
@@ -118,6 +248,7 @@ export function Component() {
           <StatPair label="涨停源" value={d?.data_meta?.zt_source ?? '—'} />
         </div>
         {d?.note && <p className="text-sub text-[11.5px] leading-relaxed">{d.note}</p>}
+        {d?.generated_ts && <p className="text-warn text-[11.5px] leading-relaxed">本页轮动候选与资金榜取自 {d.generated_ts.replace('T', ' ').slice(0, 19)} 的快照，盘中变化以“盘中实时”页的当前快照为准。</p>}
         {!rot.isLoading && !d && (
           <EmptyState text="题材轮动数据未生成" hint="cache/rotation.json 缺失" />
         )}
@@ -133,7 +264,7 @@ export function Component() {
         extra={
           <SegTabs
             items={[
-              { key: 'reflow', label: `回流候选 (${sorted.length})` },
+              { key: 'reflow', label: `埋伏漏斗 (${sorted.length})` },
               { key: 'trend', label: `涨停趋势 (${d?.sector_zt_trends?.length ?? 0})` },
               { key: 'flow', label: '5日资金' },
               { key: 'avoid', label: `规避 (${d?.avoidance_sweep?.length ?? 0})` },
@@ -145,9 +276,21 @@ export function Component() {
       >
         {tab === 'reflow' && (
           <div className="flex flex-col gap-2">
-            {sorted.length === 0 && <EmptyState text="当前无回流候选" />}
-            {sorted.map((c) => (
-              <ReflowRow key={c.theme} c={c} />
+            {sorted.length === 0 && <EmptyState text="当前无轮动候选" />}
+            {sorted.length > 0 && (
+              <ThemeLifecycleFunnel counts={lifecycleCounts} />
+            )}
+            {lifecycleGroups.map(({ lifecycle, rows }) => (
+              <div key={lifecycle.key} className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-baseline gap-x-2 text-[12px] pt-1.5 border-t border-line-faint first:border-t-0 first:pt-0">
+                  <Tag tone={lifecycle.tone}>{lifecycle.label}</Tag>
+                  <span className="text-sub">{lifecycle.description}</span>
+                  <span className="num text-sub">{rows.length} 个</span>
+                </div>
+                {rows.map((c) => (
+                  <ReflowRow key={c.theme} c={c} stage={rotationStage(c)} lifecycle={themeLifecycle(c)} />
+                ))}
+              </div>
             ))}
             {sorted.length > 0 && (
               <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5">
@@ -326,7 +469,7 @@ export function Component() {
         </Zone>
 
         <Zone label="当日资金" dot="bg-up" className="xl:w-[38%]">
-          <Card title="当日板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
+          <Card title="快照板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
         {todayDuel.length > 0 && (
           <div className="mb-3">
             <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
@@ -352,8 +495,42 @@ export function Component() {
   )
 }
 
+/** 生命周期总览：按时间顺序呈现，数值为当前候选落在该阶段的数量。 */
+function ThemeLifecycleFunnel({ counts }: { counts: Record<ThemeLifecycle['key'], number> }) {
+  const steps: ThemeLifecycle[] = [
+    { key: 'potential', label: '酝酿潜伏', tone: 'neutral', description: '沉淀' },
+    { key: 'start', label: '启动试盘', tone: 'rec', description: '试强' },
+    { key: 'boom', label: '爆发扩散', tone: 'warn', description: '扩散' },
+    { key: 'cooling', label: '分歧冷却', tone: 'neutral', description: '降温' },
+    { key: 'reflow-watch', label: '回流观察', tone: 'rec', description: '等证据' },
+    { key: 'reflow-ambush', label: '回流埋伏', tone: 'up', description: '优先候选' },
+    { key: 'reflow-confirm', label: '回流确认', tone: 'rec', description: '验扩散' },
+    { key: 'fade', label: '退潮失效', tone: 'down', description: '退出' },
+  ]
+
+  return (
+    <div className="border border-line rounded-sm px-2.5 py-2">
+      <div className="text-[12px] font-semibold mb-1.5">题材生命周期</div>
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
+        {steps.map((step, index) => (
+          <span key={step.key} className="inline-flex items-center gap-1">
+            {index > 0 && <span className="text-sub text-[11px]">→</span>}
+            <span className={cn('inline-flex items-baseline gap-1 px-1.5 py-0.5 border rounded-sm text-[11.5px]',
+              step.tone === 'up' ? 'text-up border-up' : step.tone === 'down' ? 'text-down border-down' : step.tone === 'rec' ? 'text-rec border-rec' : step.tone === 'warn' ? 'text-warn border-warn' : 'text-sub border-line')}>
+              {step.label}<b className="num">{counts[step.key]}</b>
+            </span>
+          </span>
+        ))}
+      </div>
+      <p className="text-sub text-[11px] leading-relaxed mt-1.5">
+        “回流埋伏”需同时满足资金转入、K线止跌、催化新鲜、大盘配合且尚未启动；“回流确认”已有价格响应，等待扩散验证。
+      </p>
+    </div>
+  )
+}
+
 /** 回流候选单行卡片 —— 字段多且分四因子，横向铺开比塞进表格更易读 */
-function ReflowRow({ c }: { c: RotationCandidate }) {
+function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: RotationStage; lifecycle: ThemeLifecycle }) {
   const f = c.confidence_factors
   const [open, setOpen] = useState(false)
 
@@ -367,9 +544,14 @@ function ReflowRow({ c }: { c: RotationCandidate }) {
         >
           {open ? '▾' : '▸'} {c.theme}
         </button>
+        <Tag tone={lifecycle.tone}>{lifecycle.label}</Tag>
+        <Tag tone={stage.tone}>{stage.label}</Tag>
+        <span className={cn('text-[11.5px] font-semibold', stage.tone === 'up' ? 'text-up' : stage.tone === 'down' ? 'text-down' : 'text-sub')}>
+          {stage.action}
+        </span>
         <Tag tone={c.catalyst_fresh ? 'up' : 'neutral'}>{c.catalyst_fresh ? '新催化' : '催化已旧'}</Tag>
         <Tag tone={c.today_hot ? 'up' : 'neutral'}>{c.today_hot ? '今日已动' : '今日未动'}</Tag>
-        <StatPair label="置信度" value={n1(c.confidence)} tone={c.confidence >= 60 ? 'up' : 'sub'} />
+        <StatPair label="原始排序分" value={n1(c.confidence)} tone={c.confidence >= 60 ? 'up' : 'sub'} />
         <StatPair label="冷却" value={`${c.cooled_days} 日`} />
         <StatPair label="爆发日" value={c.boom_day ?? '—'} />
         <StatPair label="爆发涨停" value={c.boom_zt ?? '—'} />
@@ -410,6 +592,13 @@ function ReflowRow({ c }: { c: RotationCandidate }) {
         </span>
         <span>涨停方向 {ztDirText(c.zt_dir)}</span>
         <span>有效日 {c.zt_valid_days}</span>
+      </div>
+
+      <div className="mt-1 text-[12px] leading-relaxed">
+        <span className={stage.tone === 'up' ? 'text-up' : stage.tone === 'down' ? 'text-down' : 'text-sub'}>
+          {stage.label}：
+        </span>
+        {stage.reason}
       </div>
 
       {c.trigger && (

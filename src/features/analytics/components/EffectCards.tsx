@@ -41,11 +41,13 @@ const fmtPct = (v: number | null, digits = 1): string =>
 /** 轴位刻度条：把 `level ∈ [-2, +2]` 画成一条带游标的横条（⛔ 不显示「分」，避免伪精确） */
 function AxisMeter({ level, axis, tier }: { level: number | null; axis: 'gain' | 'loss'; tier: Tier }) {
   const tone = axisTone(axis, tier)
+  // 赚钱侧看强弱，亏钱侧看压力高低；同一端点不能都写「强」，会把风险读反。
+  const edge = axis === 'gain' ? ['弱', '强'] : ['低', '高']
   /** `[-2,2]` → `[0,100]%` 的横向位置 */
   const pos = level == null ? 50 : ((Math.max(-2, Math.min(2, level)) + 2) / 4) * 100
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <span className="text-[10px] text-sub flex-none">弱</span>
+      <span className="text-[10px] text-sub flex-none">{edge[0]}</span>
       <div className="relative h-1.5 flex-1 min-w-[80px] rounded-full bg-line-faint">
         {/* 中位（0 轴）刻度 */}
         <span className="absolute top-[-2px] h-[10px] w-px bg-line" style={{ left: '50%' }} />
@@ -54,9 +56,15 @@ function AxisMeter({ level, axis, tier }: { level: number | null; axis: 'gain' |
           style={{ left: `calc(${pos}% - 2px)` }}
         />
       </div>
-      <span className="text-[10px] text-sub flex-none">强</span>
+      <span className="text-[10px] text-sub flex-none">{edge[1]}</span>
     </div>
   )
+}
+
+/** 亏钱轴的相同档位改用“压力”语义，避免“亏钱效应强”造成歧义。 */
+function axisWord(kind: 'gain' | 'loss', word: string): string {
+  if (kind === 'gain') return word
+  return ({ 强: '高', 偏强: '偏高', 中性: '中等', 偏弱: '偏低', 弱: '低' } as Record<string, string>)[word] ?? '—'
 }
 
 /** 单轴（赚钱 / 亏钱）：大定性词 + 轴位条 + 原始读数表 */
@@ -78,7 +86,7 @@ function AxisBlock({
       <div className="flex items-baseline gap-2 flex-wrap min-w-0">
         <span className="text-[12.5px] font-semibold text-txt flex-none">{title}</span>
         <span className={cn('text-[20px] font-semibold leading-none flex-none', TONE_TEXT[tone])}>
-          {axis.word}
+          {axisWord(kind, axis.word)}
         </span>
         <span className="text-sub text-[10.5px] min-w-0 break-all">{hint}</span>
       </div>
@@ -98,7 +106,7 @@ function AxisBlock({
             ),
           },
           {
-            label: '今日',
+            label: '当前读数',
             num: true,
             cell: (r) => (
               <span
@@ -143,14 +151,14 @@ export function EffectAxesCard({ axes }: { axes: EffectAxes }) {
         <AxisBlock
           axis={axes.gain}
           kind="gain"
-          title="赚钱效应"
-          hint="昨涨停池今日的上行侧（涨得多 / 基数大 = 更强）"
+          title="赚钱回报"
+          hint="昨天涨停票今天能否给出上行回报"
         />
         <AxisBlock
           axis={axes.loss}
           kind="loss"
-          title="亏钱效应"
-          hint="昨涨停池今日的下行侧（核按钮 / 破位多 = 更强）"
+          title="亏钱压力"
+          hint="昨天涨停票今天的核按钮、破位与炸板风险"
         />
       </div>
 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { EbbBanner, ExtremeCard, FeedbackCard, LadderCard, LeadersCard, SectorFlowCard, SignalRail, ThemeTopCard, marketQueries } from '@/features/market'
+import { EbbBanner, ExtremeCard, LadderCard, LeadersCard, SectorFlowCard, SignalRail, ThemeTopCard, marketQueries } from '@/features/market'
 import { IntradayMoodCard } from '@/features/analytics'
 import { Zone } from '@/shared/ui'
 import { cn } from '@/shared/lib'
@@ -24,10 +24,10 @@ export async function loader() {
  * ```
  *
  * · **左栏 4 张 = 2×2 均分**（`grid xl:grid-cols-2`）—— 都是「当刻盘面与标的」，需要宽度；
- * · **中栏 = 反馈与信号(FeedbackCard) + 连板天梯 + 极值名单** —— 纵向堆叠；
+ * · **中栏 = 连板天梯（含晋级）+ 极值名单（含核按钮）** —— 纵向堆叠；
  * · **最右「信号」rail = 固定 10% 窄列**（`SignalRail`）—— 只放紧凑版短线精灵列表，
  *   按信号 `type` 着色（涨停/接近涨停=红、快速拉升=紫、打开涨停板=橙、打开跌停=青）。
- *   09-22 起**不再折叠**、**不再显示反馈 4 数字条**（与中区 FeedbackCard 重复）。
+ *   09-22 起**不再折叠**、**不再显示反馈 4 数字条**（与中区两张融合卡重复）。
  *
  * ⚠️ 左栏内部**不能用 `Board`** —— 它按**视口**断点给列数（≥1920 直接 4 列），
  *    放进栏里会得到 4 张 ~270px 的窄卡（表格必挤）。栏内均分用显式 2 列网格。
@@ -39,12 +39,21 @@ const ZONE_RAIL = 'xl:w-[10%]'
 
 export function Component() {
   const { data, isPending, isError } = useQuery(marketQueries.latest())
+  // 量能与广度缺失是上游明确的未知值，提示用户不要把空白当作盘面为零。
+  const missingMarket = data?.market == null
+  const missingBreadth = data?.breadth?.up == null || data?.breadth?.down == null
+  const missingParts = [missingMarket && '两市成交额', missingBreadth && '全市场涨跌家数'].filter(Boolean).join('、')
 
   return (
     <div className="flex flex-col gap-3">
       {(isPending || isError || !data) && (
         <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-[12px] text-warn">
           {isPending ? '正在加载主快照…' : isError ? data ? '主快照更新失败，相关卡片保留上次数据；空白项不能视为零值。' : '主快照加载失败，暂无法确认盘面与风险状态。' : '主快照尚未提供，暂无法确认盘面与风险状态。'}
+        </p>
+      )}
+      {data && missingParts && (
+        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-[12px] text-warn">
+          当前快照 {data.ts.slice(11, 19)}：{missingParts}未采集到，量能与广度判断不完整。
         </p>
       )}
       {/* 退潮预警通栏 —— 层级高于所有卡片（有预警才渲染，无预警不占位）。
@@ -67,7 +76,7 @@ export function Component() {
         </Zone>
 
         <Zone label="反馈与信号" dot="bg-down" className={cn('min-w-0', ZONE_MID)}>
-          <FeedbackCard />
+          {/* 昨日涨停反馈分别并入天梯与极值，避免同一指标在三张卡里重复。 */}
           <LadderCard />
           <ExtremeCard />
         </Zone>

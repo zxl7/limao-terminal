@@ -92,6 +92,11 @@ export interface SectorRisk {
   inflow_top: SectorFlowLite[]
   outflow_top: SectorFlowLite[]
   ok: boolean
+  /** 本轮采集失败时沿用同交易日最近一次完整结果。 */
+  stale?: boolean
+  /** 完整板块快照的生成时间。 */
+  asof?: string
+  error?: string
 }
 
 /** 连板天梯：一组同板数的股票（⚠️ 仅股票名，非对象） */
@@ -410,6 +415,10 @@ export interface QuoteItem {
   price?: number | null
   /** 封单额（亿）· 仅真封板时非空 */
   seal_yi?: number | null
+  /** 当日曾确认封板；收盘后盘口封单消失时仍保留该事实。 */
+  sealed_today?: boolean
+  /** 今日涨停池首封时间，HHMMSS；无今日涨停记录时为空。 */
+  today_fbt?: string | null
 }
 
 export interface TrendHistoryItem {
@@ -1439,7 +1448,10 @@ export interface EmotionDay {
   max_boards: number | null
   /** 是否冰点种子日 */
   seed: boolean
-  main_themes: string[]
+  /**
+   * 日频归档早期记录可能未生成题材聚合；缺失表示无可用归因，不能当作空题材或 0。
+   */
+  main_themes?: string[]
 }
 
 /** 3 日窗转折信号 —— `ebb_warn` = 假修复，`repair_warn` = 修复前兆 */

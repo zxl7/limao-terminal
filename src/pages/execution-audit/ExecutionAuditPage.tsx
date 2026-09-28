@@ -7,7 +7,10 @@ import { Card, CardBadge, EmptyState } from '@/shared/ui'
 
 /** 真实执行审计：候选预测、题材/连板研究与账户收益不在此页混算。 */
 export async function loader() {
-  await queryClient.ensureQueryData(analyticsQueries.decisionExecutionAudit())
+  // 审计产物按日生成；生成窗口内不可用只能显示页内空态，不能阻断整个终端。
+  await Promise.allSettled([
+    queryClient.ensureQueryData(analyticsQueries.decisionExecutionAudit()),
+  ])
   return null
 }
 
@@ -58,13 +61,13 @@ export function Component() {
           dense
           empty="尚无已入场且有收益的记录"
           columns={[
-            { key: 'recommendation_date', title: '推荐日' },
-            { key: 'trade_date', title: '执行日' },
-            { key: 'name', title: '标的', render: (row) => `${row.name} ${row.code}` },
-            { key: 'bucket', title: '候选池' },
-            { key: 'caliber', title: '裁决口径', render: (row) => <Tag tone={row.caliber === 'ai' ? 'up' : 'warn'}>{row.caliber}</Tag> },
-            { key: 'gross_return_pct', title: '竞价至收盘', render: (row) => row.gross_return_pct == null ? '—' : `${row.gross_return_pct >= 0 ? '+' : ''}${row.gross_return_pct.toFixed(2)}%` },
-            { key: 'evidence', title: '证据完整性' },
+            { label: '推荐日', cell: (row) => row.recommendation_date },
+            { label: '执行日', cell: (row) => row.trade_date },
+            { label: '标的', cell: (row) => `${row.name} ${row.code}` },
+            { label: '候选池', cell: (row) => row.bucket },
+            { label: '裁决口径', cell: (row) => <Tag tone={row.caliber === 'ai' ? 'up' : 'warn'}>{row.caliber}</Tag> },
+            { label: '竞价至收盘', num: true, cell: (row) => row.gross_return_pct == null ? '—' : `${row.gross_return_pct >= 0 ? '+' : ''}${row.gross_return_pct.toFixed(2)}%` },
+            { label: '证据完整性', cell: (row) => row.evidence },
           ]}
         />
       </Card>

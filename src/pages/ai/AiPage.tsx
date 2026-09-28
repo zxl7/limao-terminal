@@ -110,11 +110,42 @@ function ChangeBlock({
   )
 }
 
-function ChangeRow({ title, tone, children }: { title: string; tone: 'warn' | 'rec' | 'sub'; children: ReactNode }) {
+function ChangeRow({
+  title,
+  tone,
+  pct: pctVal,
+  children,
+}: {
+  title: string
+  tone: 'warn' | 'rec' | 'sub'
+  /** 个股涨跌幅度（今晨竞价涨幅 %）—— 缺数据时留空，不退化成 0 */
+  pct?: number | null
+  children: ReactNode
+}) {
   return (
     <div className="min-w-0 border-l-2 border-line pl-2">
-      <div className={cn('truncate text-[11.5px] font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')} title={title}>{title}</div>
-      <div className="line-clamp-2 text-[10.5px] leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>{children}</div>
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span
+          className={cn('truncate text-[11.5px] font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')}
+          title={title}
+        >
+          {title}
+        </span>
+        {pctVal != null && (
+          <span
+            className={cn(
+              'num flex-none text-[11px] font-semibold',
+              pctVal > 0 ? 'text-up' : pctVal < 0 ? 'text-down' : 'text-sub',
+            )}
+          >
+            {pctVal > 0 ? '+' : ''}
+            {pctVal.toFixed(2)}%
+          </span>
+        )}
+      </div>
+      <div className="line-clamp-2 text-[10.5px] leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -294,28 +325,28 @@ export function Component() {
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
             <ChangeBlock label="地位靠前" empty="暂无身份变化" tone="warn">
               {decisionChanges.roleRows.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone={ROLE_TONE[role]}>
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone={ROLE_TONE[role]} pct={row.call?.gapPct}>
                   {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '周期证据待积累'}
                 </ChangeRow>
               ))}
             </ChangeBlock>
             <ChangeBlock label="二进三竞争" empty="暂无完整竞争记录" tone="rec">
               {decisionChanges.competition.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec">
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec" pct={row.call?.gapPct}>
                   {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '竞争结果待确认'}
                 </ChangeRow>
               ))}
             </ChangeBlock>
             <ChangeBlock label="新老接力线索" empty="暂无接力线索" tone="rec">
               {decisionChanges.succession.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec">
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec" pct={row.call?.gapPct}>
                   {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '后续表现待确认'}
                 </ChangeRow>
               ))}
             </ChangeBlock>
             <ChangeBlock label="AI与机械差异" empty="暂无需要关注的差异" tone="sub">
               {decisionChanges.mechanical.slice(0, 3).map((row) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · 昨预案 ${biasText(row.bias ?? '')}`} tone="sub">
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · 昨预案 ${biasText(row.bias ?? '')}`} tone="sub" pct={row.call?.gapPct}>
                   {shortReason(row.call?.mechanicalLeaderNote) ?? `今晨裁决：${viewText(row.call?.view ?? '')}`}
                 </ChangeRow>
               ))}

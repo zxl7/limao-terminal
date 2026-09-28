@@ -11,20 +11,24 @@ import {
   EffectAxesCard,
   EffectScenarioCard,
   EffectTrendCard,
-  EffectWindowCard,
   NextDayProjectionCard,
   projectNextDay,
+  StatPair,
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge } from '@/shared/ui'
+
+/** 亏钱轴用压力高低表达，避免“亏钱效应强”在总览中被误读成正向结论。 */
+function lossWord(word: string): string {
+  return ({ 强: '高', 偏强: '偏高', 中性: '中等', 偏弱: '偏低', 弱: '低' } as Record<string, string>)[word] ?? '—'
+}
 
 /**
  * 赚钱效应 / 亏钱效应 研判页（`/effect` · 2026-09-23 立项）。
  *
  * ## 这一页回答什么
  *
- * 昨天出手的人，今天赚了还是亏了；以及从今天这个局面往后看，**条件期望**是什么。
- * 时间窗 8 格：`T-3 / T-2 / T-1 → T → T+1 / T+2 / T+3 / T+4`。
+ * 昨天出手的人，今天赚了还是亏了；以及今天的涨停结构，明天能提供什么条件基线。
  *
  * ## 三份数据各管一段（⛔ 不要混读）
  *
@@ -99,9 +103,9 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ── Hero 通栏：8 日窗口条（实线=事实 / 虚线=推演）+ 当日定性 ── */}
+      {/* ── 先定义统计对象：避免用户把赚钱效应误读成指数或预测 ── */}
       <Card
-        title="📈 赚钱效应 · 亏钱效应"
+        title="💸 赚钱效应｜昨日涨停的今日反馈"
         extra={
           <div className="flex items-center gap-2">
             <CardBadge>
@@ -113,35 +117,51 @@ export function Component() {
         {err ? (
           <div className="text-down text-[12px] py-2">数据不可用：{String((err as Error).message ?? err)}</div>
         ) : (
-          <EffectWindowCard history={history} axes={axes} />
+          <>
+            <p className="text-[13px] leading-relaxed text-txt">
+              统计对象固定为<b>昨日涨停池</b>：今天上涨、给出溢价的是赚钱回报；核按钮、破位和炸板形成亏钱压力。这里不判断指数涨跌，也不直接预测明天。
+            </p>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+              <StatPair label="昨日涨停池" value={`${axes.basis.prevZtCount ?? '—'} 只`} />
+              <StatPair label="今日涨停" value={`${axes.basis.nowZtCount ?? '—'} 只`} tone="up" />
+              <StatPair label="今日晋级" value={`${axes.basis.promoteCount ?? '—'} 只`} tone="up" />
+              <StatPair label="赚钱回报" value={axes.gain.word} tone="up" />
+              <StatPair label="亏钱压力" value={lossWord(axes.loss.word)} tone="down" />
+            </div>
+          </>
         )}
-        <p className="mt-2 text-[11.5px] text-sub leading-relaxed">
-          当日情绪 <span className="num text-txt">{sentiment}</span> · 数据仅供参考，不构成投资建议。
+        <p className="mt-3 text-[11.5px] text-sub leading-relaxed">
+          当前情绪 <span className="num text-txt">{sentiment}</span>。先读“赚钱回报”和“亏钱压力”是否同步恶化，再看历史与下一交易日的条件基线。
         </p>
       </Card>
 
-      {/* ── 主体：左 60% 事实（当日 + 历史） / 右 40% 推演（次日 + 情景）── */}
+      {/* 第一步是今日事实，第二步才是基于今日涨停结构的统计基线。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">
         <div className="xl:w-[60%] xl:flex-none min-w-0 flex flex-col gap-3">
-          <Card title="当日双轴" extra={<CardBadge>昨涨停池今日表现</CardBadge>}>
+          <Card title="① 今天：赚钱回报与亏钱压力" extra={<CardBadge>实时反馈</CardBadge>}>
             <EffectAxesCard axes={axes} />
-          </Card>
-          <Card
-            title="历史窗口"
-            extra={<CardBadge>{history.length} 个交易日</CardBadge>}
-          >
-            <EffectTrendCard points={history} />
           </Card>
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col gap-3">
           <Card
-            title="次日条件期望"
-            extra={<CardBadge>统计期望 · 非预测</CardBadge>}
+            title="② 下一交易日：今日结构的统计基线"
+            extra={<CardBadge>条件期望 · 非预测</CardBadge>}
           >
             <NextDayProjectionCard projection={projection} />
           </Card>
-          <Card title="未来三情景" extra={<CardBadge>T+2 ~ T+4</CardBadge>}>
+        </div>
+      </div>
+
+      {/* 历史只回答“在改善还是恶化”；情景只列观察条件，避免与当日事实混读。 */}
+      <div className="flex gap-3 items-start max-xl:flex-col">
+        <div className="xl:w-[60%] xl:flex-none min-w-0">
+          <Card title="③ 过去几日：赚钱环境在改善还是恶化" extra={<CardBadge>{history.length} 个已落盘交易日</CardBadge>}>
+            <EffectTrendCard points={history} />
+          </Card>
+        </div>
+        <div className="flex-1 min-w-0">
+          <Card title="④ 后续只盯这三类条件" extra={<CardBadge>T+2 ~ T+4</CardBadge>}>
             <EffectScenarioCard scenarios={scenarios} />
           </Card>
         </div>
