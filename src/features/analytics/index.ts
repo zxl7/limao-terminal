@@ -32,7 +32,7 @@ export { CardArchiveView, cardDate, type ArchiveCard } from './components/CardAr
 export { DossierView } from './components/DossierView'
 
 // AI 台账「判断明细」= AI 判断 × 尾盘财富密码接力卡真实字段（区间/量能/指标/标签/理由）
-export { AiJudgeDetail, type JudgeCall, type JudgeRow } from './components/AiJudgeDetail'
+export { AiJudgeDetail, compareJudgeRows, type JudgeCall, type JudgeRow } from './components/AiJudgeDetail'
 
 // 自动化任务台账解析（`config/tasks.yaml` 原文 → 条目 · 只解析所需子集）
 export { parseTaskLedger } from './lib/task-ledger'

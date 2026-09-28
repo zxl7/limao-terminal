@@ -67,8 +67,8 @@ export function Component() {
         </Zone>
 
         <Zone label="反馈与信号" dot="bg-down" className={cn('min-w-0', ZONE_MID)}>
-          <LadderCard />
           <FeedbackCard />
+          <LadderCard />
           <ExtremeCard />
         </Zone>
 

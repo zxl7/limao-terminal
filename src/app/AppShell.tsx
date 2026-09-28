@@ -89,6 +89,7 @@ export const TABS: readonly TabDef[] = [
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
   { to: '/auction', label: '竞价决策', group: '决策' },
+  { to: '/execution-audit', label: '执行审计', group: '决策' },
 
   // ── 段5 · 数据与运维（日频）──
   { to: '/record', label: '数据记录', group: '数据' },

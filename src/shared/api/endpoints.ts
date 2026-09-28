@@ -30,6 +30,7 @@ import type {
   DecisionManifest,
   DecisionDossier,
   EmotionSummary5D,
+  ExecutionAudit,
   EngineStateFile,
   EruptionDay,
   FeedbackMatrix,
@@ -122,6 +123,7 @@ export interface RouteTypeMap {
   //    实际结构里没有 `candidates` 数组，渲染会直接读到 undefined。
   '/api/decision/candidates': DatedFile<DecisionDossier>[]
   '/api/decision/latest': DecisionDossier
+  '/api/decision/execution-audit': ExecutionAudit
   '/api/decision/auction-history': DatedFile<Record<string, unknown>>[]
   '/api/decision/archive': DatedFile<DecisionDossier>[]
   '/api/decision/zt-pool': ZtPoolSnapshot
@@ -288,6 +290,8 @@ export const api = {
   decisionCandidates: () => fetchRoute('/api/decision/candidates'),
   /** 最新一期决策档案（完整字段：环境 / 接力池 / 观察池 / 早鸟 / 旁白） */
   decisionLatest: () => fetchRoute('/api/decision/latest'),
+  /** 实际执行证据链：候选、竞价、裁决与账户收益分开留存。 */
+  decisionExecutionAudit: () => fetchRoute('/api/decision/execution-audit'),
   /** 竞价报价存档 */
   decisionAuctionHistory: () => fetchRoute('/api/decision/auction-history'),
   /** 决策黑匣子存档 */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fireEvent, render } from '@testing-library/react'
-import { AiJudgeDetail, type JudgeRow } from '@/features/analytics'
+import { AiJudgeDetail, compareJudgeRows, type JudgeRow } from '@/features/analytics'
 import type { DossierStock } from '@/shared/api'
 
 /**
@@ -107,6 +107,30 @@ const callRow: JudgeRow = {
 }
 
 describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
+  it('同一 AI 裁决档内，板块龙和空间高度优先于低位高分票', () => {
+    const leader = { ...stock, code: '000001', name: '高度龙', boards: 3, is_sector_dragon: true, score: 45 } as DossierStock
+    const follower = { ...stock, code: '000002', name: '低位高分', boards: 2, is_sector_dragon: true, score: 90 } as DossierStock
+    const rows: JudgeRow[] = [
+      { code: follower.code, view: 'watch', stock: follower },
+      { code: leader.code, view: 'watch', stock: leader },
+    ]
+    expect([...rows].sort(compareJudgeRows).map((item) => item.code)).toEqual(['000001', '000002'])
+  })
+
+  it('历史normal强龙复核提示不展示，硬否决降级提示保留', () => {
+    const historical: JudgeRow = {
+      ...callRow,
+      biasWarning: 'AI 判 normal，但机械证据显示是强龙（接力池第1·09:30秒板）→ 与接力池排名背离，请复核',
+    }
+    const hardVeto: JudgeRow = {
+      ...row,
+      code: '000001',
+      biasWarning: 'AI 原判 avoid，但候选无四类硬伤 → 已降级 normal',
+    }
+    const { queryByText, getByText } = render(<AiJudgeDetail rows={[historical, hardVeto]} />)
+    expect(queryByText(/与接力池排名背离/)).toBeNull()
+    expect(getByText(/已降级 normal/)).toBeTruthy()
+  })
   it('① 名称 + 代码同时出现（⛔ 不能只显示代码）', () => {
     const { container } = render(<AiJudgeDetail rows={[row]} />)
     const txt = container.textContent ?? ''
@@ -174,8 +198,8 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
     expect(container.textContent).toContain('该日无 AI 判断记录')
   })
 
-  it('⑨b bias 越权兜底留痕必须显示（否则等于没兜住）', () => {
-    const { container } = render(
+  it('⑨b 历史 normal + 强龙复核提示静默隐藏，硬否决降级提示仍显示', () => {
+    const oldLeaderWarning = render(
       <AiJudgeDetail
         rows={[
           {
@@ -185,9 +209,22 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
         ]}
       />,
     )
-    const txt = container.textContent ?? ''
-    expect(txt).toContain('与接力池排名背离')
-    expect(txt).toContain('接力池第1')
+    const oldText = oldLeaderWarning.container.textContent ?? ''
+    expect(oldText).not.toContain('与接力池排名背离')
+    expect(oldText).not.toContain('接力池第1')
+
+    const hardGuard = render(
+      <AiJudgeDetail
+        rows={[
+          {
+            ...row,
+            biasWarning: 'AI 判 avoid，但未发现一字/ST/成交额不足5亿/纯跟风硬伤，已降为 normal',
+          },
+        ]}
+      />,
+    )
+    expect(hardGuard.container.textContent ?? '').toContain('已降为 normal')
+
     // 无留痕时不得凭空渲染该段
     const clean = render(<AiJudgeDetail rows={[row]} />)
     expect(clean.container.textContent ?? '').not.toContain('背离')
@@ -257,15 +294,16 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
     expect(txt).not.toContain('机械强龙')
   })
 
-  it('地位排序优先于参与档，且身份只展示三档', () => {
+  it('参与档优先于观察档；同档才按龙头优先，且身份只展示三档', () => {
     const { container } = render(<AiJudgeDetail rows={[
       { code: '000002', call: { view: 'participate', leaderRole: '跟风', statusRank: 2 } },
       { code: '000001', call: { view: 'watch', leaderRole: '龙头', statusRank: 1 } },
     ]} />)
     const articles = [...container.querySelectorAll('article')]
-    expect(articles[0].textContent).toContain('000001')
-    expect(articles[0].textContent).toContain('龙头')
-    expect(articles[1].textContent).toContain('跟风')
+    expect(articles[0].textContent).toContain('000002')
+    expect(articles[0].textContent).toContain('跟风')
+    expect(articles[1].textContent).toContain('000001')
+    expect(articles[1].textContent).toContain('龙头')
   })
 
   it('⑫ 无终态 → 明说「今晨裁决未落盘」，且不渲染裁决段', () => {

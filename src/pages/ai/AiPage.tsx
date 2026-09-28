@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type {
@@ -11,6 +11,7 @@ import type {
 import {
   AiJudgeDetail,
   analyticsQueries,
+  compareJudgeRows,
   DataTable,
   SegTabs,
   StatPair,
@@ -20,7 +21,7 @@ import {
   pct,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, LineChart, Zone, ZoneRow } from '@/shared/ui'
-import { cn, stanceText } from '@/shared/lib'
+import { biasText, cn, stanceText, viewText } from '@/shared/lib'
 
 /**
  * AI 台账 —— 数据源 `wealth_code/cache/ai_view/` + `ai_decisions.jsonl` + `ai_nav_history.jsonl`。
@@ -70,6 +71,53 @@ const VIEW_META: Record<string, { label: string; tone: 'up' | 'rec' | 'sub' }> =
 const NAV_BASELINE: { value: number; label: string; tone: 'sub'; dashed: boolean }[] = [
   { value: 1, label: '盈亏分界 1.0', tone: 'sub', dashed: true },
 ]
+
+const ROLE_TONE: Record<string, 'warn' | 'rec' | 'sub'> = {
+  龙头: 'warn',
+  准龙头: 'rec',
+  跟风: 'sub',
+}
+
+function roleOf(row: JudgeRow): '龙头' | '准龙头' | '跟风' | undefined {
+  const role = row.call?.leaderRole ?? row.stock?.leader_role
+  return role === '龙头' || role === '准龙头' || role === '跟风' ? role : undefined
+}
+
+function shortReason(text?: string | null): string | undefined {
+  const line = text?.split(/[；\n]/).map((x) => x.trim()).find(Boolean)
+  return line || undefined
+}
+
+function ChangeBlock({
+  label,
+  empty,
+  tone,
+  children,
+}: {
+  label: string
+  empty: string
+  tone: 'warn' | 'rec' | 'sub'
+  children: ReactNode
+}) {
+  const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : []
+  return (
+    <section className="min-w-0 rounded-sm border border-line bg-card px-2.5 py-2">
+      <div className={cn('mb-1.5 text-[12px] font-semibold', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-sub')}>
+        {label}
+      </div>
+      {items.length ? <div className="flex flex-col gap-1.5">{children}</div> : <div className="text-[11px] text-sub">{empty}</div>}
+    </section>
+  )
+}
+
+function ChangeRow({ title, tone, children }: { title: string; tone: 'warn' | 'rec' | 'sub'; children: ReactNode }) {
+  return (
+    <div className="min-w-0 border-l-2 border-line pl-2">
+      <div className={cn('truncate text-[11.5px] font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')} title={title}>{title}</div>
+      <div className="line-clamp-2 text-[10.5px] leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>{children}</div>
+    </div>
+  )
+}
 
 export function Component() {
   const view = useQuery(analyticsQueries.aiView())
@@ -217,8 +265,64 @@ export function Component() {
   /** 今晨 09:25 实际买入只数（名额内成交） */
   const callCount = callFile?.meta?.participate?.length ?? 0
 
+  /** 今日变化只取后端已落盘的角色、周期证据与09:25裁决；页面不自行推断交易结论。 */
+  const decisionChanges = useMemo(() => {
+    const roleRows = judgeRows
+      .map((row) => ({ row, role: roleOf(row) }))
+      .filter((item): item is { row: JudgeRow; role: '龙头' | '准龙头' | '跟风' } => !!item.role)
+      .sort((a, b) => compareJudgeRows(a.row, b.row))
+
+    const competition = roleRows.filter(({ row }) => {
+      const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
+      return note.includes('二板') || note.includes('晋级')
+    })
+    const succession = roleRows.filter(({ row }) => {
+      const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
+      return note.includes('断板') || note.includes('接力')
+    })
+    const mechanical = judgeRows.filter((row) => row.call?.mechanicalLeader && row.bias !== 'focus')
+    return { roleRows, competition, succession, mechanical }
+  }, [judgeRows])
+
   return (
     <div className="flex flex-col gap-3">
+      {tab === 'view' && activeView && (
+        <Card
+          title="今日决策变化"
+          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{activeView.date}</CardBadge>}
+        >
+          <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
+            <ChangeBlock label="地位靠前" empty="暂无身份变化" tone="warn">
+              {decisionChanges.roleRows.slice(0, 3).map(({ row, role }) => (
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone={ROLE_TONE[role]}>
+                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '周期证据待积累'}
+                </ChangeRow>
+              ))}
+            </ChangeBlock>
+            <ChangeBlock label="二进三竞争" empty="暂无完整竞争记录" tone="rec">
+              {decisionChanges.competition.slice(0, 3).map(({ row, role }) => (
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec">
+                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '竞争结果待确认'}
+                </ChangeRow>
+              ))}
+            </ChangeBlock>
+            <ChangeBlock label="新老接力线索" empty="暂无接力线索" tone="rec">
+              {decisionChanges.succession.slice(0, 3).map(({ row, role }) => (
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec">
+                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '后续表现待确认'}
+                </ChangeRow>
+              ))}
+            </ChangeBlock>
+            <ChangeBlock label="AI与机械差异" empty="暂无需要关注的差异" tone="sub">
+              {decisionChanges.mechanical.slice(0, 3).map((row) => (
+                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · 昨预案 ${biasText(row.bias ?? '')}`} tone="sub">
+                  {shortReason(row.call?.mechanicalLeaderNote) ?? `今晨裁决：${viewText(row.call?.view ?? '')}`}
+                </ChangeRow>
+              ))}
+            </ChangeBlock>
+          </div>
+        </Card>
+      )}
       {/* 概览窄栏（两轨口径提示） + 明细宽栏（逐笔判断记录，多列需横向空间）。
           ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
       <ZoneRow className="ai-ledger-layout">

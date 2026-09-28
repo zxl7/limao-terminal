@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
-import type { RotationCandidate } from '@/shared/api'
+import type { MarketSnapshot, RotationCandidate } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
@@ -31,7 +31,10 @@ import { cn } from '@/shared/lib'
  */
 
 export async function loader() {
-  await queryClient.ensureQueryData(marketQueries.rotation())
+  await Promise.all([
+    queryClient.ensureQueryData(marketQueries.rotation()),
+    queryClient.ensureQueryData(marketQueries.latest()),
+  ])
   return null
 }
 
@@ -54,8 +57,36 @@ function confTier(c: RotationCandidate): { label: string; tone: 'up' | 'rec' | '
   return { label: '仅形态回流', tone: 'neutral' }
 }
 
+type LiveReflow = {
+  label: '题材确认' | '资金试探' | '待资金回流'
+  tone: 'up' | 'rec' | 'warn'
+  evidence: string
+}
+
+/** 与上游回流监控同口径：名称先精确匹配，避免泛行业名误配具体题材。 */
+function themeHit(theme: string, sector: string): boolean {
+  const t = theme.trim()
+  const s = sector.trim()
+  return Boolean(t && s && (t === s || (t.length >= 2 && s.includes(t)) || (s.length >= 3 && t.includes(s))))
+}
+
+function liveReflow(c: RotationCandidate, latest?: MarketSnapshot): LiveReflow {
+  if (c.confidence_factors.capital !== 'inflow_rising') {
+    return { label: '待资金回流', tone: 'warn', evidence: '五日资金尚未转入' }
+  }
+  const sector = latest?.top5.find((x) => themeHit(c.theme, x.name))
+  if (!sector) return { label: '资金试探', tone: 'rec', evidence: '资金已回，等待板块进入实时强势榜' }
+  const leaderPct = sector.leader?.pct ?? 0
+  const confirmed = (sector.delta === 'new' || sector.delta === 'surging') && sector.zt_count >= 2 && leaderPct >= 5
+  if (confirmed) {
+    return { label: '题材确认', tone: 'up', evidence: `${sector.name} 涨停 ${sector.zt_count} 只 · ${sector.leader?.name ?? '核心票'} +${n1(leaderPct)}%` }
+  }
+  return { label: '资金试探', tone: 'rec', evidence: `${sector.name} 尚未形成扩散确认` }
+}
+
 export function Component() {
   const rot = useQuery(marketQueries.rotation())
+  const latest = useQuery(marketQueries.latest())
   const d = rot.data
 
   /** `d?.candidates ?? []` 每次渲染都生成新数组，显式 memo 稳定引用后再参与 useMemo 依赖 */
@@ -68,11 +99,19 @@ export function Component() {
   /** 今日已动 vs 未动 —— 决定「还能不能低吸」 */
   const moved = sorted.filter((c) => c.today_hot)
   const calm = sorted.filter((c) => !c.today_hot)
+  const liveByTheme = useMemo(
+    () => new Map(all.map((c) => [c.theme, liveReflow(c, latest.data)])),
+    [all, latest.data],
+  )
+  const liveCounts = useMemo(() => ({
+    confirmed: [...liveByTheme.values()].filter((x) => x.label === '题材确认').length,
+    probing: [...liveByTheme.values()].filter((x) => x.label === '资金试探').length,
+  }), [liveByTheme])
 
   /**
    * 回流信号排序条 —— 本页的核心交付物「可排序的介入清单」的视觉版。
    *
-   * 附注给出**因子结构与冷却天数**：同样的置信度分值，来自「四因子齐备」还是
+   * 附注给出**因子结构与冷却天数**：同样的置信度分值，来自「五因子齐备」还是
    * 「仅形态回流」是完全不同的操作价值，光看条长会把两者混为一谈。
    * 未启动的题材排在前面（可低吸），已启动的置后并整体压在下方 —— 顺序本身就是建议。
    */
@@ -81,9 +120,9 @@ export function Component() {
     return ordered.slice(0, 15).map((c) => ({
       label: c.theme,
       value: c.confidence,
-      note: `${confTier(c).label} · 冷却 ${c.cooled_days} 日`,
+      note: `${liveByTheme.get(c.theme)?.label ?? '—'} · ${confTier(c).label} · 冷却 ${c.cooled_days} 日`,
     }))
-  }, [calm, moved])
+  }, [calm, moved, liveByTheme])
 
   /**
    * 五因子命中结构 —— 回答「这批回流信号的质量如何」。
@@ -97,12 +136,13 @@ export function Component() {
     return [
       { label: '催化新', value: cnt((c) => c.catalyst_fresh), tone: 'mid' as const },
       { label: '资金回流', value: cnt((c) => c.confidence_factors.capital === 'inflow_rising'), tone: 'mid' as const },
+      { label: '题材确认', value: liveCounts.confirmed, tone: 'mid' as const },
       { label: 'K线止跌', value: cnt((c) => String(c.confidence_factors.kline ?? '').startsWith('stop_fall')), tone: 'mid' as const },
       { label: '阶段爆发位', value: cnt((c) => c.confidence_factors.phase === 'boom'), tone: 'mid' as const },
       { label: '大盘配合', value: cnt((c) => c.confidence_factors.market === true), tone: 'mid' as const },
       { label: '今日已动', value: moved.length, tone: 'mid' as const },
     ]
-  }, [all, moved])
+  }, [all, moved, liveCounts])
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,6 +154,8 @@ export function Component() {
           <StatPair label="数据日" value={d?.date ?? '—'} />
           <StatPair label="候选总数" value={all.length} />
           <StatPair label="资金已回" value={all.filter((c) => c.confidence_factors.capital === 'inflow_rising').length} tone="up" />
+          <StatPair label="题材确认" value={liveCounts.confirmed} tone="up" />
+          <StatPair label="资金试探" value={liveCounts.probing} tone="rec" />
           <StatPair
             label="K线止跌"
             value={all.filter((c) => String(c.confidence_factors.kline ?? '').startsWith('stop_fall')).length}
@@ -126,7 +168,7 @@ export function Component() {
           置信度是**五因子**（催化 / 大盘 / 资金 / 相位 / **K线止跌**）加权后的**排序分值**，
           不是成功率 —— 本页按它排序，但不把它当概率解读。「K线止跌」看的是**该题材龙头个股**
           的日K（站上MA5 / 近2日不创新低 / 跌幅收窄 / 缩量，四条命中≥2 成立）。
-          「今日已动」的题材已失去低吸位置，与「未启动」分开列示。
+          盘中状态按两层展示：资金先转入时仅为「资金试探」；只有板块新晋或升温、至少两只涨停、核心票涨幅≥5%才升级为「题材确认」。
         </p>
         {!rot.isLoading && !d && <EmptyState text="回流数据未生成" hint="cache/rotation.json 缺失" />}
       </Card>
@@ -166,15 +208,14 @@ export function Component() {
             <div>
               <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
                 <Icon name="dna" size={13} className="text-sub" />
-                四因子命中结构
+                五因子与盘中确认结构
               </div>
               <BarChart bars={factorBars} height={175} format={(v) => `${v} 个`} maxBarWidth={38} showValue />
               <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
                 柱高 = <b className="text-txt">命中该因子的题材数</b>（不是分值），
                 故统一用中性蓝着色 —— 计数没有好坏语义，染红染绿都是过度解读。
                 <br />
-                <b className="text-txt">「资金回流」柱子最高、而「催化新」很低</b> = 这轮回流靠资金推动、
-                缺乏新增催化，属技术性回流而非逻辑修复，持续性通常更弱。
+                「资金回流」高而「题材确认」低时，说明资金只是试探，价格与扩散尚未配合；不能把它当作题材重新启动。
               </p>
             </div>
           </div>
@@ -202,6 +243,13 @@ export function Component() {
               cell: (c) => {
                 const t = confTier(c)
                 return <Tag tone={t.tone}>{t.label}</Tag>
+              },
+            },
+            {
+              label: '盘中状态',
+              cell: (c) => {
+                const state = liveByTheme.get(c.theme)
+                return <Tag tone={state?.tone ?? 'neutral'} title={state?.evidence}>{state?.label ?? '—'}</Tag>
               },
             },
             { label: '冷却', num: true, cell: (c) => `${c.cooled_days} 日` },
@@ -234,6 +282,13 @@ export function Component() {
           columns={[
             { label: '题材', cell: (c) => <span className="text-txt">{c.theme}</span> },
             { label: '置信度', num: true, cell: (c) => n1(c.confidence) },
+            {
+              label: '盘中状态',
+              cell: (c) => {
+                const state = liveByTheme.get(c.theme)
+                return <Tag tone={state?.tone ?? 'neutral'} title={state?.evidence}>{state?.label ?? '—'}</Tag>
+              },
+            },
             { label: '冷却', num: true, cell: (c) => `${c.cooled_days} 日` },
             {
               label: '爆发参照',

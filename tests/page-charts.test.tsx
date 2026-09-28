@@ -128,17 +128,19 @@ describe('EmotionPage —— 情绪轨迹/接力质量/涨停家数', () => {
   })
 })
 
-describe('TradePage —— 净值与回撤/逐日收益', () => {
-  it('净值曲线、回撤曲线、逐日收益柱三条都画出来', async () => {
+describe('TradePage —— 全部交易走势 / 逐日收益', () => {
+  it('按全部结算交易画一条净值折线，不单列回撤，逐日收益柱仍保留', async () => {
     const container = await renderPage(await import('@/pages/trade/TradePage'))
 
-    expect(screen.getByText(/净值与回撤/)).toBeInTheDocument()
+    expect(screen.getByText(/全部交易走势/)).toBeInTheDocument()
+    expect(screen.queryByText(/净值与回撤/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/最大回撤/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/回撤曲线/)).not.toBeInTheDocument()
     expect(screen.getByText(/逐日收益分布/)).toBeInTheDocument()
 
     const ds = pathDs(container)
     const lines = ds.filter((d) => d.includes('M') && d.includes('L'))
-    // 净值 + 回撤 = 至少 2 条带 M/L 的路径（含面积填充路径，故用 >= 2 而非 == 2）
-    expect(lines.length, '净值/回撤折线未生成 path').toBeGreaterThanOrEqual(2)
+    expect(lines.length, '全部交易净值折线未生成 path').toBeGreaterThanOrEqual(1)
     for (const d of lines) expect(d).not.toContain('NaN')
 
     // 逐日收益柱：空仓日以中性色呈现，但仍应是实心柱而非透明热区

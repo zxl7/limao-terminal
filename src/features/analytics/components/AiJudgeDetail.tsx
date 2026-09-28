@@ -142,10 +142,7 @@ function dimEntries(v: unknown): Array<{ key: string; label: string; score: numb
   return out
 }
 
-/**
- * 新数据按后端 status_rank 展示地位顺序，不在前端重算角色或准入。
- * 历史无排序字段时兼容「参与 → 观察 → 放弃 → 其他」，同档保持原有顺序。
- */
+/** 判断档位先行；同档聚焦题材第一，避免低位高分票压过空间龙。 */
 const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
 
 /**
@@ -157,6 +154,32 @@ const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
  */
 const viewOf = (r: JudgeRow) => r.call?.view ?? r.view ?? ''
 
+/** AI 裁决不变，只调整同一裁决档内的阅读与聚焦优先级。 */
+export function compareJudgeRows(a: JudgeRow, b: JudgeRow): number {
+  const viewOrder = (VIEW_ORDER[viewOf(a)] ?? 9) - (VIEW_ORDER[viewOf(b)] ?? 9)
+  if (viewOrder) return viewOrder
+  const as = a.stock
+  const bs = b.stock
+  const leaderOrder =
+    Number(bs?.is_sector_dragon) - Number(as?.is_sector_dragon)
+    || (bs?.boards ?? 0) - (as?.boards ?? 0)
+    || (bs?.carry_cnt ?? 0) - (as?.carry_cnt ?? 0)
+    || (bs?.theme_mates_cnt ?? 0) - (as?.theme_mates_cnt ?? 0)
+    || (bs?.lead_score ?? 0) - (as?.lead_score ?? 0)
+    || (bs?.score ?? 0) - (as?.score ?? 0)
+  if (leaderOrder) return leaderOrder
+  return (a.call?.statusRank ?? a.stock?.status_rank ?? Infinity)
+    - (b.call?.statusRank ?? b.stock?.status_rank ?? Infinity)
+}
+
+/** 历史记录的 normal/机械强龙提示在09:25融合排序落地前生成；不改账本，仅在展示层降噪。 */
+function actionableWarning(warning?: string): string | undefined {
+  if (!warning) return undefined
+  return warning.includes('机械证据显示是强龙') && warning.includes('与接力池排名背离')
+    ? undefined
+    : warning
+}
+
 export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -164,12 +187,7 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
   if (!rows.length) {
     return <div className="text-sub text-[12px] py-2">该日无 AI 判断记录</div>
   }
-  const ordered = [...rows].sort((a, b) => {
-    const ar = a.call?.statusRank ?? a.stock?.status_rank
-    const br = b.call?.statusRank ?? b.stock?.status_rank
-    if (ar != null || br != null) return (ar ?? Infinity) - (br ?? Infinity)
-    return (VIEW_ORDER[viewOf(a)] ?? 9) - (VIEW_ORDER[viewOf(b)] ?? 9)
-  })
+  const ordered = [...rows].sort(compareJudgeRows)
   const visible = ordered.filter((r) =>
     (filter === 'all' || (r.call ? r.call.view : 'pending') === filter) &&
     (!needle || `${r.code} ${r.stock?.name ?? ''} ${r.stock?.theme_name ?? ''}`.toLowerCase().includes(needle)),
@@ -201,6 +219,7 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
         const tags = s?.tags ?? []
         const zone = c?.zone ? ZONE_META[c.zone] : undefined
         const volOk = c?.amountYi != null && c?.needYi != null && c.amountYi >= c.needYi
+        const warning = actionableWarning(r.biasWarning)
         return (
           <article
             key={r.code}
@@ -245,9 +264,9 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
             </div>
 
             {/* ── ⛔ 越权兜底留痕（bias 与机械证据冲突 / 已被降级）—— 必须显眼，否则等于没兜住 ── */}
-            {r.biasWarning && (
+            {warning && (
               <div className="mb-1.5 rounded-sm border border-warn/40 bg-warn-soft px-2 py-1 text-[11px] leading-relaxed text-warn break-all">
-                ⚠️ {r.biasWarning}
+                ⚠️ {warning}
               </div>
             )}
 

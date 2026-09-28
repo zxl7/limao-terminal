@@ -559,6 +559,36 @@ export interface DossierEnvironment {
   em_expect: EmExpect[]
 }
 
+/** 执行审计：只认账户已入场且有收盘收益的主口径，缺件不补零。 */
+export interface ExecutionAudit {
+  schema: 'execution_audit_v1'
+  generated_at_bj: string
+  main_metric: { label: string; formula: string; includes_costs: boolean; includes_slippage: boolean }
+  calendar: { source: string; days: string[]; count: number }
+  summary: {
+    batches: number; stocks: number; entered: number; covered_returns: number
+    mechanical_fallback_entries: number; ai_rejected_entries: number; ai_plan_missing_candidates: number
+    ice_ai_entries: number; incomplete_batches: number
+  }
+  batches: Array<{
+    recommendation_date: string; trade_date: string | null; candidate_file: string
+    candidate_generated_at?: string; regime?: string | null
+    source: { candidate_frozen: boolean; auction_frozen: boolean; ai_plan_count: number; pool_call_frozen: boolean; account_entries: number }
+    caliber: { expected: string; actual: string[]; mechanical_fallback: boolean }
+    integrity: { complete: boolean; issues: string[] }
+    stocks: Array<{
+      code: string; name: string; bucket: string; candidate_rank?: number
+      mechanical: { status?: string | null; can_enter: boolean; ice_ban: boolean }
+      ai: {
+        status: string; can_enter: boolean | null; final_can_enter?: boolean | null
+        ice_conflict?: boolean; view?: string | null; gap_zone?: string | null
+      }
+      execution: { entered: boolean; caliber?: string | null; gross_return_label: string; gross_return_pct?: number | null }
+      integrity: { complete: boolean; issues: string[] }
+    }>
+  }>
+}
+
 /** 决策时点的真实盘面反馈（与脚本 environment 的对照项，用于发现脚本失真） */
 export interface DossierFeedback {
   sentiment_score: number
@@ -763,6 +793,9 @@ export interface DossierStock {
   /** 梯队等级 A/B/C/D */
   ladder_grade: string
   is_sector_dragon: boolean
+  /** 龙头优先排序名次：板块龙→连板高度→带动性→题材广度→综合分 */
+  leader_preference_rank?: number
+  leader_preference_note?: string
   sector_mates_cnt: number
   theme_mates_cnt: number
   theme_name: string
@@ -1691,6 +1724,8 @@ export interface AiNavEntry {
 export interface AccountNavStock {
   code: string
   name: string
+  /** 该票从系统成交价到当日结算价的实际收益（%）；旧账本可缺失 */
+  return_pct?: number
   [k: string]: unknown
 }
 

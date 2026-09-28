@@ -171,6 +171,10 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'wealth_code/cache', pattern: '^candidates-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
     desc: '最新一期选股候选（完整字段）',
   },
+  '/api/decision/execution-audit': {
+    file: 'wealth_code/cache/execution_audit.json', cadence: 'daily',
+    desc: '执行审计（候选冻结、竞价、裁决、账户收益与缺口）',
+  },
   '/api/decision/auction-history': {
     dir: 'wealth_code/cache', pattern: '^auction_quotes-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
     desc: '竞价报价存档（每票竞价涨幅/金额）',

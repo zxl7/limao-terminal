@@ -145,6 +145,13 @@ export const analyticsQueries = {
       queryFn: api.decisionLatest,
       staleTime: DAILY_STALE,
     }),
+  /** 真实执行审计：日频生成，不将候选预测混为账户收益。 */
+  decisionExecutionAudit: () =>
+    queryOptions({
+      queryKey: ['decision', 'execution-audit'] as const,
+      queryFn: api.decisionExecutionAudit,
+      staleTime: DAILY_STALE,
+    }),
   /** 竞价报价存档 */
   decisionAuctionHistory: () =>
     queryOptions({

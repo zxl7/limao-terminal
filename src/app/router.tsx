@@ -56,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'backtest', lazy: () => import('@/pages/backtest/BacktestPage') },
       { path: 'institution', lazy: () => import('@/pages/institution/InstitutionPage') },
       { path: 'auction', lazy: () => import('@/pages/auction/AuctionPage') },
+      { path: 'execution-audit', lazy: () => import('@/pages/execution-audit/ExecutionAuditPage') },
 
       // ── 数据与运维 ──
       { path: 'record', lazy: () => import('@/pages/record/RecordPage') },

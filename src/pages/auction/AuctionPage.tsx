@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
-import type { CandidatesFile, DecisionDossier, EarlyItem, RelayShadow } from '@/shared/api'
+import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, RelayShadow } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
@@ -54,6 +54,18 @@ function cnt(v: unknown): string {
   return '—'
 }
 
+/** 与猎手选池同源：先聚焦板块龙和空间高度，再比较带动、题材广度与综合分。 */
+function leaderFirst(rows: DossierStock[]): DossierStock[] {
+  return [...rows].sort((a, b) =>
+    Number(b.is_sector_dragon) - Number(a.is_sector_dragon)
+    || b.boards - a.boards
+    || b.carry_cnt - a.carry_cnt
+    || b.theme_mates_cnt - a.theme_mates_cnt
+    || b.lead_score - a.lead_score
+    || b.score - a.score,
+  ).map((row, index) => ({ ...row, leader_preference_rank: row.leader_preference_rank ?? index + 1 }))
+}
+
 export function Component() {
   const dossier = useQuery(analyticsQueries.decisionLatest())
   const shadowQ = useQuery(analyticsQueries.shadowRelay())
@@ -67,6 +79,8 @@ export function Component() {
   const au = auction.data
   const env = d?.environment
   const renv = d?.real_env
+  const relayRows = leaderFirst(d?.relay ?? [])
+  const watchRows = leaderFirst(d?.watch ?? [])
 
   /** 竞价报价只有代码没有名称 —— 用接力池/观察池/候选池的名单补齐 */
   const nameByCode = new Map<string, string>()
@@ -152,11 +166,11 @@ export function Component() {
         <Zone label="接力池 · 可执行" dot="bg-up" className="xl:w-[62%]">
           <Card
             title="🎯 接力池"
-            extra={<CardBadge tone="up">{(d?.relay ?? []).length} 只 · 按总分排序</CardBadge>}
+            extra={<CardBadge tone="up">{(d?.relay ?? []).length} 只 · 龙头优先排序</CardBadge>}
           >
             {d?.relay?.length ? (
               <DataTable
-                rows={d.relay}
+                rows={relayRows}
                 rowKey={(r) => r.code}
                 dense
                 empty="无接力标的"
@@ -165,6 +179,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
+                        {r.leader_preference_rank != null && <span className="num text-rec mr-1">#{r.leader_preference_rank}</span>}
                         <span className="text-up">{r.name}</span>
                         <span className="num text-sub ml-1.5">{r.code}</span>
                       </span>
@@ -172,7 +187,7 @@ export function Component() {
                   },
                   { label: '题材', cell: (r) => <Tag>{r.theme || '—'}</Tag> },
                   {
-                    label: '总分',
+                    label: '综合分',
                     num: true,
                     cell: (r) => <span className="text-up font-semibold">{num(r.score)}</span>,
                   },
@@ -344,7 +359,7 @@ export function Component() {
           >
             {d?.watch?.length ? (
               <DataTable
-                rows={d.watch}
+                rows={watchRows}
                 rowKey={(r) => r.code}
                 dense
                 empty="无观察标的"
