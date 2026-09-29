@@ -53,8 +53,14 @@ export function HeatMatrix({
   cellH = 22,
   /** 左侧行标签宽度 */
   labelWidth = 128,
+  /** 右侧附注的固定宽度；`fit` 时用于让日期列与数据格严格对齐。 */
+  noteWidth = 0,
   /** 是否渲染色阶图例 */
   legend = true,
+  /** `true` 时按正负值使用红绿双向色阶；资金净额等有方向的数据必须开启。 */
+  signed = false,
+  /** 在容器内均分日期列，取消横向滚动。 */
+  fit = false,
   className,
 }: {
   rows: HeatRow[]
@@ -64,7 +70,10 @@ export function HeatMatrix({
   cellW?: number
   cellH?: number
   labelWidth?: number
+  noteWidth?: number
   legend?: boolean
+  signed?: boolean
+  fit?: boolean
   className?: string
 }) {
   /**
@@ -75,7 +84,7 @@ export function HeatMatrix({
    *
    * Hook 放在空态提前返回之前（理由同 BarList：两条渲染路径的 Hook 数必须一致）。
    */
-  const [hover, setHover] = useState<{ row: string; col: string; text: string; filled: boolean; anchor: TipAnchor } | null>(
+  const [hover, setHover] = useState<{ row: string; col: string; text: string; filled: boolean; positive: boolean; anchor: TipAnchor } | null>(
     null,
   )
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -90,10 +99,12 @@ export function HeatMatrix({
   )
   const norm = max && max > 0 ? max : flatMax
   const safe = norm > 0 ? norm : 1
+  const hasNotes = rows.some((r) => r.note)
+  const cellClass = fit ? 'flex-1 min-w-0' : 'shrink-0'
 
   return (
     <div ref={wrapRef} className={cn('relative flex flex-col gap-1.5', className)}>
-      <div className="overflow-x-auto">
+      <div className={fit ? 'overflow-hidden' : 'overflow-x-auto'}>
         <div className="inline-block min-w-full">
           {/* ── 列头（日期） ── */}
           <div className="flex items-center">
@@ -102,12 +113,13 @@ export function HeatMatrix({
               <span
                 // oxlint-disable-next-line react/no-array-index-key -- 同一日期轴可能出现重复列标签，索引即身份
                 key={`${c}-${i}`}
-                className="shrink-0 text-center text-[10.5px] text-sub num"
-                style={{ width: cellW }}
+                className={`${cellClass} text-center text-[10.5px] text-sub num`}
+                style={fit ? undefined : { width: cellW }}
               >
                 {c}
               </span>
             ))}
+            {hasNotes && <span className="shrink-0 ml-2" style={{ width: noteWidth }} />}
           </div>
 
           {/* ── 数据行 ── */}
@@ -128,6 +140,8 @@ export function HeatMatrix({
                 const filled = isNum(v)
                 const intensity = filled ? Math.min(1, Math.abs(v) / safe) : 0
                 const text = format(v)
+                const positive = !signed || !filled || v >= 0
+                const toneVar = positive ? 'var(--color-up)' : 'var(--color-down)'
 
                 return (
                   <span
@@ -146,13 +160,13 @@ export function HeatMatrix({
                         ? `${r.label} · ${c}：${text || String(v)}`
                         : `${r.label} · ${c}：无样本`
                     }
-                    className="shrink-0 flex items-center justify-center num text-[10.5px]"
+                    className={`${cellClass} flex items-center justify-center num text-[10.5px]`}
                     style={{
-                      width: cellW,
+                      width: fit ? undefined : cellW,
                       height: cellH,
-                      // 强度着色：同色系加深，最小值也保留可辨识的浅底
+                      // 强度着色：资金矩阵按正负红绿区分；其余强度矩阵保持单色。
                       background: filled
-                        ? `color-mix(in srgb, var(--color-up) ${Math.max(8, intensity * 88)}%, var(--color-card))`
+                        ? `color-mix(in srgb, ${toneVar} ${Math.max(8, intensity * 88)}%, var(--color-card))`
                         : undefined,
                       // null：斜纹灰格（「不知道」而非「零」）
                       backgroundImage: filled
@@ -173,6 +187,7 @@ export function HeatMatrix({
                         col: c,
                         text: filled ? text || String(v) : '',
                         filled,
+                        positive,
                         anchor: pointerToPx(wrap, e),
                       })
                     }}
@@ -183,7 +198,11 @@ export function HeatMatrix({
                 )
               })}
 
-              {r.note && <span className="shrink-0 ml-2 text-sub text-[11px]">{r.note}</span>}
+              {hasNotes && (
+                <span className="shrink-0 ml-2 text-sub text-[11px]" style={{ width: noteWidth }}>
+                  {r.note}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -191,20 +210,32 @@ export function HeatMatrix({
 
       {legend && (
         <div className="flex items-center gap-2 text-[10.5px] text-sub">
-          <span>弱</span>
-          <span className="flex" style={{ height: 8 }}>
-            {[8, 30, 55, 88].map((p) => (
-              <span
-                key={p}
-                className="w-4"
-                style={{
-                  background: `color-mix(in srgb, var(--color-up) ${p}%, var(--color-card))`,
-                  border: '1px solid var(--color-line-faint)',
-                }}
-              />
-            ))}
-          </span>
-          <span>强</span>
+          {signed ? (
+            <>
+              <span>净流入</span>
+              <span className="flex" style={{ height: 8 }}>
+                {[30, 55, 88].map((p) => (
+                  <span key={`up-${p}`} className="w-4" style={{ background: `color-mix(in srgb, var(--color-up) ${p}%, var(--color-card))`, border: '1px solid var(--color-line-faint)' }} />
+                ))}
+              </span>
+              <span>净流出</span>
+              <span className="flex" style={{ height: 8 }}>
+                {[30, 55, 88].map((p) => (
+                  <span key={`down-${p}`} className="w-4" style={{ background: `color-mix(in srgb, var(--color-down) ${p}%, var(--color-card))`, border: '1px solid var(--color-line-faint)' }} />
+                ))}
+              </span>
+            </>
+          ) : (
+            <>
+              <span>弱</span>
+              <span className="flex" style={{ height: 8 }}>
+                {[8, 30, 55, 88].map((p) => (
+                  <span key={p} className="w-4" style={{ background: `color-mix(in srgb, var(--color-up) ${p}%, var(--color-card))`, border: '1px solid var(--color-line-faint)' }} />
+                ))}
+              </span>
+              <span>强</span>
+            </>
+          )}
           <span className="inline-flex items-center gap-1 ml-2">
             <span
               className="inline-block w-4 h-2"
@@ -227,7 +258,7 @@ export function HeatMatrix({
             title: `${hover.row} · ${hover.col}`,
             rows: [
               hover.filled
-                ? { label: '数值', value: hover.text || '—', tone: 'up' as const }
+                ? { label: '数值', value: hover.text || '—', tone: hover.positive ? 'up' as const : 'down' as const }
                 : { label: '数值', value: '无样本', tone: 'sub' as const },
             ],
           }}

@@ -100,15 +100,18 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['emotion', 'zt-history'] as const,
       queryFn: api.emotionZtHistory,
-      refetchInterval: intradayPollMs,
-      staleTime: 120_000,
+      // 时间轴页的当日涨停家数 / 最高板直接消费此源，盘中须与逐事件账本同频。
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
     }),
   /** 情绪快照（情绪联动） */
   emotionMemory: () =>
     queryOptions({
       queryKey: ['emotion', 'memory'] as const,
       queryFn: api.emotionMemory,
-      staleTime: DAILY_STALE,
+      // 题材爆发、轮动和推送文案在盘中会追加；不轮询会让紫色题材节点滞后于事实节点。
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
     }),
   /** 昨日涨停池（唯一涨停权威） */
   ztYesterday: () =>
@@ -310,6 +313,14 @@ export const analyticsQueries = {
       queryKey: ['flow', 'history'] as const,
       queryFn: api.flowHistory,
       staleTime: DAILY_STALE,
+    }),
+  /** 今日盘中全量板块资金池，与实时采集同节拍更新。 */
+  flowLive: () =>
+    queryOptions({
+      queryKey: ['flow', 'live'] as const,
+      queryFn: api.flowLive,
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
     }),
 
   // ══════════════ 机构投研 ══════════════

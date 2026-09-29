@@ -34,6 +34,7 @@ import {
   type TimelineSlot,
 } from '@/features/analytics'
 import { Card, CardBadge, StockLink } from '@/shared/ui'
+import { APP_CONFIG } from '@/shared/config'
 import { cn, inTrading, isStarMarket } from '@/shared/lib'
 import { useNow } from '@/shared/hooks'
 
@@ -166,6 +167,21 @@ export function Component() {
     const d = String(day.date).replace(/-/g, '')
     return itAll.filter((e) => String(e.at ?? '').slice(0, 10).replace(/-/g, '') === d)
   }, [itAll, day])
+
+  /**
+   * 盘中页同时消费逐事件账本与题材记忆；两者任一滞后都会造成“事实节点已到、题材标记未到”。
+   * 以较旧的一侧作为页面水位，直接告诉用户当前画面是否仍可作为实时盘面使用。
+   */
+  const sourceUpdatedAt = useMemo(() => {
+    const times = [itQ.dataUpdatedAt, memQ.dataUpdatedAt].filter((time) => time > 0)
+    return times.length > 0 ? Math.min(...times) : 0
+  }, [itQ.dataUpdatedAt, memQ.dataUpdatedAt])
+  const sourceLagMs = sourceUpdatedAt > 0 ? Math.max(0, now.getTime() - sourceUpdatedAt) : null
+  const isLiveDay = inTrading(undefined, now) && day?.date === days[0]?.data?.date
+  const sourceFresh = sourceLagMs != null && sourceLagMs <= APP_CONFIG.staleAfterMs
+  const sourceTime = sourceUpdatedAt > 0
+    ? new Date(sourceUpdatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    : '未获取'
 
   /**
    * 涨停全量：优先本日归档的 `zt_list`；归档残缺且恰是「今天」时，
@@ -411,6 +427,11 @@ export function Component() {
               />
             )}
             <CardBadge>{day?.date ?? '—'}</CardBadge>
+            {isLiveDay && (
+              <CardBadge tone={sourceFresh ? 'up' : 'warn'}>
+                {itQ.isFetching || memQ.isFetching ? '实时刷新中' : sourceFresh ? `实时·${sourceTime}` : `数据延迟·${sourceTime}`}
+              </CardBadge>
+            )}
           </div>
         }
       >
@@ -434,6 +455,11 @@ export function Component() {
           <StatPair label="题材线" value={`${bursts.themes.length} 条`} tone="up" />
           <StatPair label="时刻槽" value={`${slots.length} 个`} />
           <StatPair label="题材事件" value={`${themeEventCount} 条`} />
+          <StatPair
+            label="个股来源"
+            value={isFullDay ? '收盘涨停池' : itStocks.length > 0 ? `盘中首封 ${itStocks.length} 只` : '待首封事件'}
+            tone={isFullDay || itStocks.length > 0 ? 'sub' : undefined}
+          />
         </div>
 
         {/* 📈 盘中「涨停 / 跌停 / 炸板率」实时曲线 **已移出本页**（2026-09-21 用户：

@@ -155,15 +155,15 @@ describe('TimelineSnake · 蛇形骨架', () => {
     }
   })
 
-  it('③ 轴覆盖 09:15–15:00：首尾节点分别落在首行起点与末行终点', () => {
+  it('③ 轴覆盖 09:25–15:00：首尾节点分别落在首行起点与末行终点', () => {
     const blocks = [
       normalBlock(SESSION_OPEN, slot(SESSION_OPEN)),
       normalBlock(SESSION_CLOSE, slot(SESSION_CLOSE)),
     ]
     const layout = layoutSnake({ marks: blocks.map((b) => b.at), width: W })
     const { container } = render(<TimelineSnake blocks={blocks} {...props} width={W} {...instant} />)
-    expect(nodeAt(container, '09:15').style.left).toBe(`${layout.x0}px`)
-    expect(nodeAt(container, '15:00').style.left).toBe(`${layout.x1}px`)
+    expect(nodeAt(container, '09:25').style.left).toBe(`${layout.x0}px`)
+    expect(nodeAt(container, '15:00').style.left).toBe(`${layout.x0}px`)
   })
 
   it('④ 空数据：轴骨架照画（⛔ 不留白板、也不加解释文案）', () => {
@@ -367,6 +367,19 @@ describe('TimelineSnake · 节点标记形态', () => {
     expect(barsOf(container)).toHaveLength(nodesOf(container).length)
   })
 
+  it('①b 相邻分钟收窄命中区，不能由后一个节点遮住前一个', () => {
+    const blocks = [
+      normalBlock(10 * 60, slot(10 * 60)),
+      normalBlock(10 * 60 + 1, slot(10 * 60 + 1)),
+    ]
+    const { container } = render(<TimelineSnake blocks={blocks} {...props} width={W} {...instant} />)
+    const a = nodeAt(container, '10:00')
+    const b = nodeAt(container, '10:01')
+    const gap = Math.abs(Number.parseFloat(a.style.left) - Number.parseFloat(b.style.left))
+    expect(Number.parseFloat(a.style.width)).toBeLessThanOrEqual(gap)
+    expect(Number.parseFloat(b.style.width)).toBeLessThanOrEqual(gap)
+  })
+
   it('② 竖条高度编码活跃度：活跃的更高，且封顶 SNAKE_BAR_MAX_H', () => {
     const busy = normalBlock(10 * 60, slot(10 * 60, { sectors: [sec('电力', 9), sec('半导体', 8)] }))
     const quiet = normalBlock(14 * 60, slot(14 * 60, { singles: [mk('x', '140000', '黄酒')] }))
@@ -419,12 +432,12 @@ describe('TimelineSnake · 节点标记形态', () => {
     }
   })
 
-  it('⑤ **整段**分钟级密集（255 分钟每分钟一个）→ 自动增行，且行内不重叠', () => {
+  it('⑤ **整段**分钟级密集保持固定四段，并如实标记拥挤', () => {
     const marks = Array.from({ length: 255 }, (_, i) => 9 * 60 + 15 + i)
     const blocks = marks.map((m) => normalBlock(m, slot(m)))
     const { container } = render(<TimelineSnake blocks={blocks} {...props} width={W} {...instant} />)
     const layout = layoutSnake({ marks, width: W })
-    expect(layout.rows).toBeGreaterThan(SNAKE_MIN_ROWS)
+    expect(layout.rows).toBe(SNAKE_MIN_ROWS)
     expect(layout.overcrowded).toBe(false)
     expect(layout.minLaneGap!).toBeGreaterThanOrEqual(SNAKE_MIN_GAP)
     expect(nodesOf(container)).toHaveLength(255)
@@ -603,7 +616,7 @@ describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含�
   it('⑥ 仅龙头轮动的题材也上轴：淡紫弱标记 + 题材名（⛔ 不带 🚀）', () => {
     const { container } = render(<TimelineSnake blocks={[rotatedBlock(14 * 60)]} {...props} {...instant} width={W} />)
     const bar = barAt(container, '14:00')
-    expect(bar.className, '仅轮动 = 淡紫弱标记（不是爆发的实心紫）').toContain('bg-rec/40')
+    expect(bar.className, '仅轮动 = 空心紫弱标记（不是爆发的实心紫）').toContain('border-rec')
     expect(bar.className.split(' '), '⛔ 不得与爆发同色').not.toContain('bg-rec')
     const node = nodeAt(container, '14:00')
     expect(node.textContent, '轴上必须看得到题材名').toContain('PCB板')

@@ -148,12 +148,12 @@ describe('TradePage —— 全部交易走势 / 逐日收益', () => {
   })
 })
 
-describe('FlowPage —— 跨日资金矩阵/板块资金轨迹', () => {
+describe('FlowPage —— 跨日资金矩阵', () => {
   it('矩阵格数 = 行 × 列，且「无样本」格必须留空（不得伪造 0）', async () => {
     const container = await renderPage(await import('@/pages/flow/FlowPage'))
 
     expect(screen.getByText(/跨日资金矩阵/)).toBeInTheDocument()
-    expect(screen.getByText(/板块资金轨迹/)).toBeInTheDocument()
+    expect(screen.queryByText(/板块资金轨迹/)).not.toBeInTheDocument()
 
     /**
      * 热力格识别：每格 `aria-label` 形如「板块 · MM-DD：值 / 无样本」。
@@ -178,8 +178,7 @@ describe('FlowPage —— 跨日资金矩阵/板块资金轨迹', () => {
       }
     }
 
-    // 轨迹条：每行一个 Sparkline，真实数据下应有至少一条有效折线
-    expect(sparklines(container).length, '板块资金轨迹未渲染 sparkline').toBeGreaterThan(0)
+    // 一张矩阵同时承载跨日方向、强度与逐日读数，不再重复渲染轨迹卡。
   })
 
   it('切到「逐日原始档」tab 后，当日进出两端双向榜可用', async () => {

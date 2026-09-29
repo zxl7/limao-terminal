@@ -173,6 +173,17 @@ describe('HeatMatrix —— 三态区分（null / 0 / 有值）', () => {
     render(<HeatMatrix rows={[]} cols={[]} />)
     expect(screen.getByText('无矩阵数据')).toBeInTheDocument()
   })
+
+  it('signed 模式按正负值使用红绿双向色阶', () => {
+    const { container } = render(
+      <HeatMatrix rows={[{ label: '资金', values: [5, -5] }]} cols={['流入', '流出']} signed />,
+    )
+    const cells = [...container.querySelectorAll<HTMLElement>('span[aria-label]')]
+    expect(cells[0].style.background).toContain('var(--color-up)')
+    expect(cells[1].style.background).toContain('var(--color-down)')
+    expect(container.textContent).toContain('净流入')
+    expect(container.textContent).toContain('净流出')
+  })
 })
 
 describe('Radar —— 维度不足时退回文字，不强行画', () => {

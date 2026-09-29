@@ -931,6 +931,10 @@ export interface PoolStock {
   /** 是否龙头 */
   dragon: boolean
   pct: number
+  /** 当日实时涨幅；行情源未覆盖时为 null，不能回退到历史建池涨幅。 */
+  live_pct?: number | null
+  /** 当日实时价；与 live_pct 同一批快照。 */
+  live_price?: number | null
   cap_yi: number
   /** 板块归属："main" = 主板 */
   board: string
@@ -1131,6 +1135,17 @@ export interface FlowHistoryDay {
   /** 源文件名（含日期） */
   file: string
   data: Record<string, unknown> | null
+}
+
+/** `/api/flow/live`：猎手盘中层发布的全量板块资金快照。 */
+export interface SectorFundPool {
+  date: string
+  /** Unix 秒级时间戳 */
+  ts: number
+  boards: Record<string, {
+    pct: number | null
+    flow_yi: number | null
+  }>
 }
 
 // ════════════════════════════════════════════════════════════════

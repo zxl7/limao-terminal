@@ -426,6 +426,8 @@ const PoolStock = z.object({
   name: s.optional(),
   dragon: b.optional(),
   pct: n.optional(),
+  live_pct: nOrNull.optional(),
+  live_price: nOrNull.optional(),
   cap_yi: nOrNull.optional(),
   board: s.optional(),
   from_zt: b.optional(),

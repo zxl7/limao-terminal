@@ -40,6 +40,7 @@ import type {
   RuleConfigFile,
   ShortSpiritConfig,
   FlowHistoryDay,
+  SectorFundPool,
   GeneHistory,
   GenePoolFile,
   GeneProfile,
@@ -95,6 +96,7 @@ export interface RouteTypeMap {
   '/api/theme/series': ThemeSeries
   '/api/theme/sequence': ThemeSequence
   '/api/flow/history': FlowHistoryDay[]
+  '/api/flow/live': SectorFundPool
 
   // ── 三、板块核心票 ──
   '/api/board/core': DatedFile<BoardCoreFile>[]
@@ -243,6 +245,8 @@ export const api = {
   sequence: () => fetchRoute('/api/theme/sequence'),
   /** 板块资金历史（多日合并） */
   flowHistory: () => fetchRoute('/api/flow/history'),
+  /** 板块资金盘中全量快照（今日） */
+  flowLive: () => fetchRoute('/api/flow/live'),
 
   // ── 三、板块核心票 ──
   /** 板块核心度（四维加权 core_score）· 板块异动先查 core 票动不动 */

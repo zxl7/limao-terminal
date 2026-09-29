@@ -172,22 +172,22 @@ describe('形态判定 —— 爆发 vs 扩散（⛔ 只按家数判会把扩散
 })
 
 describe('时序 —— 事件与推送并入同一条轴，且同刻合并', () => {
-  it('盘前清空批次不进入时间轴，也不被夹到 09:15 起点', () => {
+  it('盘前清空批次不进入时间轴，09:25 后的记录才入轴', () => {
     const { nodes } = buildTimeline({
-      stocks: [mk('pre', '090700'), mk('open', '091500')],
+      stocks: [mk('pre', '090700'), mk('open', '092500')],
       events: [
         { time: '00:03', event: '隔夜快照', severity: 'high', topic: '清空' },
         { time: '09:07', event: '盘前清空', severity: 'high', topic: '清空' },
-        { time: '09:15', event: '集合竞价', severity: 'high', topic: '竞价' },
+        { time: '09:25', event: '竞价结果', severity: 'high', topic: '竞价' },
       ],
       pushes: [
         { name: '旧题材', type: 'sector', first_pushed: '09:00', last_pushed: '09:10', push_count: 1, context: '', last_catalyst: '' },
-        { name: '竞价题材', type: 'sector', first_pushed: '09:15', last_pushed: '09:16', push_count: 1, context: '', last_catalyst: '' },
+        { name: '竞价题材', type: 'sector', first_pushed: '09:25', last_pushed: '09:26', push_count: 1, context: '', last_catalyst: '' },
       ],
     })
-    expect(nodes.map((n) => n.at)).toEqual([555, 555, 555])
+    expect(nodes.map((n) => n.at)).toEqual([565, 565, 565])
     expect(nodes.filter((n) => n.kind === 'single').map((n) => (n as { stock: ZtPoolStock }).stock.code)).toEqual(['open'])
-    expect((nodes.find((n) => n.kind === 'event') as { events: Array<{ event: string }> }).events.map((e) => e.event)).toEqual(['集合竞价'])
+    expect((nodes.find((n) => n.kind === 'event') as { events: Array<{ event: string }> }).events.map((e) => e.event)).toEqual(['竞价结果'])
     expect((nodes.find((n) => n.kind === 'push') as { pushes: Array<{ name: string }> }).pushes.map((p) => p.name)).toEqual(['竞价题材'])
   })
 

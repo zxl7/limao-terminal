@@ -5,7 +5,6 @@ import { BlockDetail, blockRangeText, KIND_LABEL } from './BlockDetail'
 import { summarizeBlock, type BlockSummary } from '../lib/block-summary'
 import { minToClock, SLOT_VISIBLE_SECTORS, type TimelineBlock } from '../lib/timeline'
 import {
-  clockOfAxis,
   layoutSnake,
   snakePos,
   SNAKE_BAR_MAX_H,
@@ -15,7 +14,7 @@ import {
 import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
 
 /**
- * **蛇形时间轴**（boustrophedon）—— 一条线从 09:15 横过去、到边半圆弯下来、反向再横走。
+ * **蛇形时间轴**（boustrophedon）—— 固定四段从 09:25 横走、经半圆弯道反向连接。
  *
  * ## 交互（2026-09-17 用户定稿：**只要 hover，不要点击**）
  *
@@ -32,7 +31,7 @@ import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
  *
  * ## ⛔ 版面铁律（沿用本站 PC 端约定）
  *
- * · **宽度跟容器、高度由布局内核决定且有界**（`rows ∈ [3,9]`）—— ⛔ 禁 `w-full h-auto`
+ * · **宽度跟容器、四段高度固定**（上午两根、下午两根）—— ⛔ 禁 `w-full h-auto`
  *   的等比放大；宽度用 `useChartWidth` 实测后交给 `layoutSnake`，故文字 1:1 不缩放。
  * · 浮层是**绝对定位层**、不是静态文字行；且**不能改变节点命中区尺寸**，否则 hover 会抖。
  * · 节点本身是**小标记**（细竖条）：实测节点相邻间隔中位 **2 分钟**，
@@ -64,15 +63,20 @@ const TICK_MINUTES = [10 * 60, 11 * 60, 13 * 60 + 30, 14 * 60, 14 * 60 + 30, 15 
  *    也与本函数注释自述不符（用户抓包「这种题材爆发的节点，可以标紫色显示」）。
  *    现统一为 `bg-rec`（紫），并同步卡片题材区的 🚀 首爆 标签色。
  */
-function barTone(s: BlockSummary, block: TimelineBlock): string {
-  if (block.kind === 'linkage') return 'bg-up'
-  if (s.fade.length > 0 || s.downSectorCount > 0 || s.otherDownCount > 0) return 'bg-down'
-  if (s.burst.length > 0) return 'bg-rec'
-  // 仅龙头轮动的题材 → **淡紫**（弱一档：题材被观测到，但不是新崛起）
-  if (s.rotated.length > 0) return 'bg-rec/40'
-  if (s.upSectorCount > 0 || s.otherUpCount > 0) return 'bg-up/70'
-  if (block.kind === 'merged') return 'bg-line-strong'
-  return 'bg-sub'
+function barVisual(s: BlockSummary, block: TimelineBlock): {
+  kind: 'linkage' | 'risk' | 'burst' | 'rotation' | 'up' | 'system' | 'normal'
+  className: string
+  width: number
+  title: string
+} {
+  // 颜色表示方向与题材，宽度/空心表示事件类型；不能只靠色相区分。
+  if (block.kind === 'linkage') return { kind: 'linkage', className: 'bg-up ring-1 ring-up', width: 14, title: '多板块联动' }
+  if (s.fade.length > 0 || s.downSectorCount > 0 || s.otherDownCount > 0) return { kind: 'risk', className: 'bg-down', width: SNAKE_BAR_W, title: '风险或负反馈' }
+  if (s.burst.length > 0) return { kind: 'burst', className: 'bg-rec', width: SNAKE_BAR_W, title: '题材新爆发' }
+  if (s.rotated.length > 0) return { kind: 'rotation', className: 'border border-rec bg-card', width: SNAKE_BAR_W, title: '题材轮动或回流' }
+  if (s.upSectorCount > 0 || s.otherUpCount > 0) return { kind: 'up', className: 'bg-up/70', width: SNAKE_BAR_W, title: '盘中走强' }
+  if (block.kind === 'merged') return { kind: 'system', className: 'bg-line-strong', width: SNAKE_BAR_W, title: '低频系统记录' }
+  return { kind: 'normal', className: 'bg-sub', width: SNAKE_BAR_W, title: '盘中事实' }
 }
 
 /** 该刻的**活跃度**（用于竖条高度）—— 收盘口径个股 + 盘中板块事件 + 题材信号权重 */
@@ -347,6 +351,30 @@ export function TimelineSnake({
     [layout],
   )
 
+  /**
+   * 相邻分钟的可视竖条可只隔约 22px，而旧命中区为 26px，会让后一个节点遮住前一个。
+   * 按同一行相邻落点收窄命中区，保证密集时每个分钟节点仍可独立 hover。
+   */
+  const hitWidthByKey = useMemo(() => {
+    const widths = new Map<string, number>()
+    const byRow = new Map<number, typeof nodes>()
+    for (const node of nodes) {
+      const row = byRow.get(node.point.row)
+      if (row) row.push(node)
+      else byRow.set(node.point.row, [node])
+    }
+    for (const row of byRow.values()) {
+      const ordered = [...row].sort((a, b) => a.point.x - b.point.x)
+      ordered.forEach((node, index) => {
+        const before = index > 0 ? Math.abs(node.point.x - ordered[index - 1].point.x) : SNAKE_NODE_W
+        const after = index < ordered.length - 1 ? Math.abs(ordered[index + 1].point.x - node.point.x) : SNAKE_NODE_W
+        // 不低于竖条宽度，避免密集时把可视标记变成难以操作的像素点。
+        widths.set(node.block.key, Math.max(SNAKE_BAR_W, Math.min(SNAKE_NODE_W, before, after)))
+      })
+    }
+    return widths
+  }, [nodes])
+
   return (
     <div className="flex flex-col gap-2 min-w-0">
       <div ref={setEl} className="relative min-w-0" style={{ height: layout.height }}>
@@ -371,7 +399,7 @@ export function TimelineSnake({
           <TimeGrid key={t.m} x={t.x} y={t.y} rowHeight={layout.rowHeight} label={t.label} />
         ))}
 
-        {/* ── 行标签（每行的起止时刻；⛔ 用 fromClock 而非 axis）── */}
+        {/* ── 行标签（固定四段的墙上时钟范围）── */}
         {layout.lanes.map((lane) => (
           <span
             key={`lane-${lane.row}`}
@@ -383,13 +411,15 @@ export function TimelineSnake({
             }}
             aria-hidden
           >
-            {minToClock(clockOfAxis(lane.fromAxis))} → {minToClock(clockOfAxis(lane.toAxis))}
+            {minToClock(lane.fromClock)} → {minToClock(lane.toClock)}
           </span>
         ))}
 
         {/* ── 节点（小标记：细竖条，高度编码活跃度；明细走 hover）── */}
         {nodes.map(({ block, point, summary }) => {
           const isOpen = block.key === openKey
+          const visual = barVisual(summary, block)
+          const hitWidth = hitWidthByKey.get(block.key) ?? SNAKE_NODE_W
           const outsideTag =
             point.outside === 'post' ? '（盘后）' : point.outside === 'pre' ? '（盘前）' : ''
           /**
@@ -423,11 +453,11 @@ export function TimelineSnake({
               onMouseLeave={leaveNode}
               onFocus={() => enterNode(block.key)}
               onBlur={leaveNode}
-              className="absolute cursor-help border-0 bg-transparent p-0"
+              className="absolute cursor-pointer border-0 bg-transparent p-0"
               style={{
                 left: point.x,
                 top: point.y,
-                width: SNAKE_NODE_W,
+                width: hitWidth,
                 height: SNAKE_BAR_MAX_H + 22,
                 // 命中区中心对齐落点（竖条再以命中区中心为基准）
                 transform: 'translate(-50%, -50%)',
@@ -449,17 +479,19 @@ export function TimelineSnake({
               {isOpen && (
                 <span
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[4px] ring-2 ring-line-strong pointer-events-none"
-                  style={{ width: SNAKE_NODE_W - 6, height: SNAKE_BAR_MAX_H + 10 }}
+                  style={{ width: Math.max(SNAKE_BAR_W, hitWidth - 6), height: SNAKE_BAR_MAX_H + 10 }}
                 />
               )}
               {/* 竖条：高度 = 活跃度，颜色 = 性质 */}
               <span
                 className={cn(
                   'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none',
-                  barTone(summary, block),
+                  visual.className,
                   isOpen && 'ring-2 ring-line-strong',
                 )}
-                style={{ width: SNAKE_BAR_W, height: barHeight(summary) }}
+                style={{ width: visual.width, height: barHeight(summary) }}
+                data-node-kind={visual.kind}
+                title={visual.title}
               />
               {/* 时刻标签：只给显著节点 / 盘外记录，且同层不挤才显示 */}
               {labeled.has(block.key) && (

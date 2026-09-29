@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
-import type { RotationData, SectorFlowFull } from '@/shared/api'
-import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
+import type { RotationData, SectorFlowFull, SectorFundPool } from '@/shared/api'
+import { DataTable, SegTabs, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { analyticsQueries } from '@/features/analytics'
 import {
@@ -12,7 +12,6 @@ import {
   EmptyState,
   HeatMatrix,
   Icon,
-  Sparkline,
   Zone,
   ZoneRow,
   type HeatRow,
@@ -54,6 +53,7 @@ import { cn } from '@/shared/lib'
 
 export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.flowHistory())
+  await queryClient.ensureQueryData(analyticsQueries.flowLive())
   await queryClient.ensureQueryData(marketQueries.rotation())
   return null
 }
@@ -66,7 +66,7 @@ interface FlowBoardRow {
   tx_flow_yi?: number | null
   tx_5d_yi?: number | null
   tx_10d_yi?: number | null
-  is_focus: boolean
+  is_focus?: boolean
 }
 
 interface FlowDayFile {
@@ -75,10 +75,19 @@ interface FlowDayFile {
   boards: Record<string, Omit<FlowBoardRow, 'name'>>
 }
 
-/** 跨日窗口长度（交易日）。10 日 ≈ 两个自然周，足够看出一轮进出的起落 */
-const WINDOW = 10
-/** 矩阵行数 / 轨迹条数上限 —— 再多就变成「什么都看不清的密集网格」 */
-const ROWS_MAX = 12
+interface FlowDay {
+  date: string
+  generated_ts: string
+  rows: FlowBoardRow[]
+  /** 收盘归档与盘中快照必须明确区分，避免把盘中值说成收盘值。 */
+  source: 'archive' | 'live'
+}
+
+/** 最多回看 20 个交易日；当前可用归档少于 20 日时，完整使用所有已归档交易日。 */
+const WINDOW_MAX = 20
+/** 矩阵保留今日流入、流出两端各 15 个板块。 */
+const MATRIX_ROWS_MAX = 30
+const MATRIX_INFLOW_ROWS = 15
 
 /** 资金额格式化：带正号 + 单位亿（正负号是资金流的语义核心，不能省） */
 function yi(v: number): string {
@@ -87,6 +96,7 @@ function yi(v: number): string {
 
 export function Component() {
   const hist = useQuery(analyticsQueries.flowHistory())
+  const live = useQuery(analyticsQueries.flowLive())
   const rot = useQuery(marketQueries.rotation())
   const [tab, setTab] = useState<'today' | '5d' | 'daily'>('today')
 
@@ -94,7 +104,7 @@ export function Component() {
 
   /** 逐日档：解析成 { date, rows[] } 数组，日期倒序 */
   const days = useMemo(() => {
-    return (hist.data ?? [])
+    const archivedDays: FlowDay[] = (hist.data ?? [])
       .map((f) => f.data as unknown as FlowDayFile | null)
       .filter((x): x is FlowDayFile => !!x && typeof x === 'object' && !!x.boards)
       .map((x) => ({
@@ -103,57 +113,79 @@ export function Component() {
         rows: Object.entries(x.boards)
           .map(([name, v]) => ({ name, ...v }) as FlowBoardRow)
           .sort((a, b) => (b.flow_yi ?? -Infinity) - (a.flow_yi ?? -Infinity)),
+        source: 'archive' as const,
       }))
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }, [hist.data])
+    const livePool = live.data as SectorFundPool | undefined
+    if (!livePool?.date || !livePool.boards || typeof livePool.boards !== 'object') {
+      return archivedDays.sort((a, b) => b.date.localeCompare(a.date))
+    }
+
+    const liveDay: FlowDay = {
+      date: livePool.date,
+      generated_ts: new Date(livePool.ts * 1000).toISOString(),
+      rows: Object.entries(livePool.boards)
+        .map(([name, value]) => ({ name, pct: value.pct, flow_yi: value.flow_yi }) as FlowBoardRow)
+        .sort((a, b) => (b.flow_yi ?? -Infinity) - (a.flow_yi ?? -Infinity)),
+      // 今日盘中池没有关注标记；不伪造该展示元数据。
+      source: 'live' as const,
+    }
+    const existing = archivedDays.findIndex((day) => day.date === liveDay.date)
+    // 同日以板块数较多的完整来源为准，防止收盘归档尚未完成时用残缺文件覆盖盘中全量快照。
+    if (existing >= 0 && archivedDays[existing].rows.length >= liveDay.rows.length) {
+      return archivedDays.sort((a, b) => b.date.localeCompare(a.date))
+    }
+    const merged = existing >= 0
+      ? archivedDays.map((day, i) => (i === existing ? liveDay : day))
+      : [...archivedDays, liveDay]
+    return merged.sort((a, b) => b.date.localeCompare(a.date))
+  }, [hist.data, live.data])
 
   const [dayIdx, setDayIdx] = useState(0)
   const activeDay = days[Math.min(dayIdx, Math.max(0, days.length - 1))]
 
-  /** 当日全板块合计净额 —— 判断「钱是净流入市场还是净流出」 */
-  const dayNetSum = useMemo(
-    () => (activeDay?.rows ?? []).reduce((s, r) => s + (r.flow_yi ?? 0), 0),
-    [activeDay],
-  )
-
   /**
-   * 跨日派生视图 —— 矩阵 / 轨迹 / 全局量纲。
+   * 跨日派生视图 —— 矩阵 / 全局量纲。
    *
    * 三件事一次算完（同源，共用一份按日索引）：
-   *   1. `rows`    矩阵行（按窗口内**累计绝对净额**取前 12）
-   *   2. `trails`  轨迹条（同口径取前 10，附窗口累计净额）
-   *   3. `absMax`  全窗口最大单日绝对净额 —— 逐日双向榜的**固定量纲**
+   *   1. `rows`    矩阵行（今日流入前 15 + 流出前 15）
+   *   2. `absMax`  全窗口最大单日绝对净额 —— 逐日双向榜的**固定量纲**
    *
-   * ## 为什么选行标准是「累计绝对净额」而不是「累计净额」
-   *
-   * 净额会在流入流出相抵后归零：一个「天天 +80 亿再 -70 亿」的高换手板块，
-   * 净额只有 +10 亿，按净额排序会被淘汰，但它恰恰是盘面最需要盯的资金主战场。
-   * 绝对净额衡量的是**资金动静**，这才对应「这个板块有没有在打」。
+   * 只取今日流入、流出两端，各保留 15 个，便于同时观察攻击和撤离方向。
    */
   const crossDay = useMemo(() => {
-    const win = days.slice(0, WINDOW).reverse() // 时间升序：左旧右新
+    const win = days.slice(0, WINDOW_MAX) // 最新 → 最旧：29、28、27
     if (win.length < 2) return null
 
     // 每日一份 name→flow 索引：避免在嵌套循环里反复 find（100+ 板块 × N 日）
     const idx = win.map((day) => new Map(day.rows.map((r) => [r.name, r.flow_yi])))
     const total = new Map<string, number>()
-    const weight = new Map<string, number>()
     let absMax = 0
 
     for (const m of idx) {
       for (const [name, v] of m) {
         if (v == null) continue
         total.set(name, (total.get(name) ?? 0) + v)
-        weight.set(name, (weight.get(name) ?? 0) + Math.abs(v))
         absMax = Math.max(absMax, Math.abs(v))
       }
     }
-    if (!weight.size) return null
+    if (!total.size) return null
 
-    const picked = [...weight.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, ROWS_MAX)
-      .map(([name]) => name)
+    const today = idx[0]
+    const todayRows = [...total.keys()]
+      // 无今日实测值不能参与今日流入/流出排名，也不能伪装成 0。
+      .flatMap((name) => {
+        const value = today.get(name)
+        return value == null ? [] : [{ name, value }]
+      })
+    const byValueDesc = (a: { name: string; value: number }, b: { name: string; value: number }) =>
+      b.value - a.value || a.name.localeCompare(b.name, 'zh-Hans-CN')
+    const inflow = todayRows.filter((row) => row.value > 0).sort(byValueDesc).slice(0, MATRIX_INFLOW_ROWS)
+    const outflow = todayRows
+      .filter((row) => row.value < 0)
+      .sort((a, b) => a.value - b.value || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+      .slice(0, MATRIX_ROWS_MAX - MATRIX_INFLOW_ROWS)
+    // 统一按今日净流入高→低呈现：上方流入，下方流出。
+    const picked = [...inflow, ...outflow].sort(byValueDesc).map((row) => row.name)
 
     const rows: HeatRow[] = picked.map((name) => {
       const t = total.get(name) ?? 0
@@ -164,13 +196,7 @@ export function Component() {
       }
     })
 
-    const trails = picked.slice(0, 10).map((name) => ({
-      name,
-      total: total.get(name) ?? 0,
-      points: idx.map((m) => m.get(name) ?? null),
-    }))
-
-    return { cols: win.map((x) => x.date.slice(5)), rows, trails, absMax }
+    return { cols: win.map((x) => x.date.slice(5)), rows, absMax, days: win.length }
   }, [days])
 
   const mc = d?.market_context
@@ -204,34 +230,8 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card
-        title="💰 资金流向"
-        extra={
-          <CardBadge tone={dayNetSum >= 0 ? 'up' : 'down'}>
-            逐日档合计 {n2(dayNetSum)} 亿
-          </CardBadge>
-        }
-      >
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
-          <StatPair label="轮动数据日" value={d?.date ?? '—'} />
-          <StatPair label="逐日档期数" value={days.length} />
-          <StatPair label="最新档" value={activeDay?.date ?? '—'} />
-          <StatPair label="5日窗口" value={d?.flow_5d?.data_days?.join(' ~ ') ?? '—'} />
-          <StatPair label="对齐天数" value={d?.data_meta?.aligned_days ?? '—'} />
-        </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
-          三路口径并列：<b className="text-txt">当日</b>主力资金（易被大单扰动）·
-          <b className="text-txt">5 日累计</b>（抗扰动，看持续性）·
-          <b className="text-txt">逐日原始档</b>（全板块，含滚动 5/10 日交叉验证）。
-          单日冠军不等于持续主线。
-        </p>
-      </Card>
-
-      {/* 主工作区 = 板块资金（当日对决 + 5日累计 + 逐日原始档，内容最多、列最宽）；
-          辅助区 = 跨日资金矩阵 + 板块资金轨迹（趋势类，次要）。
-          ⛔ 旧版 4 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
       <ZoneRow>
-        <Zone label="板块资金" dot="bg-lead" className="xl:w-[62%]">
+        <Zone label="板块资金" dot="bg-lead" className="xl:w-[48%]">
           <Card
             title="板块资金"
         extra={
@@ -324,6 +324,7 @@ export function Component() {
                   </select>
                   <span className="text-sub text-[11.5px]">
                     共 {activeDay?.rows.length ?? 0} 个板块 · 生成于 {activeDay?.generated_ts?.slice(11, 19) || '—'}
+                    {activeDay?.source === 'live' && ' · 今日盘中全量快照'}
                   </span>
                 </div>
 
@@ -333,7 +334,7 @@ export function Component() {
                     title="当日进出两端"
                     hint={
                       crossDay
-                        ? `固定量纲：条长以 ${WINDOW} 日最大单日净额 ${n1(crossDay.absMax)} 亿为基准，跨日期可比`
+                        ? `固定量纲：条长以 ${crossDay.days} 日最大单日净额 ${n1(crossDay.absMax)} 亿为基准，跨日期可比`
                         : '仅本批相对比较'
                     }
                   />
@@ -420,13 +421,13 @@ export function Component() {
 
         </Zone>
 
-        <Zone label="跨日与轨迹" dot="bg-mid" className="xl:w-[38%]">
+        <Zone label="跨日资金" dot="bg-mid" className="xl:w-[52%]">
           {/* ── 跨日资金矩阵：单日榜看不到的「持续性」全在这一张里 ── */}
           <Card
             title="🧊 跨日资金矩阵"
         extra={
           <CardBadge tone="warn">
-            行=板块 · 列=交易日 · 序 = {WINDOW} 日资金动静前 {ROWS_MAX}
+            今日流入前 {MATRIX_INFLOW_ROWS} · 流出前 {MATRIX_ROWS_MAX - MATRIX_INFLOW_ROWS}
           </CardBadge>
         }
       >
@@ -437,14 +438,17 @@ export function Component() {
               cols={crossDay.cols}
               max={crossDay.absMax}
               format={(v) => (v == null ? '—' : yi(v))}
-              cellW={52}
-              cellH={24}
-              labelWidth={92}
+              cellW={60}
+              cellH={26}
+              labelWidth={120}
+              noteWidth={56}
               legend
+              signed
+              fit
             />
             <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
-              选行标准 = <b className="text-txt">窗口内累计绝对净额</b>（资金动静），而非累计净额 ——
-              后者会在流入流出相抵后归零，把「天天大开大合」的高换手板块筛掉，而那恰恰是资金主战场。
+              仅展示<b className="text-txt">今日净流入前 {MATRIX_INFLOW_ROWS}</b> 与
+              <b className="text-txt">净流出前 {MATRIX_ROWS_MAX - MATRIX_INFLOW_ROWS}</b> 个板块，行序按今日净额从高到低；每格保留该日真实净额，悬停可读数。
               颜色深浅按各格绝对值占全窗口最大单日净额（<span className="num">{n1(crossDay.absMax)}</span> 亿）的比例着色：
               <b className="text-up"> 红=净流入</b> / <b className="text-down">绿=净流出</b>。
               <b className="text-txt"> 斜纹灰格 = 当日该板块无记录</b>（非 0，指数据缺失）。
@@ -455,56 +459,6 @@ export function Component() {
         )}
       </Card>
 
-      {/* ── 板块资金轨迹：形状比数字更能暴露「突然放量」与「逐日衰减」── */}
-      <Card
-        title="🧵 板块资金轨迹"
-        extra={<CardBadge tone={crossDay ? 'neutral' : 'warn'}>{WINDOW} 日逐日净额折线</CardBadge>}
-      >
-        {crossDay ? (
-          <>
-            <div className="flex flex-col gap-1">
-              {crossDay.trails.map((t) => (
-                <div
-                  key={t.name}
-                  className="flex items-center gap-2 text-[12px] py-0.5 border-b border-line/40 last:border-0"
-                >
-                  <span className="w-[92px] shrink-0 truncate text-txt" title={t.name}>
-                    {t.name}
-                  </span>
-                  <Sparkline
-                    points={t.points}
-                    tone={t.total >= 0 ? 'up' : 'down'}
-                    area
-                    height={22}
-                    className="flex-1"
-                    /* 带日期轴：否则悬浮只能报「第 4 个点 = 37」，而人真正要问的是「哪一天是 37」 */
-                    labels={crossDay.cols}
-                    format={(v) => `${yi(v)} 亿`}
-                  />
-                  <span
-                    className={cn(
-                      'num w-[68px] shrink-0 text-right font-semibold',
-                      t.total > 0 ? 'text-up' : t.total < 0 ? 'text-down' : 'text-txt',
-                    )}
-                    title={`${WINDOW} 日累计净额`}
-                  >
-                    {yi(t.total)} 亿
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
-              每行一条折线 = 该板块在窗口内的逐日净额轨迹。着色按<b className="text-txt">
-                窗口累计净额
-              </b>的正负（红=净流入 / 绿=净流出），形状则反映节奏：连续同色爬升 = 持续吸金，
-              单根尖峰 = 一日游，逐步收敛向零 = 资金撤离。
-              <b className="text-txt"> 缺失日断线不补零</b> —— 补零会伪造出「资金归零」的形态。
-            </p>
-          </>
-        ) : (
-          <EmptyState text="轨迹需要至少 2 个逐日档" />
-        )}
-      </Card>
         </Zone>
       </ZoneRow>
     </div>

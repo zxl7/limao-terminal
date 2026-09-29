@@ -83,6 +83,8 @@ export const ROUTES: Record<string, RouteDef> = {
   //    裁剪决策点：若确认不再产出，连同 `sequence` endpoint 一并删除。
   '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'daily',    desc: '题材序列（⚠️ 疑似停更 · 已被 theme/series 取代 · 仅留档）' },
   '/api/flow/history':      { dir: 'cache/sector_flow_history', pattern: '^sector_flow_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily', desc: '板块资金历史（多日合并）' },
+  // 盘中全量板块资金池：与收盘后逐日归档并列，终端只读此实时快照补齐今日。
+  '/api/flow/live':         { file: 'cache/pulse_snapshots/sector_fund_pool.json', cadence: 'intraday', desc: '板块资金盘中全量快照（今日）' },
 
   // ══════════════════════════════════════════════════════════════
   // 三、板块核心票（scripts/board_core.py · 四维加权）

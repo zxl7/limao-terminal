@@ -318,7 +318,7 @@ export function Component() {
         <Card title="观察池与主板池全量" extra={<CardBadge>按题材归属核对</CardBadge>}>
           <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5 mb-2">
             铁律：池内题材标签不可直接采信 —— 须按个股真实主轴核对。下表按题材分组列出标的，
-            距「可操作」还差一步人工确认。
+            涨幅只显示当日实时行情；取不到即为「—」，距「可操作」还差一步人工确认。
           </p>
           <div className="flex flex-col gap-2">
             {sorted.map((c) => (
@@ -337,14 +337,15 @@ export function Component() {
                       className={cn(
                         'badge border',
                         s.dragon ? 'border-lead text-lead' : 'border-line text-sub',
-                        s.pct > 0 && !s.dragon && 'text-up border-up',
+                        (s.live_pct ?? 0) > 0 && !s.dragon && 'text-up border-up',
                       )}
-                      title={`${s.code} · ${s.board || '板块未知'} · ${n2(s.cap_yi)}亿${s.risk ? ` · ${s.risk}` : ''}`}
+                      title={`${s.code} · ${s.board || '板块未知'} · 实时涨幅 ${s.live_pct != null ? pct(s.live_pct, 1) : '—'}${c.boom_day ? ` · 建池日 ${c.boom_day}` : ''} · ${n2(s.cap_yi)}亿${s.risk ? ` · ${s.risk}` : ''}`}
                     >
                       <StockLink code={s.code}>
                         {s.dragon ? '龙 ' : ''}
                         {s.name}
-                        <span className="num ml-1">{pct(s.pct, 1)}</span>
+                        <span className="text-sub text-[10px] ml-1">实时</span>
+                        <span className="num ml-1">{s.live_pct != null ? pct(s.live_pct, 1) : '—'}</span>
                       </StockLink>
                     </span>
                   ))}

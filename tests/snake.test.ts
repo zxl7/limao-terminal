@@ -4,6 +4,7 @@ import {
   clockOfAxis,
   layoutSnake,
   SEAM_AXIS,
+  SESSION_AM_END,
   SESSION_CLOSE,
   SESSION_OPEN,
   SESSION_TOTAL_MIN,
@@ -26,19 +27,19 @@ import type { ZtPoolStock } from '@/shared/api'
  * 而不是断言某个具体像素值。
  */
 
-/** 09:15 + n 分钟（上午段，不跨午休） */
+/** 09:25 + n 分钟（上午段，不跨午休） */
 const am = (n: number) => SESSION_OPEN + n
 /** 13:00 + n 分钟（下午段） */
 const pm = (n: number) => 13 * 60 + n
 
 describe('轴坐标换算 axisOf / clockOfAxis（午休折叠）', () => {
-  it('09:15 → 0，11:30 → 接缝 135', () => {
+  it('09:25 → 0，11:30 → 接缝 125', () => {
     expect(axisOf(am(0))).toBe(0)
-    expect(axisOf(am(135))).toBe(SEAM_AXIS)
-    expect(SEAM_AXIS).toBe(135)
+    expect(axisOf(SESSION_AM_END)).toBe(SEAM_AXIS)
+    expect(SEAM_AXIS).toBe(125)
   })
 
-  it('13:00 → 仍是接缝 135（⛔ 午休 90 分钟被压掉，不留死白）', () => {
+  it('13:00 → 仍是接缝 125（⛔ 午休 90 分钟被压掉，不留死白）', () => {
     expect(axisOf(13 * 60)).toBe(SEAM_AXIS)
   })
 
@@ -47,13 +48,13 @@ describe('轴坐标换算 axisOf / clockOfAxis（午休折叠）', () => {
     expect(axisOf(11 * 60 + 45)).toBe(SEAM_AXIS)
   })
 
-  it('13:01 → 136，15:00 → 255（交易分钟总数）', () => {
-    expect(axisOf(pm(1))).toBe(136)
+  it('13:01 → 126，15:00 → 245（交易分钟总数）', () => {
+    expect(axisOf(pm(1))).toBe(126)
     expect(axisOf(SESSION_CLOSE)).toBe(SESSION_TOTAL_MIN)
-    expect(SESSION_TOTAL_MIN).toBe(255)
+    expect(SESSION_TOTAL_MIN).toBe(245)
   })
 
-  it('越界钳制：早于 09:15 → 0，晚于 15:00 → 255，非法值 → 0', () => {
+  it('越界钳制：早于 09:25 → 0，晚于 15:00 → 245，非法值 → 0', () => {
     expect(axisOf(8 * 60)).toBe(0)
     expect(axisOf(16 * 60)).toBe(SESSION_TOTAL_MIN)
     expect(axisOf(Number.NaN)).toBe(0)
@@ -62,25 +63,38 @@ describe('轴坐标换算 axisOf / clockOfAxis（午休折叠）', () => {
 
   it('★ 往返一致：`clockOfAxis(axisOf(m)) === m`（⚠️ 接缝两点除外，见下条）', () => {
     // ⛔ 11:30 与 13:00 被折叠到**同一个轴点**，往返天然不可区分 —— 故样本不含这两点
-    const sample = [am(0), am(1), am(60), am(134), pm(1), pm(60), pm(119), pm(120)]
+    const sample = [am(0), am(1), am(60), am(124), pm(1), pm(60), pm(119), pm(120)]
     for (const m of sample) expect(clockOfAxis(axisOf(m))).toBe(m)
   })
 
   it('⚠️ 接缝歧义（设计如此）：11:30 与 13:00 塌成同一轴点，反向一律解回 11:30', () => {
-    expect(axisOf(am(135))).toBe(SEAM_AXIS)
+    expect(axisOf(SESSION_AM_END)).toBe(SEAM_AXIS)
     expect(axisOf(pm(0))).toBe(SEAM_AXIS)
-    expect(clockOfAxis(SEAM_AXIS)).toBe(am(135)) // 反向取上午侧
+    expect(clockOfAxis(SEAM_AXIS)).toBe(SESSION_AM_END) // 反向取上午侧
     // ⇒ 因此**贴标签一律走 clockOfAxis / lane.fromClock|toClock**，不要用 axis 反推时钟
   })
 
-  it('反向：接缝 135 → 11:30（上午收），136 → 13:01', () => {
+  it('反向：接缝 125 → 11:30（上午收），126 → 13:01', () => {
     expect(clockOfAxis(SEAM_AXIS)).toBe(11 * 60 + 30)
-    expect(clockOfAxis(136)).toBe(13 * 60 + 1)
+    expect(clockOfAxis(126)).toBe(13 * 60 + 1)
   })
 })
 
 describe('layoutSnake 不变量', () => {
   const W = 1600
+
+  it('固定四段：上午两根、下午两根，按蛇形方向连续连接', () => {
+    const L = layoutSnake({ marks: [SESSION_OPEN, 630, SESSION_AM_END, 780, 840, SESSION_CLOSE], width: W })
+    expect(L.rows).toBe(4)
+    expect(L.lanes.map((lane) => [lane.fromClock, lane.toClock])).toEqual([
+      [565, 630],
+      [630, 690],
+      [780, 840],
+      [840, 900],
+    ])
+    expect(L.points.map((point) => point.row)).toEqual([0, 1, 1, 2, 3, 3])
+    expect(L.path.match(/A /g)?.length).toBe(3)
+  })
 
   it('① 不丢不重：节点数 === 去重后的 marks 数，`at` 集合一致', () => {
     const marks = [am(10), am(3), am(10), am(200), am(3)] // 含重复
@@ -114,7 +128,7 @@ describe('layoutSnake 不变量', () => {
   })
 
   it('④ 坐标在界内：0 ≤ x ≤ width；y 不越出容器，也不串到邻行', () => {
-    const marks = [am(0), am(1), am(50), am(135), pm(0), pm(119), pm(120)]
+    const marks = [am(0), am(1), am(50), SESSION_AM_END, pm(0), pm(119), pm(120)]
     const L = layoutSnake({ marks, width: W })
     expect(L.points.length).toBe(marks.length)
     for (const p of L.points) {
@@ -129,14 +143,14 @@ describe('layoutSnake 不变量', () => {
     }
   })
 
-  it('④b 两端对齐：首行起点 = 09:15 落 x0，末行终点 = 15:00 落行末', () => {
+  it('④b 两端对齐：09:25 落首行起点，15:00 落末行终点', () => {
     const L = layoutSnake({ marks: [SESSION_OPEN, SESSION_CLOSE], width: W })
     const first = L.points.find((p) => p.at === SESSION_OPEN)!
     const last = L.points.find((p) => p.at === SESSION_CLOSE)!
     // 首行（正向）起点贴左端点；末行方向取决于 rows 奇偶，但一定贴该行的终点
     expect(first.x).toBeCloseTo(L.x0, 5)
     expect(last.row).toBe(L.rows - 1)
-    expect(last.x).toBeCloseTo(L.x1, 5)
+    expect(last.x).toBeCloseTo(L.x0, 5)
   })
 
   it('⑤ 路径合法：起点在首行起点、转弯数 === rows−1、含 NaN 判负', () => {
@@ -155,20 +169,20 @@ describe('layoutSnake 不变量', () => {
     expect(L.height).toBe(40 + L.rows * SNAKE_ROW_HEIGHT)
   })
 
-  it('密度驱动行数：节点越多行数越多，但仍封顶 SNAKE_MAX_ROWS（⛔ 不无限增高）', () => {
+  it('固定四段：节点密度不改变行数', () => {
     // 稀疏：节点间隔 1 小时 → 无需增行
     const few = layoutSnake({ marks: Array.from({ length: 5 }, (_, i) => am(i * 60)), width: W })
     // 密集：分钟级（真实形态）
     const many = layoutSnake({ marks: Array.from({ length: 130 }, (_, i) => am(i)), width: W })
     expect(few.rows).toBe(SNAKE_MIN_ROWS)
-    expect(many.rows).toBeGreaterThan(few.rows)
-    expect(many.rows).toBeLessThanOrEqual(SNAKE_MAX_ROWS)
+    expect(many.rows).toBe(SNAKE_MIN_ROWS)
+    expect(many.rows).toBe(SNAKE_MAX_ROWS)
   })
 
-  it('⚠️ 分钟级密集即使节点很少也要增行（1 分钟 × 255 分钟需要足够横向长度）', () => {
+  it('⚠️ 分钟级密集保持在固定时段，并如实标记拥挤', () => {
     // 5 个节点但相邻仅 1 分钟 —— 行宽不变时想给出 ≥minGap 的间距只能增行
     const fewDense = layoutSnake({ marks: [am(0), am(1), am(2), am(3), am(4)], width: W })
-    expect(fewDense.rows).toBeGreaterThan(SNAKE_MIN_ROWS)
+    expect(fewDense.rows).toBe(SNAKE_MIN_ROWS)
     expect(fewDense.overcrowded).toBe(false)
     expect(fewDense.minLaneGap!).toBeGreaterThanOrEqual(SNAKE_MIN_GAP)
   })
@@ -201,8 +215,8 @@ describe('layoutSnake 不变量', () => {
     expect(L.overcrowded).toBe(false)
     expect(L.minLaneGap).not.toBeNull()
     expect(L.minLaneGap!).toBeGreaterThanOrEqual(SNAKE_MIN_GAP)
-    // 也因此必须用到比下限更多的行数
-    expect(L.rows).toBeGreaterThan(SNAKE_MIN_ROWS)
+    // 固定四段仍保持原有时间归属
+    expect(L.rows).toBe(SNAKE_MIN_ROWS)
     // 守恒：一个不丢
     expect(L.points).toHaveLength(dense.length)
   })
@@ -268,7 +282,7 @@ describe('layoutSnake 不变量', () => {
     const noon = L.points.find((p) => p.at === 12 * 60 + 6)!
     expect(noon.axis).toBe(SEAM_AXIS)
     // 与 11:30 同轴坐标（同一位置：接缝 = 上午终点 = 下午起点）
-    expect(noon.axis).toBe(axisOf(am(135)))
+    expect(noon.axis).toBe(axisOf(SESSION_AM_END))
     // 而 11:15（am(120)）仍在上午段内，轴坐标 120 ≠ 135
     expect(L.points.find((p) => p.at === am(120))!.axis).toBe(120)
   })
@@ -287,8 +301,8 @@ describe('layoutSnake 不变量', () => {
 // 常量自检：导出面别漂移（组件与测试共用同一批常量）
 describe('常量面', () => {
   it('导出常量齐备且自洽', () => {
-    expect(SEAM_AXIS).toBe(135)
-    expect(SESSION_TOTAL_MIN).toBe(255)
+    expect(SEAM_AXIS).toBe(125)
+    expect(SESSION_TOTAL_MIN).toBe(245)
     expect(SNAKE_ROW_HEIGHT).toBe(128)
   })
 })
@@ -299,7 +313,7 @@ describe('常量面', () => {
  */
 describe('snakePos 与 layoutSnake 必须同源', () => {
   it('★ 布局里每个节点，用 snakePos 重算必须逐字段一致（含 x / y / row）', () => {
-    const L = layoutSnake({ marks: [am(0), am(7), am(60), am(135), pm(1), pm(60), SESSION_CLOSE], width: 1600 })
+    const L = layoutSnake({ marks: [am(0), am(7), am(60), SESSION_AM_END, pm(1), pm(60), SESSION_CLOSE], width: 1600 })
     for (const p of L.points) {
       const again = snakePos(L, p.at)
       // x / row 必须恒等（这是刻度与节点不错位的充要条件）
