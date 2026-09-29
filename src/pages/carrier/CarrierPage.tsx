@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { CarrierItem } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, fmtFbt, n1, pct } from '@/features/analytics'
+import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
@@ -33,12 +34,14 @@ import { cn } from '@/shared/lib'
 export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.carrierState())
   await queryClient.ensureQueryData(analyticsQueries.ma5Status())
+  await queryClient.ensureQueryData(marketQueries.feedback())
   return null
 }
 
 export function Component() {
   const carrier = useQuery(analyticsQueries.carrierState())
   const ma5 = useQuery(analyticsQueries.ma5Status())
+  const feedback = useQuery(marketQueries.feedback())
 
   const c = carrier.data
   const m = ma5.data
@@ -58,6 +61,15 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
+      <Card title="⚡ 盘中承接" extra={<CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>}>
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+          <StatPair label="晋级数" value={feedback.data?.promote_count ?? '—'} tone="up" />
+          <StatPair label="连板晋级" value={feedback.data?.lb_promote_count ?? '—'} tone="up" />
+          <StatPair label="最高板" value={feedback.data?.now_max_boards ?? '—'} tone="up" />
+          <StatPair label="核按钮" value={feedback.data?.nuke_count ?? '—'} tone={feedback.data?.nuke_count ? 'down' : 'sub'} />
+        </div>
+        <p className="mt-1.5 text-[11px] text-sub">盘中先看晋级与核按钮的承接变化；“确认载体 / 证伪”仍只由盘后结论文件写入，避免把过程信号当终态。</p>
+      </Card>
       <Card
         title="🧭 载体追踪"
         extra={<CardBadge tone={dead.length ? 'warn' : 'neutral'}>今日证伪 {dead.length} 家</CardBadge>}

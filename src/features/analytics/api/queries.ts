@@ -191,7 +191,8 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['decision', 'pool-call'] as const,
       queryFn: api.decisionPoolCall,
-      refetchInterval: intradayPollMs,
+      // 09:25 后以最终裁决文件为准，30 秒内同步到终端，避免推送与页面不同步。
+      refetchInterval: livePollMs,
       staleTime: 60_000,
     }),
 
@@ -201,6 +202,7 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['ai', 'view'] as const,
       queryFn: api.aiView,
+      refetchInterval: livePollMs,
       staleTime: DAILY_STALE,
     }),
   /** AI 判断台账 */
@@ -208,6 +210,7 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['ai', 'decisions'] as const,
       queryFn: api.aiDecisions,
+      refetchInterval: livePollMs,
       staleTime: DAILY_STALE,
     }),
   /** AI 轨净值 */

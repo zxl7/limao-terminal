@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { PromoDaily, PromoEvent, PromoSummaryRow } from '@/shared/api'
 import { analyticsQueries, SegTabs, n1, pct, tone } from '@/features/analytics'
+import { marketQueries } from '@/features/market'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
@@ -40,6 +41,7 @@ import { cn } from '@/shared/lib'
 export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.promotionSummary())
   await queryClient.ensureQueryData(analyticsQueries.promotionDaily())
+  await queryClient.ensureQueryData(marketQueries.feedback())
   return null
 }
 
@@ -56,6 +58,7 @@ export function Component() {
   const [tab, setTab] = useState<'summary' | 'daily'>('summary')
   const summary = useQuery(analyticsQueries.promotionSummary())
   const daily = useQuery(analyticsQueries.promotionDaily())
+  const feedback = useQuery(marketQueries.feedback())
 
   const rows = useMemo<PromoSummaryRow[]>(() => {
     const list = summary.data?.rows ?? []
@@ -110,6 +113,16 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
+      <Card title="⚡ 实时晋级反馈" extra={<CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>}>
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+          <span>昨日涨停 <b className="num text-txt">{feedback.data?.prev_zt_count ?? '—'}</b></span>
+          <span>今日晋级 <b className="num text-up">{feedback.data?.promote_count ?? '—'}</b></span>
+          <span>晋级率 <b className="num text-up">{feedback.data?.promote_rate != null ? `${n1(feedback.data.promote_rate)}%` : '—'}</b></span>
+          <span>连板晋级 <b className="num text-up">{feedback.data?.lb_promote_count ?? '—'}</b></span>
+          <span>核按钮 <b className={feedback.data?.nuke_count ? 'num text-down' : 'num text-sub'}>{feedback.data?.nuke_count ?? '—'}</b></span>
+        </div>
+        <p className="mt-1.5 text-[11px] text-sub">本卡随反馈矩阵刷新；下方统计仍是已收盘交易日的结果，不将盘中浮动状态混入历史晋级率。</p>
+      </Card>
       {/* ── 趋势层：先看周期位置，再看分段统计 ── */}
       {/* 两卡都是内容主体（趋势图 + 分档量化表），PC 下并排而非上下铺满。
           ⛔ 旧版纵向平铺：4K 下每张卡右侧大片空白。 */}

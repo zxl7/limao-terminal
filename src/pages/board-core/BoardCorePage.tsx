@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { BoardCoreFile, BoardCoreStock } from '@/shared/api'
 import { analyticsQueries } from '@/features/analytics'
+import { marketQueries } from '@/features/market'
 import { BarChart, Card, CardBadge, EmptyState, Icon, Radar, Zone, ZoneRow, type RadarAxis } from '@/shared/ui'
 import { cn, isNum } from '@/shared/lib'
 
@@ -37,6 +38,7 @@ import { cn, isNum } from '@/shared/lib'
 
 export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.boardCore())
+  await queryClient.ensureQueryData(marketQueries.latest())
   return null
 }
 
@@ -65,6 +67,7 @@ const BUCKETS = Array.from({ length: 10 }, (_, i) => ({
 
 export function Component() {
   const { data, isLoading, isError } = useQuery(analyticsQueries.boardCore())
+  const latest = useQuery(marketQueries.latest())
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<string | null>(null)
 
@@ -149,9 +152,24 @@ export function Component() {
   const ts = boards[0]?.ts
   const totalStocks = boards.reduce((n, b) => n + (b.top?.length ?? 0), 0)
   const maxCore = Math.max(1, ...boards.map((b) => b.top1.core_score))
+  const liveLeaders = useMemo(() => {
+    const coreCodes = new Set(boards.flatMap((board) => board.top.map((stock) => stock.code)))
+    return (latest.data?.top5 ?? [])
+      .map((theme) => ({ theme: theme.name, leader: theme.leader }))
+      .filter((item) => item.leader && coreCodes.has(item.leader.code.split('.')[0]))
+  }, [boards, latest.data?.top5])
 
   return (
     <div className="flex flex-col gap-3">
+      <Card title="⚡ 今日核心核验" extra={<CardBadge tone={liveLeaders.length ? 'up' : 'neutral'}>{latest.data?.ts?.slice(11, 19) ?? '等待行情快照'}</CardBadge>}>
+        {liveLeaders.length ? (
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px]">
+            {liveLeaders.map(({ theme, leader }) => <span key={theme}><b className="text-rec">{leader?.name}</b><span className="text-sub"> · {theme}</span></span>)}
+          </div>
+        ) : (
+          <p className="text-[11px] text-sub">当前主线题材尚未与历史核心池交集；这表示没有盘中验证，不代表核心票走弱。</p>
+        )}
+      </Card>
       {/* ── 视图层：形状（怎么算出来的）+ 分布（今天强票多不多）── */}
       {/* 维度说明（窄·读法解释） + 板块核心票（宽表·多列，给最大横向空间）。
           ⛔ 旧版两张卡等宽纵向平铺：雷达/维度卡右侧大片空白，核心票表又挤在半屏。 */}
