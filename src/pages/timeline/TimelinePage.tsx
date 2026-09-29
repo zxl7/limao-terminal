@@ -33,7 +33,7 @@ import {
   type ThemeBurstResult,
   type TimelineSlot,
 } from '@/features/analytics'
-import { Card, CardBadge } from '@/shared/ui'
+import { Card, CardBadge, StockLink } from '@/shared/ui'
 import { cn, inTrading, isStarMarket } from '@/shared/lib'
 import { useNow } from '@/shared/hooks'
 
@@ -581,7 +581,7 @@ export function Component() {
               <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                 {looseStocks.map((s) => (
                   <span key={s.code} className="text-[12px] text-txt">
-                    {s.name}
+                    <StockLink code={s.code}>{s.name}</StockLink>
                     <span className="num text-sub ml-1">{s.boards}板</span>
                     <span className="text-sub ml-1">{s.sector}</span>
                   </span>

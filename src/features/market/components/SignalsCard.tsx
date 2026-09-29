@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn, fmtPct, isStarMarket } from '@/shared/lib'
-import { Card, EmptyState } from '@/shared/ui'
+import { Card, EmptyState, StockLink } from '@/shared/ui'
 import type { ShortSpiritDeposit } from '@/shared/api'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
@@ -59,8 +59,7 @@ export function SignalsCard() {
                 <span className="num text-[11px] text-sub flex-none">
                   {s.first_seen ? s.first_seen.slice(0, 5) : '—'}
                 </span>
-                <span className="text-[13px] font-semibold">{s.name}</span>
-                <span className="text-[11px] text-sub">{s.code}</span>
+                <StockLink code={s.code} className="text-[13px] font-semibold">{s.name}</StockLink>
                 {s.pct != null ? (
                   <span className={cn('num text-[13px] font-semibold ml-auto', pctTone(s.pct))}>
                     {fmtPct(s.pct)}

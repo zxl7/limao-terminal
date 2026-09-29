@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { sentimentClass } from '@/shared/lib'
-import { Card, Kpi, KpiStrip } from '@/shared/ui'
+import { Card, Kpi, KpiStrip, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { defenseTone, feedbackTone } from '../model/labels'
 
@@ -81,8 +81,7 @@ export function ExtremeCard() {
                 <div key={n.code ?? n.name} className="rounded-sm bg-down-soft/50 px-2 py-1.5 text-[11px]">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 flex items-baseline gap-1.5">
-                      <b className="text-txt truncate">{n.name}</b>
-                      <span className="num text-sub">{n.code}</span>
+                      <StockLink code={n.code} className="text-txt truncate font-bold">{n.name}</StockLink>
                       {n.tag && <span className="text-sub">{n.tag}</span>}
                     </span>
                     <b className="num text-down shrink-0">{n.pct != null ? `${n.pct > 0 ? '+' : ''}${n.pct}%` : '—'}</b>

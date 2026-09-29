@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { DossierStock } from '@/shared/api'
 import { cn, biasText, cardPhaseText, sectorSentimentText, sectorTierText, viewText } from '@/shared/lib'
+import { StockLink } from '@/shared/ui'
 // ⚠️ `tone` 别名导入：本文件内 `Chip` 组件有一个同名的 `tone` prop，
 //    直接导入会被 lint 判为「遮蔽外层变量」（实测 1 warning，门禁要求 0）。
 import { n1, n2, pct, rangePct, tone as valueTone } from '../lib/format'
@@ -142,8 +143,8 @@ function dimEntries(v: unknown): Array<{ key: string; label: string; score: numb
   return out
 }
 
-/** 判断档位先行；同档聚焦题材第一，避免低位高分票压过空间龙。 */
-const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
+/** 判断档位先行；参与、观察、放弃与待裁决分别成类。 */
+const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2, pending: 3 }
 
 /**
  * 展示口径的「判断」= **今晨 09:25 终态优先**，无终态才回落昨日盘后预案。
@@ -152,21 +153,22 @@ const VIEW_ORDER: Record<string, number> = { participate: 0, watch: 1, skip: 2 }
  * 应该显示今天 9:25 的这个」—— 旧版直接渲染 `ai_view.view`（＝昨日 15:30 写的预案），
  * 于是真龙被判「一般」而跟风票被判「重点看」，与今晨实际成交完全相反。
  */
-const viewOf = (r: JudgeRow) => r.call?.view ?? r.view ?? ''
+const viewOf = (r: JudgeRow) => r.call?.view ?? r.view ?? 'pending'
 
-/** AI 裁决不变，只调整同一裁决档内的阅读与聚焦优先级。 */
+/** AI 裁决不变；每个裁决类别内严格按冻结排序评分从高到低展示。 */
 export function compareJudgeRows(a: JudgeRow, b: JudgeRow): number {
   const viewOrder = (VIEW_ORDER[viewOf(a)] ?? 9) - (VIEW_ORDER[viewOf(b)] ?? 9)
   if (viewOrder) return viewOrder
   const as = a.stock
   const bs = b.stock
+  const scoreOrder = (bs?.score ?? -Infinity) - (as?.score ?? -Infinity)
+  if (scoreOrder) return scoreOrder
   const leaderOrder =
     Number(bs?.is_sector_dragon) - Number(as?.is_sector_dragon)
     || (bs?.boards ?? 0) - (as?.boards ?? 0)
     || (bs?.carry_cnt ?? 0) - (as?.carry_cnt ?? 0)
     || (bs?.theme_mates_cnt ?? 0) - (as?.theme_mates_cnt ?? 0)
     || (bs?.lead_score ?? 0) - (as?.lead_score ?? 0)
-    || (bs?.score ?? 0) - (as?.score ?? 0)
   if (leaderOrder) return leaderOrder
   return (a.call?.statusRank ?? a.stock?.status_rank ?? Infinity)
     - (b.call?.statusRank ?? b.stock?.status_rank ?? Infinity)
@@ -228,12 +230,16 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
               finalView === 'participate' ? 'border-up/30 bg-up-soft/40' : 'border-line bg-card',
             )}
           >
-            {/* ── 标题行：名称 + 代码 + 判断 + 池别 + 标签 ── */}
+            {/* ── 标题行：名称 + 冻结排序评分 + 判断 + 池别 + 标签 ── */}
             <div className="flex items-baseline gap-2 flex-wrap mb-1.5 min-w-0">
-              <span className="text-[13.5px] font-semibold text-txt">
-                {s?.name || '未知标的'}
+              <StockLink code={r.code} className="text-[13.5px] font-semibold text-txt">
+                {s?.name || r.code}
+              </StockLink>
+              <span
+                className={cn('num text-[15px] font-semibold flex-none', (s?.score ?? 0) >= 80 ? 'text-up' : 'text-sub')}
+              >
+                {s?.score == null ? '—' : n1(s.score)}
               </span>
-              <span className="num text-[11.5px] text-sub">{r.code}</span>
               <span
                 className={cn(
                   'text-[11px] font-semibold px-1.5 rounded-sm border flex-none',

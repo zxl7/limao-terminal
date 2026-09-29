@@ -17,11 +17,12 @@ import {
   StatPair,
   Tag,
   type JudgeRow,
+  n1,
   n2,
   pct,
 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, LineChart, Zone, ZoneRow } from '@/shared/ui'
-import { biasText, cn, stanceText, viewText } from '@/shared/lib'
+import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
+import { cn, stanceText, viewText } from '@/shared/lib'
 
 /**
  * AI 台账 —— 数据源 `wealth_code/cache/ai_view/` + `ai_decisions.jsonl` + `ai_nav_history.jsonl`。
@@ -92,11 +93,13 @@ function ChangeBlock({
   label,
   empty,
   tone,
+  summary,
   children,
 }: {
   label: string
   empty: string
   tone: 'warn' | 'rec' | 'sub'
+  summary?: ReactNode
   children: ReactNode
 }) {
   const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : []
@@ -105,6 +108,7 @@ function ChangeBlock({
       <div className={cn('mb-1.5 text-[12px] font-semibold', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-sub')}>
         {label}
       </div>
+      {summary && <div className="mb-1.5 text-[10.5px] text-sub">{summary}</div>}
       {items.length ? <div className="flex flex-col gap-1.5">{children}</div> : <div className="text-[11px] text-sub">{empty}</div>}
     </section>
   )
@@ -112,11 +116,13 @@ function ChangeBlock({
 
 function ChangeRow({
   title,
+  titleText,
   tone,
   pct: pctVal,
   children,
 }: {
-  title: string
+  title: ReactNode
+  titleText?: string
   tone: 'warn' | 'rec' | 'sub'
   /** 个股涨跌幅度（今晨竞价涨幅 %）—— 缺数据时留空，不退化成 0 */
   pct?: number | null
@@ -127,7 +133,7 @@ function ChangeRow({
       <div className="flex items-baseline gap-1.5 min-w-0">
         <span
           className={cn('truncate text-[11.5px] font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')}
-          title={title}
+          title={titleText}
         >
           {title}
         </span>
@@ -269,9 +275,28 @@ export function Component() {
     [viewRows, stockMap, callFile],
   )
 
+  const decisionScoreByKey = useMemo(() => {
+    const scores = new Map<string, number>()
+    for (const file of dossiers.data ?? []) {
+      const d = file.data
+      if (!d) continue
+      for (const stock of [...(d.relay ?? []), ...(d.watch ?? [])]) {
+        if (stock.code && Number.isFinite(stock.score)) scores.set(`${d.date}-${stock.code}`, stock.score)
+      }
+    }
+    return scores
+  }, [dossiers.data])
+
+  /** 新台账直接读冻结评分；历史行仅从同日候选档案补读，不自行重算评分。 */
   const decRows = useMemo(
-    () => [...(decisions.data ?? [])].sort((a, b) => b.decision_date.localeCompare(a.decision_date)),
-    [decisions.data],
+    () =>
+      [...(decisions.data ?? [])]
+        .map((row) => ({
+          ...row,
+          ranking_score: row.ranking_score ?? decisionScoreByKey.get(`${row.decision_date}-${row.code}`),
+        }))
+        .sort((a, b) => b.decision_date.localeCompare(a.decision_date)),
+    [decisions.data, decisionScoreByKey],
   )
 
   const navRows = useMemo(
@@ -296,12 +321,25 @@ export function Component() {
   /** 今晨 09:25 实际买入只数（名额内成交） */
   const callCount = callFile?.meta?.participate?.length ?? 0
 
-  /** 今日变化只取后端已落盘的角色、周期证据与09:25裁决；页面不自行推断交易结论。 */
+  /** 今日变化只取已落盘预案、09:25裁决与竞价字段；页面不自行推断交易结论。 */
   const decisionChanges = useMemo(() => {
+    const finalViewOf = (row: JudgeRow) => row.call?.view ?? row.view ?? 'pending'
+    const plannedViewOf = (bias?: string) => ({ focus: 'participate', normal: 'watch', avoid: 'skip' }[bias ?? ''])
     const roleRows = judgeRows
       .map((row) => ({ row, role: roleOf(row) }))
       .filter((item): item is { row: JudgeRow; role: '龙头' | '准龙头' | '跟风' } => !!item.role)
       .sort((a, b) => compareJudgeRows(a.row, b.row))
+
+    const finalRows = [...judgeRows].sort(compareJudgeRows)
+    const finalCounts = finalRows.reduce<Record<string, number>>((counts, row) => {
+      const view = finalViewOf(row)
+      counts[view] = (counts[view] ?? 0) + 1
+      return counts
+    }, {})
+    const changed = finalRows.filter((row) => {
+      const planned = plannedViewOf(row.bias)
+      return !!row.call && !!planned && planned !== finalViewOf(row)
+    })
 
     const competition = roleRows.filter(({ row }) => {
       const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
@@ -311,8 +349,24 @@ export function Component() {
       const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
       return note.includes('断板') || note.includes('接力')
     })
-    const mechanical = judgeRows.filter((row) => row.call?.mechanicalLeader && row.bias !== 'focus')
-    return { roleRows, competition, succession, mechanical }
+    // 竞争与接力证据可能指向同一只票，只保留一次，避免把同一结论重复展示成两条。
+    const competitionRows = [...competition, ...succession].filter(
+      ({ row }, index, list) => list.findIndex((item) => item.row.code === row.code) === index,
+    )
+    const risks = finalRows
+      .map((row) => {
+        const reasons: string[] = []
+        const planned = plannedViewOf(row.bias)
+        const finalView = finalViewOf(row)
+        if (!row.call) reasons.push('今晨裁决冻结件未落盘')
+        if (row.call?.zone === 'above') reasons.push('竞价高于预期区间')
+        if (row.call?.zone === 'below') reasons.push('竞价低于预期区间')
+        if (row.call?.amountYi != null && row.call?.needYi != null && row.call.amountYi < row.call.needYi) reasons.push('竞价量能不足')
+        if (row.call?.mechanicalLeader && planned && planned !== finalView) reasons.push('AI预案与最终裁决不同')
+        return { row, reasons }
+      })
+      .filter((item) => item.reasons.length > 0)
+    return { finalRows, finalCounts, changed, competitionRows, risks, finalViewOf, plannedViewOf }
   }, [judgeRows])
 
   return (
@@ -323,31 +377,64 @@ export function Component() {
           extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{activeView.date}</CardBadge>}
         >
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
-            <ChangeBlock label="地位靠前" empty="暂无身份变化" tone="warn">
-              {decisionChanges.roleRows.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone={ROLE_TONE[role]} pct={row.call?.gapPct}>
-                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '周期证据待积累'}
+            <ChangeBlock
+              label="今日最终结论"
+              empty="暂无参与标的"
+              tone="warn"
+              summary={<>参与 {decisionChanges.finalCounts.participate ?? 0} · 观察 {decisionChanges.finalCounts.watch ?? 0} · 放弃 {decisionChanges.finalCounts.skip ?? 0} · 待裁决 {decisionChanges.finalCounts.pending ?? 0}</>}
+            >
+              {decisionChanges.finalRows.filter((row) => decisionChanges.finalViewOf(row) === 'participate').slice(0, 3).map((row) => (
+                <ChangeRow
+                  key={row.code}
+                  title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
+                  titleText={row.stock?.name ?? row.code}
+                  tone="warn"
+                  pct={row.call?.gapPct}
+                >
+                  {row.stock?.score == null ? '排序评分缺失' : `排序评分 ${n1(row.stock.score)}`}
                 </ChangeRow>
               ))}
             </ChangeBlock>
-            <ChangeBlock label="二进三竞争" empty="暂无完整竞争记录" tone="rec">
-              {decisionChanges.competition.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec" pct={row.call?.gapPct}>
-                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '竞争结果待确认'}
+            <ChangeBlock label="预案发生变化" empty="预案与今晨裁决一致" tone="rec">
+              {decisionChanges.changed.slice(0, 3).map((row) => {
+                const planned = decisionChanges.plannedViewOf(row.bias)
+                const final = decisionChanges.finalViewOf(row)
+                return (
+                  <ChangeRow
+                    key={row.code}
+                    title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
+                    titleText={row.stock?.name ?? row.code}
+                    tone="rec"
+                    pct={row.call?.gapPct}
+                  >
+                    {`${viewText(planned)} → ${viewText(final)}${row.call?.reason ? ` · ${shortReason(row.call.reason)}` : ''}`}
+                  </ChangeRow>
+                )
+              })}
+            </ChangeBlock>
+            <ChangeBlock label="龙头竞争" empty="暂无二进三或接力竞争证据" tone="rec">
+              {decisionChanges.competitionRows.slice(0, 3).map(({ row, role }) => (
+                <ChangeRow
+                  key={row.code}
+                  title={<StockLink code={row.code}>{`${row.stock?.name ?? row.code} · ${role}`}</StockLink>}
+                  titleText={`${row.stock?.name ?? row.code} · ${role}`}
+                  tone={ROLE_TONE[role]}
+                  pct={row.call?.gapPct}
+                >
+                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '竞争证据待积累'}
                 </ChangeRow>
               ))}
             </ChangeBlock>
-            <ChangeBlock label="新老接力线索" empty="暂无接力线索" tone="rec">
-              {decisionChanges.succession.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · ${role}`} tone="rec" pct={row.call?.gapPct}>
-                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '后续表现待确认'}
-                </ChangeRow>
-              ))}
-            </ChangeBlock>
-            <ChangeBlock label="AI与机械差异" empty="暂无需要关注的差异" tone="sub">
-              {decisionChanges.mechanical.slice(0, 3).map((row) => (
-                <ChangeRow key={row.code} title={`${row.stock?.name ?? row.code} · 昨预案 ${biasText(row.bias ?? '')}`} tone="sub" pct={row.call?.gapPct}>
-                  {shortReason(row.call?.mechanicalLeaderNote) ?? `今晨裁决：${viewText(row.call?.view ?? '')}`}
+            <ChangeBlock label="风险与分歧" empty="暂无竞价或裁决异常" tone="sub">
+              {decisionChanges.risks.slice(0, 3).map(({ row, reasons }) => (
+                <ChangeRow
+                  key={row.code}
+                  title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
+                  titleText={row.stock?.name ?? row.code}
+                  tone="sub"
+                  pct={row.call?.gapPct}
+                >
+                  {reasons.join(' · ')}
                 </ChangeRow>
               ))}
             </ChangeBlock>
@@ -357,7 +444,7 @@ export function Component() {
       {/* 概览窄栏（两轨口径提示） + 明细宽栏（逐笔判断记录，多列需横向空间）。
           ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
       <ZoneRow className="ai-ledger-layout">
-        <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-2 xl:sticky xl:top-3">
+        <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-1 xl:sticky xl:top-3">
           <Card
             title="🤖 AI 独立台账"
         extra={
@@ -398,7 +485,7 @@ export function Component() {
       </Card>
         </Zone>
 
-        <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-1">
+        <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-2">
           <Card
             title="判断明细"
         extra={
@@ -492,8 +579,16 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <span className="text-rec">{r.name || '—'}</span>
-                    <span className="num text-sub ml-1.5">{r.code}</span>
+                    <StockLink code={r.code} className="text-rec">{r.name || r.code}</StockLink>
+                  </span>
+                ),
+              },
+              {
+                label: '排序评分',
+                num: true,
+                cell: (r) => (
+                  <span className={cn('num font-semibold', (r.ranking_score ?? 0) >= 80 ? 'text-up' : 'text-txt')}>
+                    {r.ranking_score == null ? '—' : `${n1(r.ranking_score)} / 100`}
                   </span>
                 ),
               },
@@ -582,7 +677,7 @@ export function Component() {
                     <span className="flex flex-wrap gap-1">
                       {r.stocks.map((s) => (
                         <Tag key={s.code} tone={s.return_pct >= 0 ? 'up' : 'down'}>
-                          {s.name || s.code} {pct(s.return_pct, 1)}
+                          <StockLink code={s.code}>{s.name || s.code} {pct(s.return_pct, 1)}</StockLink>
                         </Tag>
                       ))}
                     </span>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn, fmtPct } from '@/shared/lib'
-import { Card, EmptyState } from '@/shared/ui'
+import { Card, EmptyState, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { tradableStocks } from '../model/filters'
 import { pctTone } from '../model/labels'
@@ -71,16 +71,16 @@ export function ExpectCard() {
                 {(dragons.length > 0 || others.length > 0) && (
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-0.5">
                     {dragons.map((s) => (
-                      <span key={s.code} className="text-[12px] font-semibold text-lead">
+                      <StockLink key={s.code} code={s.code} className="text-[12px] font-semibold text-lead">
                         ★{s.name}
                         <span className={cn('num ml-1', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</span>
-                      </span>
+                      </StockLink>
                     ))}
                     {others.map((s) => (
-                      <span key={s.code} className="text-[11.5px] text-txt">
+                      <StockLink key={s.code} code={s.code} className="text-[11.5px] text-txt">
                         {s.name}
                         <span className={cn('num ml-1', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</span>
-                      </span>
+                      </StockLink>
                     ))}
                   </div>
                 )}

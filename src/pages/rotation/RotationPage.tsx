@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { PoolStock, RotationCandidate, SectorFlowFull } from '@/shared/api'
 import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline, Zone, ZoneRow } from '@/shared/ui'
+import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, capitalText, klineText, phaseText, ztDirText } from '@/shared/lib'
 
 /**
@@ -640,8 +640,7 @@ function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
             cell: (r) => (
               <span>
                 {r.dragon && <span className="text-lead mr-1">龙</span>}
-                <span className="text-rec">{r.name}</span>
-                <span className="num text-sub ml-1">{r.code}</span>
+                <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
               </span>
             ),
           },

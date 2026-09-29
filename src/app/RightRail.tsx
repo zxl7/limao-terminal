@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { marketQueries } from '@/features/market'
-import { Card } from '@/shared/ui'
+import { Card, StockLink } from '@/shared/ui'
 import { fmtPct, isStarMarket, upcls } from '@/shared/lib'
 import type { Leader, HotSpot } from '@/shared/api'
 
@@ -94,7 +94,7 @@ function HotSpots({ spots }: { spots?: HotSpot[] }) {
                   <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                     {stocks.map((st) => (
                       <span key={st.code} className="text-[12px] text-sub">
-                        {st.name}
+                        <StockLink code={st.code}>{st.name}</StockLink>
                         <span className={`num ${upTone(st.pct)} ml-0.5`}>
                           {fmtPct(st.pct)}
                         </span>

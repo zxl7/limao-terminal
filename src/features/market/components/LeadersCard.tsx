@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn, fmtPct, isLimitUp } from '@/shared/lib'
-import { Card, EmptyState } from '@/shared/ui'
+import { Card, EmptyState, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
 import { mergeCoreStocks } from '../model/filters'
@@ -25,8 +25,7 @@ export function LeadersCard() {
               {g.stocks.map((s) => (
                 <div key={s.code || s.name} data-stock-code={s.code} className="grid grid-cols-[minmax(150px,1fr)_minmax(100px,1fr)_64px] items-center gap-2 border-t border-line-faint py-1">
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
-                    <span className={cn('text-[12.5px] font-semibold', !s.unsealed && isLimitUp(s.pct, s.is_20cm, s.boards) ? 'text-up' : 'text-txt')}>{s.name}</span>
-                    <span className="num text-[10.5px] text-sub">{s.code}</span>
+                    <StockLink code={s.code} className={cn('text-[12.5px] font-semibold', !s.unsealed && isLimitUp(s.pct, s.is_20cm, s.boards) ? 'text-up' : 'text-txt')}>{s.name}</StockLink>
                     {s.boards && <span className="badge bg-lead-soft text-lead">{s.boards}</span>}
                     {s.is_20cm && <span className="text-[10px] text-sub" title="20cm · 波动大须紧止损">20cm · 波动大</span>}
                   </div>

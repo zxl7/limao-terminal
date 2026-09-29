@@ -14,3 +14,4 @@ export { TONE_BG_SOFT, TONE_CLASS, toneClass, toneSoft, type ToneToken } from '.
 export * from './charts'
 /** 图标集（零依赖内联 SVG） */
 export { Icon, type IconName } from './Icon'
+export { StockLink, xueqiuStockUrl } from './StockLink'

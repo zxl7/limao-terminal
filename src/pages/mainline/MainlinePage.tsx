@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /** 环比 = 当日涨停数 − 昨日涨停数（⚠️ 不能用 `delta`，它是状态枚举） */
@@ -243,8 +243,7 @@ export function Component() {
           <div className="border border-line rounded-sm px-2.5 py-2 mb-3">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
               <span className="text-lead text-[12.5px] font-semibold">龙头</span>
-              <span className="text-[14px] font-semibold text-rec">{expanded.leader?.name ?? '—'}</span>
-              <span className="num text-sub text-[11.5px]">{expanded.leader?.code ?? ''}</span>
+              <StockLink code={expanded.leader?.code} className="text-[14px] font-semibold text-rec">{expanded.leader?.name ?? '—'}</StockLink>
               {expanded.leader?.boards && <Tag tone="up">{expanded.leader.boards}</Tag>}
               <StatPair
                 label="涨幅"
@@ -297,8 +296,7 @@ export function Component() {
                     label: '个股',
                     cell: (r) => (
                       <span>
-                        <span className="text-rec">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
                       </span>
                     ),
                   },

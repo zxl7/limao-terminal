@@ -25,7 +25,7 @@ import {
   tone as toneCls,
 } from '@/features/analytics'
 import { buildTideState, marketQueries, TideCard, tideConflict } from '@/features/market'
-import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, Zone, ZoneRow, maLine } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, StockLink, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn, sentimentClass } from '@/shared/lib'
 
 /**
@@ -660,8 +660,7 @@ export function Component() {
                       rows={y.zt_list ?? []}
                       rowKey={(r) => r.code}
                       columns={[
-                        { label: '名称', cell: (r) => <span className="text-txt">{r.name}</span> },
-                        { label: '代码', cell: (r) => <span className="num text-sub">{r.code}</span> },
+                        { label: '名称', cell: (r) => <StockLink code={r.code} className="text-txt">{r.name}</StockLink> },
                         { label: '板数', num: true, cell: (r) => boardsLabel(r.boards) },
                         {
                           label: '涨幅',

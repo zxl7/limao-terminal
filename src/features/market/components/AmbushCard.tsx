@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { cn, fmtPct } from '@/shared/lib'
-import { Card, EmptyState, Icon } from '@/shared/ui'
+import { Card, EmptyState, Icon, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
 
@@ -73,8 +73,7 @@ export function AmbushCard() {
                   <Icon name="target" size={12} />
                   可买
                 </span>
-                <span className="text-[13px] font-semibold text-txt">{e.buy?.name ?? '—'}</span>
-                <span className="num text-[11px] text-sub">{e.buy?.code}</span>
+                <StockLink code={e.buy?.code} className="text-[13px] font-semibold text-txt">{e.buy?.name ?? '—'}</StockLink>
                 <span className={cn('num text-[13px] font-semibold', pctTone(e.buy?.pct))}>
                   {fmtPct(e.buy?.pct)}
                 </span>

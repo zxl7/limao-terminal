@@ -10,7 +10,7 @@ import type {
   HithinkZtFile,
 } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -150,8 +150,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <span className="text-up">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-up">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -268,8 +267,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <span className="text-txt">{nameByCode.get(r.code) ?? '—'}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-txt">{nameByCode.get(r.code) ?? r.code}</StockLink>
                       </span>
                     ),
                   },
@@ -341,8 +339,7 @@ export function Component() {
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <Tag tone={ANOMALY_TONE[it.tag] ?? 'neutral'}>{it.tag}</Tag>
-                      <span className="text-[12.5px] text-txt font-medium">{it.name}</span>
-                      <span className="num text-[11px] text-sub">{it.code}</span>
+                      <StockLink code={it.code} className="text-[12.5px] text-txt font-medium">{it.name || it.code}</StockLink>
                     </div>
                     <p className="text-sub text-[11.5px] leading-relaxed">{it.content}</p>
                   </li>

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { EruptionDay, NewsflashHistoryDay } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n1, pct } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -194,11 +194,13 @@ export function Component() {
                           className={cn('badge border', s.dragon ? 'border-lead text-lead' : 'border-line text-sub')}
                           title={`${s.code} · 市值 ${n1(s.cap_yi)}亿`}
                         >
-                          {s.dragon ? '龙 ' : ''}
-                          {s.name}
-                          <span className={cn('num ml-1', s.pct > 0 ? 'text-up' : 'text-down')}>
-                            {n1(s.pct)}%
-                          </span>
+                          <StockLink code={s.code}>
+                            {s.dragon ? '龙 ' : ''}
+                            {s.name}
+                            <span className={cn('num ml-1', s.pct > 0 ? 'text-up' : 'text-down')}>
+                              {n1(s.pct)}%
+                            </span>
+                          </StockLink>
                         </span>
                       ))}
                       {t.stocks.length > 12 && (

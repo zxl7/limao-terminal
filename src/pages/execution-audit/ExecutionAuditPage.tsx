@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { ExecutionAudit } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag } from '@/features/analytics'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink } from '@/shared/ui'
 
 /** 真实执行审计：候选预测、题材/连板研究与账户收益不在此页混算。 */
 export async function loader() {
@@ -63,7 +63,7 @@ export function Component() {
           columns={[
             { label: '推荐日', cell: (row) => row.recommendation_date },
             { label: '执行日', cell: (row) => row.trade_date },
-            { label: '标的', cell: (row) => `${row.name} ${row.code}` },
+            { label: '标的', cell: (row) => <StockLink code={row.code}>{row.name || row.code}</StockLink> },
             { label: '候选池', cell: (row) => row.bucket },
             { label: '裁决口径', cell: (row) => <Tag tone={row.caliber === 'ai' ? 'up' : 'warn'}>{row.caliber}</Tag> },
             { label: '竞价至收盘', num: true, cell: (row) => row.gross_return_pct == null ? '—' : `${row.gross_return_pct >= 0 ? '+' : ''}${row.gross_return_pct.toFixed(2)}%` },

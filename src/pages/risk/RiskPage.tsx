@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { RiskWatchFile } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -110,8 +110,7 @@ export function Component() {
               label: '标的',
               cell: (r) => (
                 <span>
-                  <span className="text-rec">{r.name}</span>
-                  <span className="num text-sub ml-1.5">{r.code}</span>
+                  <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
                 </span>
               ),
             },

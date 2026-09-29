@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { PromoDaily, PromoEvent, PromoSummaryRow } from '@/shared/api'
 import { analyticsQueries, SegTabs, n1, pct, tone } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, Zone, ZoneRow, maLine } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, StockLink, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -459,8 +459,7 @@ function DailyView({
                   className={cn('border-b border-line-faint', e.ok && 'bg-up-soft')}
                 >
                   <td className="py-1.5 px-2 whitespace-nowrap text-rec">
-                    {e.name}
-                    <span className="text-sub num ml-1.5">{e.code}</span>
+                  <StockLink code={e.code}>{e.name}</StockLink>
                   </td>
                   <td className="py-1.5 px-2 whitespace-nowrap text-sub">{e.stage}</td>
                   <td className="py-1.5 px-2 text-right num">

@@ -3,6 +3,7 @@ import { cn, fmtPct, isStarMarket } from '@/shared/lib'
 import { pctTone } from '../model/labels'
 import { marketQueries } from '../api/queries'
 import type { ShortSpiritDeposit } from '@/shared/api'
+import { StockLink } from '@/shared/ui'
 
 /**
  * 信号 rail —— 盘中实时页最右侧的**固定窄列（占宽 10%）**。
@@ -89,7 +90,7 @@ export function SignalRail({ className }: { className?: string }) {
                 className="py-[4px] border-b border-line last:border-b-0 min-w-0"
               >
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[12px] font-semibold truncate min-w-0" title={`${s.name ?? s.code} · ${s.code}`}>{s.name}</span>
+                  <StockLink code={s.code} className="text-[12px] font-semibold truncate min-w-0">{s.name ?? s.code}</StockLink>
                   {s.pct != null ? (
                     <span className={cn('num text-[12px] font-semibold ml-auto flex-none', pctTone(s.pct))}>
                       {fmtPct(s.pct)}

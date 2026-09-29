@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { MarketSnapshot, RotationCandidate } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -341,9 +341,11 @@ export function Component() {
                       )}
                       title={`${s.code} · ${s.board || '板块未知'} · ${n2(s.cap_yi)}亿${s.risk ? ` · ${s.risk}` : ''}`}
                     >
-                      {s.dragon ? '龙 ' : ''}
-                      {s.name}
-                      <span className="num ml-1">{pct(s.pct, 1)}</span>
+                      <StockLink code={s.code}>
+                        {s.dragon ? '龙 ' : ''}
+                        {s.name}
+                        <span className="num ml-1">{pct(s.pct, 1)}</span>
+                      </StockLink>
                     </span>
                   ))}
                   {(c.watch_pool?.length ?? 0) === 0 && <span className="text-sub text-[11.5px]">观察池为空</span>}

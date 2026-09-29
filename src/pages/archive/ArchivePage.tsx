@@ -13,7 +13,7 @@ import {
   n1,
   pct,
 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -284,8 +284,7 @@ export function Component() {
                       label: '标的',
                       cell: (s) => (
                         <span>
-                          <span className="text-rec">{s.name}</span>
-                          <span className="num text-sub ml-1.5">{s.code}</span>
+                          <StockLink code={s.code} className="text-rec">{s.name}</StockLink>
                         </span>
                       ),
                     },
@@ -327,8 +326,7 @@ export function Component() {
                   dense
                   empty="无"
                   columns={[
-                    { label: '标的', cell: (t) => <span className="text-rec">{t.name}</span> },
-                    { label: '代码', cell: (t) => <span className="num text-sub">{t.code}</span> },
+                    { label: '标的', cell: (t) => <StockLink code={t.code} className="text-rec">{t.name}</StockLink> },
                     { label: '板数', num: true, cell: (t) => <span className="text-up font-semibold">{t.boards}</span> },
                   ]}
                 />
@@ -372,7 +370,7 @@ export function Component() {
                   dense
                   empty="无报价"
                   columns={[
-                    { label: '代码', cell: (q) => <span className="num">{q.code}</span> },
+                    { label: '标的', cell: (q) => <StockLink code={q.code}>{q.name ?? q.code}</StockLink> },
                     {
                       label: '竞价涨幅',
                       num: true,

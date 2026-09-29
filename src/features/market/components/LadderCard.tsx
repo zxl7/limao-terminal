@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { cn, fmtPct } from '@/shared/lib'
-import { Card, EmptyState, Kpi, KpiStrip } from '@/shared/ui'
+import { Card, EmptyState, Kpi, KpiStrip, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { feedbackTone, pctTone } from '../model/labels'
 
@@ -122,9 +122,9 @@ export function LadderCard() {
                     const q = quotes[s.code]
                     return (
                       <span key={s.code} className="inline-flex items-baseline gap-0.5">
-                        <span className={cn('text-xs', s.moved ? 'text-up font-semibold' : 'text-txt')}>
+                        <StockLink code={s.code} className={cn('text-xs', s.moved ? 'text-up font-semibold' : 'text-txt')}>
                           {s.name}
-                        </span>
+                        </StockLink>
                         {/* 今日实时涨幅 —— 缺行情时 `—`，⛔ 不退化成 0 */}
                         <span className={cn('num text-[10.5px]', pctTone(q?.pct))}>
                           {q?.pct != null ? fmtPct(q.pct) : '—'}

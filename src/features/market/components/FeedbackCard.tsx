@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { sentimentClass } from '@/shared/lib'
-import { Card, Kpi, KpiStrip } from '@/shared/ui'
+import { Card, Kpi, KpiStrip, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { defenseTone, feedbackTone } from '../model/labels'
 
@@ -153,8 +153,7 @@ export function FeedbackCard() {
                     className="grid grid-cols-[1fr_auto_auto] items-center gap-2 px-1 py-[2px]"
                   >
                     <span className="flex items-baseline gap-1.5 min-w-0">
-                      <span className="text-[12px] text-txt truncate">{n.name}</span>
-                      <span className="num text-[10.5px] text-sub">{n.code}</span>
+                      <StockLink code={n.code} className="text-[12px] text-txt truncate">{n.name}</StockLink>
                       {n.tag && <span className="badge bg-line-faint text-sub">{n.tag}</span>}
                     </span>
                     <span className="flex gap-1">

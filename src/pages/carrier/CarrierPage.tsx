@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { CarrierItem } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, fmtFbt, n1, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -109,8 +109,7 @@ export function Component() {
               label: '载体',
               cell: (r) => (
                 <span>
-                  <span className="text-rec">{r.name}</span>
-                  <span className="num text-sub ml-1.5">{r.code}</span>
+                  <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
                 </span>
               ),
             },
@@ -161,8 +160,7 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <span className="text-txt">{r.name}</span>
-                    <span className="num text-sub ml-1.5">{r.code}</span>
+                    <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                   </span>
                 ),
               },
@@ -202,8 +200,7 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <span className="text-txt">{r.name}</span>
-                    <span className="num text-sub ml-1.5">{r.code}</span>
+                    <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                   </span>
                 ),
               },

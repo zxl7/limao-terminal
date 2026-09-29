@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { SeriesTableRow } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, Zone, ZoneRow, type HeatRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, StockLink, Zone, ZoneRow, type HeatRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -339,8 +339,7 @@ export function Component() {
                       label: '名称',
                       cell: (r) => (
                         <span className="text-txt">
-                          {r.e.name}
-                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                          <StockLink code={r.code}>{r.e.name}</StockLink>
                         </span>
                       ),
                     },
@@ -441,8 +440,7 @@ function MatrixRow({
       <td className="py-1.5 px-2 whitespace-nowrap">
         {row.leader_today ? (
           <span>
-            <span className="text-rec">{row.leader_today.name}</span>
-            <span className="num text-sub ml-1.5">{row.leader_today.code}</span>
+            <StockLink code={row.leader_today.code} className="text-rec">{row.leader_today.name}</StockLink>
             {row.leader_today.boards > 0 && <Tag tone="up">{row.leader_today.boards}板</Tag>}
           </span>
         ) : (

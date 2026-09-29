@@ -1702,6 +1702,8 @@ export interface AiDecisionEntry {
   name: string
   reason: string
   factors: Record<string, unknown>
+  /** 盘后候选冻结时的排序评分，满分 100；缺失表示历史台账未保存且候选档案不可用。 */
+  ranking_score?: number
   entry_max_gap: number
   position: number
   /** 'participate' | 'watch' | 'skip' */

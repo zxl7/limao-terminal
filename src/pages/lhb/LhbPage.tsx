@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { HithinkLhbFile, LhbTencentFile } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n2 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -118,8 +118,7 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <span className="text-rec">{r.name}</span>
-                    <span className="num text-sub ml-1.5">{r.code}</span>
+                    <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
                   </span>
                 ),
               },
@@ -171,7 +170,7 @@ export function Component() {
                       {/* ⚠️ stocks 是对象数组 {code, name}，不是字符串数组 */}
                       {r.stocks.map((s) => (
                         <Tag key={s.code} title={s.code}>
-                          {s.name || s.code}
+                          <StockLink code={s.code}>{s.name || s.code}</StockLink>
                         </Tag>
                       ))}
                     </span>
@@ -197,8 +196,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <span className="text-rec">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -263,7 +261,7 @@ export function Component() {
                           {/* ⚠️ stocks 是对象数组 {code, name} */}
                           {r.stocks.map((s) => (
                             <Tag key={s.code} title={s.code}>
-                              {s.name || s.code}
+                              <StockLink code={s.code}>{s.name || s.code}</StockLink>
                             </Tag>
                           ))}
                         </span>

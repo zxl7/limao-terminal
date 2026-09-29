@@ -3,7 +3,7 @@ import { queryClient } from '@/shared/api'
 import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, RelayShadow } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -180,8 +180,7 @@ export function Component() {
                     cell: (r) => (
                       <span>
                         {r.leader_preference_rank != null && <span className="num text-rec mr-1">#{r.leader_preference_rank}</span>}
-                        <span className="text-up">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-up">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -243,8 +242,7 @@ export function Component() {
                     {e.buy && (
                       <div className="text-[12.5px] mt-0.5">
                         <span className="text-sub">关注 </span>
-                        <span className="text-rec font-medium">{e.buy.name}</span>
-                        <span className="num text-[11px] text-sub ml-1.5">{e.buy.code}</span>
+                        <StockLink code={e.buy.code} className="text-rec font-medium">{e.buy.name}</StockLink>
                         <span className="num text-[12px] text-up ml-1.5">
                           +{num(e.buy.pct)}%
                         </span>
@@ -285,8 +283,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <span className="text-txt">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -333,8 +330,7 @@ export function Component() {
                     className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[13px] text-txt truncate">{q.name}</span>
-                      <span className="num text-[11px] text-sub">{q.code}</span>
+                      <StockLink code={q.code} className="text-[13px] text-txt truncate">{q.name}</StockLink>
                     </span>
                     <span
                       className={cn(
@@ -368,8 +364,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <span className="text-txt">{r.name}</span>
-                        <span className="num text-sub ml-1.5">{r.code}</span>
+                        <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -449,8 +444,7 @@ export function Component() {
                         label: '名称',
                         cell: (r) => (
                           <span className="text-txt">
-                            {r.name}
-                            <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                            <StockLink code={r.code}>{r.name}</StockLink>
                           </span>
                         ),
                       },
@@ -488,8 +482,7 @@ export function Component() {
                         label: '名称',
                         cell: (r) => (
                           <span className="text-txt">
-                            {r.name}
-                            <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                            <StockLink code={r.code}>{r.name}</StockLink>
                           </span>
                         ),
                       },

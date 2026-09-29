@@ -11,7 +11,7 @@ import {
   Tag,
   type ArchiveCard,
 } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 
 /**
  * 机构投研 —— 数据源三类，视角完全不同：
@@ -169,8 +169,7 @@ export function Component() {
                         className="badge border border-line text-sub"
                         title={it.code}
                       >
-                        {it.name}
-                        <span className="num ml-1 opacity-70">{it.code}</span>
+                        <StockLink code={it.code}>{it.name}</StockLink>
                       </span>
                     ))}
                   </div>

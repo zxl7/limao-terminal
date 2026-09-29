@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { DecisionDossier, DossierStock } from '@/shared/api'
 import { cn, cardPhaseText } from '@/shared/lib'
-import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, StockLink } from '@/shared/ui'
 import { DataTable, SegTabs, StatPair, Tag } from './Table'
 import { fmtFbt, n1, n2, pct, rangeLow, rangePct } from '../lib/format'
 
@@ -45,8 +45,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
       label: '标的',
       cell: (s: DossierStock) => (
         <span>
-          <span className="text-rec">{s.name}</span>
-          <span className="num text-sub ml-1.5">{s.code}</span>
+          <StockLink code={s.code} className="text-rec">{s.name}</StockLink>
           {s.is_20cm && <Tag tone="warn">20cm</Tag>}
           {s.is_st && <Tag tone="down">ST</Tag>}
           {s.is_capacity_core && <Tag tone="rec">容量核心</Tag>}
@@ -414,7 +413,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
             <div className="mt-1.5 flex flex-wrap gap-1">
               {diag.early_buy_signals.map((s) => (
                 <Tag key={`${s.code}-${s.type}`} tone="rec">
-                  {s.code} {s.type}
+                  <StockLink code={s.code}>{s.code} {s.type}</StockLink>
                 </Tag>
               ))}
             </div>
@@ -496,8 +495,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
                     label: '关注标的',
                     cell: (e) => (
                       <span>
-                        <span className="text-rec">{e.buy?.name || '—'}</span>
-                        <span className="num text-sub ml-1.5">{e.buy?.code || ''}</span>
+                        <StockLink code={e.buy?.code} className="text-rec">{e.buy?.name || '—'}</StockLink>
                         {e.buy?.is_20cm && <Tag tone="warn">20cm</Tag>}
                       </span>
                     ),

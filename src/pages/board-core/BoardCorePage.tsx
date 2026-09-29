@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { BoardCoreFile, BoardCoreStock } from '@/shared/api'
 import { analyticsQueries } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { BarChart, Card, CardBadge, EmptyState, Icon, Radar, Zone, ZoneRow, type RadarAxis } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, Radar, StockLink, Zone, ZoneRow, type RadarAxis } from '@/shared/ui'
 import { cn, isNum } from '@/shared/lib'
 
 /**
@@ -191,8 +191,7 @@ export function Component() {
                   <Icon name="target" size={13} className="text-up" />
                   {radar.board}
                 </span>
-                <span className="text-rec">{radar.stock.name}</span>
-                <span className="num text-sub text-[11px]">{radar.stock.code}</span>
+                <StockLink code={radar.stock.code} className="text-rec">{radar.stock.name}</StockLink>
               </div>
               <Radar axes={radar.axes} compare={radar.compare} size={230} tone="up" compareTone="sub" />
               <p className="text-sub text-[11px] mt-1 leading-relaxed">
@@ -303,8 +302,7 @@ export function Component() {
                         {b.board}
                       </td>
                       <td className="py-1.5 px-2 whitespace-nowrap text-rec">
-                        {t.name}
-                        <span className="text-sub num ml-1.5">{t.code}</span>
+                        <StockLink code={t.code}>{t.name}</StockLink>
                       </td>
                       <td className="py-1.5 px-2 text-right whitespace-nowrap">
                         {/* 行内细条：本表内部相对比较（与自身列的 max 归一），不跨表不可跨日 */}
@@ -368,8 +366,7 @@ export function Component() {
                                 <tr key={s.code} className="border-b border-line-faint last:border-0">
                                   <td className="py-1 px-1.5 text-sub num">{i + 1}</td>
                                   <td className="py-1 px-1.5 whitespace-nowrap">
-                                    {s.name}
-                                    <span className="text-sub num ml-1.5">{s.code}</span>
+                                    <StockLink code={s.code}>{s.name}</StockLink>
                                   </td>
                                   <td className="py-1 px-1.5 text-right num">{fmt(s.core_score)}</td>
                                   <td className="py-1 px-1.5 text-right num">{fmt(s.drive_score)}</td>

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { GeneHistory, GenePoolFile, GeneProfile, GeneSummary } from '@/shared/api'
 import { analyticsQueries, DataTable, n1, pct, rate, tone } from '@/features/analytics'
-import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, Zone, ZoneRow } from '@/shared/ui'
+import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -267,8 +267,7 @@ export function Component() {
               {filtered.map(({ profile: p, hist: h }) => (
                 <tr key={p.code} className="border-b border-line-faint">
                   <td className="py-1.5 px-2 whitespace-nowrap text-rec">
-                    {p.name}
-                    <span className="text-sub num ml-1.5">{p.code}</span>
+                    <StockLink code={p.code}>{p.name}</StockLink>
                   </td>
                   <td className="py-1.5 px-2 whitespace-nowrap text-sub">{p.industry ?? '—'}</td>
                   <td
@@ -325,8 +324,7 @@ export function Component() {
                       label: '名称',
                       cell: (r) => (
                         <span className="text-txt">
-                          {r.name}
-                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                          <StockLink code={r.code}>{r.name}</StockLink>
                         </span>
                       ),
                     },
@@ -395,8 +393,7 @@ export function Component() {
                       label: '名称',
                       cell: (r) => (
                         <span className="text-txt">
-                          {r.name}
-                          <span className="num text-sub ml-1.5 text-[11px]">{r.code}</span>
+                          <StockLink code={r.code}>{r.name}</StockLink>
                         </span>
                       ),
                     },

@@ -1,5 +1,6 @@
 import { cn } from '@/shared/lib'
 import type { IntradayLimitUpStock, IntradayTimelineEvent } from '@/shared/api'
+import { StockLink } from '@/shared/ui'
 import { SLOT_VISIBLE_SECTORS, sortIntradaySectorEvents } from '../lib/timeline'
 
 /**
@@ -79,8 +80,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
     case 'stock_up':
       return (
         <span className="text-[11.5px] text-up">
-          <span className="font-medium">{e.name}</span>
-          {e.code && <span className="num text-sub ml-1">{e.code}</span>}
+          <StockLink code={e.code} className="font-medium">{e.name}</StockLink>
           {e.sector && <span className="text-sub ml-1">{e.sector}</span>}
           {e.pct != null && <span className="num ml-1">+{Number(e.pct).toFixed(2)}%</span>}
         </span>
@@ -125,8 +125,7 @@ function LimitUpStocks({
       <span className={cn('text-[10.5px] font-medium', tone === 'up' ? 'text-up' : 'text-down')}>{label}</span>
       {stocks.map((stock) => (
         <span key={stock.code} className="text-[11px] text-txt">
-          <span className="font-medium">{stock.name || stock.code}</span>
-          <span className="num ml-1 text-sub">{stock.code}</span>
+          <StockLink code={stock.code} className="font-medium">{stock.name || stock.code}</StockLink>
           {stock.sector && <span className="ml-1 text-sub">{stock.sector}</span>}
           {stock.boards != null && stock.boards !== '' && <span className="num ml-1 text-sub">{stock.boards}</span>}
         </span>
