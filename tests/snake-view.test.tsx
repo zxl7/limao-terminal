@@ -171,6 +171,14 @@ describe('TimelineSnake · 蛇形骨架', () => {
     expect(container.querySelector('svg path')).not.toBeNull()
     expect(nodesOf(container)).toHaveLength(0)
   })
+
+  it('⑤ 上午与下午之间有“黄金分割线”分隔带，且不属于行情节点', () => {
+    const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} />)
+    const seam = container.querySelector('[aria-label="黄金分割线 · AI短线语录"]')
+    expect(seam).not.toBeNull()
+    expect(seam?.textContent).toContain('AI短线语录')
+    expect(nodesOf(container)).toHaveLength(threeBlocks().length)
+  })
 })
 
 describe('TimelineSnake · 悬停即明细（⛔ 无需点击）', () => {

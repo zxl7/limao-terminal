@@ -12,17 +12,11 @@ import {
   SegTabs,
   StatPair,
   Tag,
-  boardsLabel,
-  fmtFbt,
   n1,
-  pct,
   rate,
-  /** ⚠️ 别名：本文件内已有同名的局部变量/参数 `tone`（SeqRow 的色调枚举），
-   *  直接导入会触发 no-shadow，且语义也确实不同（那是「序列色调」不是「涨跌色调」）。 */
-  tone as toneCls,
 } from '@/features/analytics'
 import { buildTideState, marketQueries, TideCard, type TideWindowDay } from '@/features/market'
-import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, StockLink, Zone, ZoneRow, maLine } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, Zone, ZoneRow } from '@/shared/ui'
 import { cn, sentimentClass } from '@/shared/lib'
 import { APP_CONFIG } from '@/shared/config'
 
@@ -94,12 +88,27 @@ export function Component() {
    * ⚠️ 必须 memo：`s?.days ?? []` 里的 `?? []` 会在 `s` 未就绪时**每次渲染
    *    新建一个空数组**，引用一变，所有以它为依赖的 useMemo 都会失效 ——
    *    图表的比例尺与路径随之整表重算（最典型的表现是鼠标一划就卡）。
-   */
-  const days = useMemo(
-    () => (s?.days ?? []).filter((day) => day.date !== feedback.data?.date),
-    [s, feedback.data?.date],
-  )
+  */
   const traj = s?.trajectory
+  const allDays = useMemo(() => s?.days ?? [], [s])
+  const days = useMemo(
+    () => allDays.filter((day) => day.date !== feedback.data?.date),
+    [allDays, feedback.data?.date],
+  )
+  const historicTrajectory = useMemo(
+    () =>
+      allDays
+        .map((day, index) => ({
+          date: day.date,
+          sentiment: traj?.sentiment_seq?.[index] ?? null,
+          ma3: traj?.sentiment_ma3?.[index] ?? null,
+          promote: traj?.promote_seq?.[index] ?? null,
+          nuke: traj?.nuke_seq?.[index] ?? null,
+          zt: traj?.zt_seq?.[index] ?? null,
+        }))
+        .filter((day) => day.date !== feedback.data?.date),
+    [allDays, traj, feedback.data?.date],
+  )
   const turn = traj?.turn_signal
   const turnStyle = turn ? (TURN_TONE[turn.dir] ?? TURN_TONE.flat) : null
   /** 实时潮位严格按候选链路的 feedback_matrix 门控映射，不能拿日频摘要替代。 */
@@ -126,9 +135,9 @@ export function Component() {
    *    对应的值整体位移）。故以序列长度为真，日期缺失则留空标签。
    */
   const sentSeries = useMemo(() => {
-    const seq = traj?.sentiment_seq ?? []
+    const seq = historicTrajectory.map((day) => day.sentiment)
     if (!seq.length) return null
-    const labels = seq.map((_, i) => (days[i]?.date ?? '').slice(5))
+    const labels = historicTrajectory.map((day) => day.date.slice(5))
     // 线色按**当前档位**取（末个有效值），而非固定色 —— 情绪分≥7 时整条线转红，
     // 与全站「≥7 红 / 3–6 蓝 / ≤2 绿」口径一致，扫一眼就知道当前处哪一档
     const lastValid = [...seq].reverse().find((v) => v != null) ?? null
@@ -138,12 +147,12 @@ export function Component() {
       labels,
       series: [
         { name: '情绪分', values: seq, tone, area: true },
-        maLine(`MA${traj?.ma3_window ?? 3}`, seq, traj?.ma3_window ?? 3, 'sub'),
+        { name: `MA${traj?.ma3_window ?? 3}`, values: historicTrajectory.map((day) => day.ma3), tone: 'sub', dashed: true },
       ] as Parameters<typeof LineChart>[0]['series'],
       tone,
       lastValid,
     }
-  }, [traj, days])
+  }, [traj, historicTrajectory])
 
   /**
    * 近 12 个交易日收盘涨停家数。
@@ -217,8 +226,8 @@ export function Component() {
       })
   }, [days, feedback.data, ztHist.data])
 
-  /** 最新归档日的盘中涨停节奏（逐快照窗口）—— 回答「涨停是堆早盘还是补午后」 */
-  const todayRhythm = useMemo(() => {
+  /** 最近归档日的盘中涨停节奏（逐快照窗口）—— 回答「涨停是堆早盘还是补午后」 */
+  const latestHistoryRhythm = useMemo(() => {
     const top = intradayRows[0]
     if (!top || top.intraday_points.length < 2) return null
     return {
@@ -283,7 +292,7 @@ export function Component() {
             tone={turn?.dir === 'repair' ? 'up' : turn?.dir === 'ebb' ? 'down' : 'sub'}
           />
           <StatPair label="窗口" value={`${s?.window_days ?? '—'} 日`} />
-          <StatPair label="轨迹样本" value={traj?.sentiment_seq?.length ?? '—'} />
+          <StatPair label="轨迹样本" value={historicTrajectory.length || '—'} />
           {turnStyle && (
             <span className={cn('text-[12.5px] font-semibold', turnStyle.cls)}>
               {turnStyle.label}
@@ -359,11 +368,11 @@ export function Component() {
               晋级率（越高越好）
             </div>
             <LineChart
-              labels={(traj?.promote_seq ?? []).map((_, i) => (days[i]?.date ?? '').slice(5))}
+              labels={historicTrajectory.map((day) => day.date.slice(5))}
               series={[
                 {
                   name: '晋级率',
-                  values: traj?.promote_seq ?? [],
+                  values: historicTrajectory.map((day) => day.promote),
                   tone: 'up',
                   area: true,
                 },
@@ -382,11 +391,11 @@ export function Component() {
               核按钮家数（越低越好）
             </div>
             <BarChart
-              bars={(traj?.nuke_seq ?? []).map((v, i) => ({
-                label: (days[i]?.date ?? '').slice(5),
-                value: v,
+              bars={historicTrajectory.map((day) => ({
+                label: day.date.slice(5),
+                value: day.nuke,
                 // ≥3 家即视为情绪转弱信号，与页面正文口径一致
-                tone: v >= 3 ? 'down' : 'sub',
+                tone: (day.nuke ?? 0) >= 3 ? 'down' : 'sub',
               }))}
               height={150}
               format={(v) => String(Math.round(v))}
@@ -513,15 +522,15 @@ export function Component() {
           <div className="flex flex-col gap-2.5">
             {traj ? (
               <>
-                <SeqRow label="情绪分" seq={(traj.sentiment_seq ?? []).map((v) => n1(v))} tone="sent" />
+                <SeqRow label="情绪分" seq={historicTrajectory.map((day) => n1(day.sentiment))} tone="sent" />
                 <SeqRow
                   label={`MA${traj.ma3_window} 均`}
-                  seq={(traj.sentiment_ma3 ?? []).map((v) => n1(v))}
+                  seq={historicTrajectory.map((day) => n1(day.ma3))}
                   tone="sent"
                 />
-                <SeqRow label="晋级率" seq={(traj.promote_seq ?? []).map((v) => n1(v))} tone="plain" />
-                <SeqRow label="核按钮" seq={(traj.nuke_seq ?? []).map((v) => String(v))} tone="nu" />
-                <SeqRow label="涨停数" seq={(traj.zt_seq ?? []).map((v) => (v == null ? '—' : String(v)))} tone="plain" />
+                <SeqRow label="晋级率" seq={historicTrajectory.map((day) => n1(day.promote))} tone="plain" />
+                <SeqRow label="核按钮" seq={historicTrajectory.map((day) => (day.nuke == null ? '—' : String(day.nuke)))} tone="nu" />
+                <SeqRow label="涨停数" seq={historicTrajectory.map((day) => (day.zt == null ? '—' : String(day.zt)))} tone="plain" />
                 <p className="text-sub text-[11.5px] mt-1 leading-relaxed">
                   序列按时间正序；`—` = 该日字段为空（盘前快照尚未落盘），非 0。
                 </p>
@@ -534,19 +543,19 @@ export function Component() {
 
         {tab === 'intraday' && (
           <div className="flex flex-col gap-3">
-            {/* 最新归档日的盘中节奏 —— 逐快照窗口，回答「涨停堆早盘还是补午后」 */}
-            {todayRhythm && (
+            {/* 最近归档日的盘中节奏 —— 逐快照窗口，回答「涨停堆早盘还是补午后」 */}
+            {latestHistoryRhythm && (
               <div className="border border-line rounded-sm px-2.5 py-2">
                 <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
                   <Icon name="clock" size={13} className="text-sub" />
-                  {todayRhythm.date} 盘中涨停节奏
-                  {todayRhythm.truncated && (
+                  {latestHistoryRhythm.date} 盘中涨停节奏
+                  {latestHistoryRhythm.truncated && (
                     <span className="text-warn text-[11px] font-normal ml-1">归档残缺（仅盘中点）</span>
                   )}
                 </div>
                 <LineChart
-                  labels={todayRhythm.labels}
-                  series={todayRhythm.series}
+                  labels={latestHistoryRhythm.labels}
+                  series={latestHistoryRhythm.series}
                   height={170}
                   format={(v) => String(Math.round(v))}
                 />

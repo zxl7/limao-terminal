@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/shared/lib'
+import { useNow } from '@/shared/hooks'
 import { useChartWidth } from '@/shared/ui'
 import { BlockDetail, blockRangeText, KIND_LABEL } from './BlockDetail'
 import { summarizeBlock, type BlockSummary } from '../lib/block-summary'
@@ -54,6 +55,15 @@ const DETAIL_FLIP_Y = 300
 
 /** 时间刻度：整点 + 下午半点 —— 给「横轴读到哪一段」一个参照 */
 const TICK_MINUTES = [10 * 60, 11 * 60, 13 * 60 + 30, 14 * 60, 14 * 60 + 30, 15 * 60]
+
+/** 午间断点的轻量 AI 短线语录：只作节奏提示，不参与任何行情或策略计算。 */
+const AI_TRADER_QUOTES = [
+  '主线不在预测里，在资金的持续回流里。',
+  '先看情绪，再看题材，最后才看个股。',
+  '分歧不是退场信号，承接消失才是。',
+  '强者恒强，但只在结构仍强时成立。',
+  '不追最后一棒，只跟最清晰的共振。',
+] as const
 
 /**
  * 竖条颜色 = 该刻**性质**（与 A 股语义一致：涨红 / 跌绿 / **题材紫** / 普通灰）。
@@ -240,8 +250,12 @@ export function TimelineSnake({
   hoverCloseDelayMs?: number
 }) {
   const { width: measured, setEl } = useChartWidth(FALLBACK_WIDTH)
+  // 与盘中轮询同量级轮换，不写入数据流，也不影响事件轴的坐标或排序。
+  const now = useNow(30_000)
   const W = width ?? measured
   const layout = useMemo(() => layoutSnake({ marks: blocks.map((b) => b.at), width: W }), [blocks, W])
+  const aiQuote = AI_TRADER_QUOTES[Math.floor(now.getTime() / 30_000) % AI_TRADER_QUOTES.length]
+  const noonSeamY = layout.lanes[1].y + layout.rowHeight / 2
 
   /**
    * hover 打开的节点（内部状态）。
@@ -414,6 +428,20 @@ export function TimelineSnake({
             {minToClock(lane.fromClock)} → {minToClock(lane.toClock)}
           </span>
         ))}
+
+        {/* 午间停盘不是一条事件：用独立分隔带明确上午与下午的“换手”，不污染时间轴数据。 */}
+        <div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{ top: noonSeamY, transform: 'translateY(-50%)' }}
+          aria-label="黄金分割线 · AI短线语录"
+        >
+          <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-line-strong/80" />
+          <span className="relative mx-auto flex w-max max-w-[86%] items-center gap-2 rounded-full border border-line bg-card px-3 py-1 shadow-sm">
+            <span className="text-[10.5px] font-semibold tracking-[0.14em] text-lead whitespace-nowrap">黄金分割线</span>
+            <span className="h-3 w-px bg-line" />
+            <span className="max-w-[360px] truncate text-[11.5px] text-sub">AI短线语录 · {aiQuote}</span>
+          </span>
+        </div>
 
         {/* ── 节点（小标记：细竖条，高度编码活跃度；明细走 hover）── */}
         {nodes.map(({ block, point, summary }) => {

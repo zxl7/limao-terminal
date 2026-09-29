@@ -119,9 +119,6 @@ export function Component() {
           <div className="text-down text-[12px] py-2">数据不可用：{String((err as Error).message ?? err)}</div>
         ) : (
           <>
-            <p className="text-[13px] leading-relaxed text-txt">
-              统计对象固定为<b>昨日涨停池</b>：今天上涨、给出溢价的是赚钱回报；核按钮、破位和炸板形成亏钱压力。这里不判断指数涨跌，也不直接预测明天。
-            </p>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
               <StatPair label="昨日涨停池" value={`${axes.basis.prevZtCount ?? '—'} 只`} />
               <StatPair label="今日涨停" value={`${axes.basis.nowZtCount ?? '—'} 只`} tone="up" />

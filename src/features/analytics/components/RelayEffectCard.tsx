@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { RelayStock } from '@/shared/api'
 import { marketQueries } from '@/features/market'
-import { Card, LineChart, StockLink } from '@/shared/ui'
+import { BarChart, Card, LineChart, StockLink } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 import { DataTable, StatPair } from './Table'
 import { relayExpired, selectRelay, type RelayView } from '../lib/relayEffect'
@@ -58,7 +58,7 @@ export function RelayEffectCard() {
         { label: '涨幅变化中位数', num: true, cell: g => <span className={tone(g.window_pct_change)}>{fmt(g.window_pct_change, '百分点')}</span> },
       ]} />
       <div className="flex flex-wrap gap-1.5">{Object.entries(labels).map(([key, text]) => <button type="button" key={key} aria-pressed={group === key} className={cn(button, group === key ? 'border-up/30 bg-up-soft text-up' : 'border-line text-sub')} onClick={() => chooseGroup(key)}>{text}</button>)}</div>
-      <RelayScatter historical={historical} stocks={scope} selected={selected} onSelect={code => { setSelected(code); setView('all') }} />
+      <RelayBars historical={historical} stocks={scope} />
       <div className="flex flex-wrap gap-1.5">{views.filter(([key]) => !historical || key === 'all' || key === 'sealed').map(([key, text]) => <button type="button" key={key} aria-pressed={activeView === key} className={cn(button, activeView === key ? 'bg-txt text-card border-txt' : 'border-line text-sub')} onClick={() => { setView(key); setSelected(null) }}>{text}</button>)}</div>
       <p className="text-[11px] text-sub">{historical ? '历史回放保留全部昨日样本；缺少成交额的股票仍列出，15分钟指标显示未归档。' : '按近15分钟成交额降序；同额按涨幅变化排序。窗口不足或行情失效不进入走强/走弱排名。'}</p>
       <DataTable dense rows={rows} rowKey={s => s.code} empty="当前没有符合条件的股票" rowClass={s => s.code === selected ? 'bg-up-soft/40' : undefined} columns={[
@@ -76,22 +76,17 @@ export function RelayEffectCard() {
   </Card>
 }
 
-function RelayScatter({ historical, stocks, selected, onSelect }: { historical: boolean; stocks: RelayStock[]; selected: string | null; onSelect: (code: string) => void }) {
-  const points = stocks.filter(s => !s.stale && (historical ? s.amount_yi != null && s.pct != null : s.window))
-  const x = (s: RelayStock) => historical ? s.amount_yi! : s.window!.amount_yi
-  const y = (s: RelayStock) => historical ? s.pct! : s.window!.pct_change
-  const xmax = Math.max(0.01, ...points.map(x))
-  const ymax = Math.max(1, ...points.map(s => Math.abs(y(s))))
-  const amax = Math.max(0.01, ...points.map(s => s.amount_yi ?? 0))
+function RelayBars({ historical, stocks }: { historical: boolean; stocks: RelayStock[] }) {
+  const points = stocks.filter(s => !s.stale).sort((a, b) => (b.amount_yi ?? -1) - (a.amount_yi ?? -1) || a.code.localeCompare(b.code))
+  const amounts = points.map((s) => ({ label: s.name, value: historical ? s.amount_yi : s.window?.amount_yi ?? null, tone: s.sealed === true ? 'up' as const : 'sub' as const }))
+  const changes = points.map((s) => ({ label: s.name, value: historical ? s.pct : s.window?.pct_change ?? null }))
   return <div className="rounded-sm border border-line-faint p-2">
-    <p className="text-xs text-txt">量价分布 <span className="text-[10px] text-sub">{historical ? '历史截面 · 横轴：归档成交额 · 纵轴：归档涨幅' : '横轴：近15分钟成交额 · 纵轴：涨幅变化 · 点面积：累计成交额'}</span></p>
-    {!points.length ? <p className="text-xs text-sub py-6 text-center">等待同一交易时段内的有效15分钟窗口</p> : <svg viewBox="0 0 800 230" className="w-full" aria-label="量价分布图">
-      <line x1="64" x2="764" y1="105" y2="105" stroke="var(--color-line)" /><line x1="64" x2="64" y1="20" y2="190" stroke="var(--color-line)" />
-      <text x="4" y="24" fontSize="10" fill="var(--color-sub)">+{ymax.toFixed(1)} {historical ? '%' : 'pp'}</text><text x="4" y="108" fontSize="10" fill="var(--color-sub)">0</text><text x="4" y="192" fontSize="10" fill="var(--color-sub)">−{ymax.toFixed(1)} {historical ? '%' : 'pp'}</text>
-      <text x="64" y="216" fontSize="10" fill="var(--color-sub)">0亿</text><text x="710" y="216" fontSize="10" fill="var(--color-sub)">{xmax.toFixed(2)}亿</text>
-      {points.map(s => <circle key={s.code} cx={78 + x(s) / xmax * 660} cy={105 - y(s) / ymax * 72} r={4 + Math.sqrt((s.amount_yi ?? 0) / amax) * 10} fill={s.sealed === true ? 'var(--color-up)' : s.sealed === false ? 'var(--color-sub)' : 'var(--color-line-strong)'} fillOpacity="0.65" stroke={selected === s.code ? 'var(--color-txt)' : 'var(--color-card)'} strokeWidth="2" role="button" tabIndex={0} aria-label={`查看${s.name}`} onClick={() => onSelect(s.code)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(s.code) } }}><title>{s.name} · {fmt(x(s), '亿')} · {fmt(y(s), historical ? '%' : '百分点')} · {state(s)}</title></circle>)}
-    </svg>}
-    <p className="text-[10px] text-sub">红：当前封板 · 灰：当前未封板 · 浅灰：状态未知。可点击圆点查看股票。</p>
+    <p className="text-xs text-txt">连板量价柱状图 <span className="text-[10px] text-sub">{historical ? '历史截面：归档成交额与收盘涨幅' : '近15分钟成交额与涨幅变化分别显示'}</span></p>
+    {!points.length ? <p className="text-xs text-sub py-6 text-center">{historical ? '当前梯队没有可用历史数据' : '等待同一交易时段内的有效15分钟窗口'}</p> : <div className="grid gap-3 lg:grid-cols-2">
+      <div><p className="text-[10.5px] text-sub mb-1">{historical ? '归档成交额（亿）' : '近15分钟成交额（亿）'}</p><BarChart bars={amounts} height={190} format={v => `${v.toFixed(2)}亿`} /></div>
+      <div><p className="text-[10.5px] text-sub mb-1">{historical ? '收盘涨幅（%）' : '近15分钟涨幅变化（百分点）'}</p><BarChart bars={changes} height={190} bipolar format={v => `${v.toFixed(1)}${historical ? '%' : 'pp'}`} /></div>
+    </div>}
+    <p className="text-[10px] text-sub">按成交额由高到低排列；成交额图红柱表示当前封板，灰柱表示未封板或状态未知。涨幅柱以零轴区分强弱。</p>
   </div>
 }
 
