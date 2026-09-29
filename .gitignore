@@ -1,2 +1,12 @@
-node_modules
-dist
+# Dependencies and generated bundles
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Local configuration and editor state
+.env
+.env.*
+*.local
+*.secret
+.DS_Store
