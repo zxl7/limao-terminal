@@ -244,6 +244,11 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
   ]
 }
 
+/** 盘后候选卡按冻结总分展示；同分保留上游原顺序，原池内排名字段不被改写。 */
+function byFrozenScore<T extends DossierStock>(rows: T[] | undefined): T[] {
+  return [...(rows ?? [])].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity))
+}
+
 export function DossierView({ d }: { d: DecisionDossier }) {
   const [tab, setTab] = useState<'relay' | 'watch' | 'early' | 'narrative'>('relay')
   const env = d.environment
@@ -440,12 +445,12 @@ export function DossierView({ d }: { d: DecisionDossier }) {
         {tab === 'relay' && (
           <>
             <p className="text-sub text-[11.5px] mb-1.5 leading-relaxed">
-              接力池 = 可直接执行。列序按「结果 → 可交易 → 结构 → 资金」排列，
+              接力池 = 可直接执行，列表按冻结总分由高到低展示。列序按「结果 → 可交易 → 结构 → 资金」排列，
               `theme` 与 `core_theme` 不同轴时以主轴为准（原系统铁律：按个股真实主轴归类）。
             </p>
             <div className="overflow-x-auto max-h-[62vh] overflow-y-auto">
               <DataTable
-                rows={d.relay ?? []}
+                rows={byFrozenScore(d.relay)}
                 rowKey={(s, i) => `${s.code}-${i}`}
                 dense
                 empty="该日接力池为空"
@@ -458,12 +463,12 @@ export function DossierView({ d }: { d: DecisionDossier }) {
         {tab === 'watch' && (
           <>
             <p className="text-sub text-[11.5px] mb-1.5 leading-relaxed">
-              观察池 = 待确认。分组由脚本给出（如「容量核心」）—— 属于不同介入逻辑，
+              观察池 = 待确认，列表按冻结总分由高到低展示。分组由脚本给出（如「容量核心」）—— 属于不同介入逻辑，
               不可与接力池同等对待。
             </p>
             <div className="overflow-x-auto max-h-[62vh] overflow-y-auto">
               <DataTable
-                rows={d.watch ?? []}
+                rows={byFrozenScore(d.watch)}
                 rowKey={(s, i) => `${s.code}-${i}`}
                 dense
                 empty="该日观察池为空"
