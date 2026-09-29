@@ -137,7 +137,9 @@ export function Component() {
                   onClick={() => setOpenRank(t.rank)}
                   className={cn(
                     'text-left border rounded-sm px-2.5 py-1.5 cursor-pointer bg-transparent transition-colors',
-                    t.rank === expanded?.rank ? 'border-line-strong bg-card' : 'border-line hover:border-line-strong',
+                    t.rank === expanded?.rank
+                      ? 'border-line-strong bg-card'
+                      : 'border-line hover:border-line-strong',
                   )}
                 >
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -151,11 +153,7 @@ export function Component() {
                     </span>
                     <span className="text-[13.5px] font-semibold text-txt">{t.name}</span>
                     <StatPair label="涨停" value={t.zt_count} tone="up" />
-                    <StatPair
-                      label="环比"
-                      value={deltaText(t.zt_count, t.zt_prev)}
-                      tone={deltaTone(t.zt_count, t.zt_prev)}
-                    />
+                    <StatPair label="环比" value={deltaText(t.zt_count, t.zt_prev)} tone={deltaTone(t.zt_count, t.zt_prev)} />
                     <StatPair label="昨日" value={t.zt_prev} />
                     <StatPair label="均换手" value={n1(t.turn_avg)} />
                     <StatPair label="题材家数" value={t.total_stocks} />
@@ -166,8 +164,6 @@ export function Component() {
                     {t.leader?.boards && <Tag tone="up">{t.leader.boards}</Tag>}
                     {stateLabel(t.delta) && <Tag tone={t.delta === 'new' ? 'rec' : 'neutral'}>{stateLabel(t.delta)}</Tag>}
                   </div>
-                  {/* 行内细条：仅表达「本批题材间」涨停家数的相对规模，便于纵向扫读排名。
-                      不与大盘或历史比较 —— 那是上方柱状图的职责。 */}
                   <span
                     className="block mt-1 h-[3px] w-full rounded-sm overflow-hidden"
                     style={{ background: 'var(--color-line-faint)' }}
@@ -193,8 +189,8 @@ export function Component() {
         <Zone label="环比与详情" dot="bg-up" className="xl:w-[38%]">
           {/* ── 环比视角：列表看「多少」，这张看「扩还是缩」 ── */}
           <Card
-            title="📊 题材涨停家数 · 今日 vs 昨日"
-        extra={<CardBadge tone="warn">长度=今日家数 · 颜色=环比方向 · 空心=昨日</CardBadge>}
+            title="📊 题材涨停家数 · 强度变化"
+        extra={<CardBadge tone="warn">实心今日 · 空心昨日</CardBadge>}
       >
         {ztBars.length ? (
           <>
@@ -205,16 +201,8 @@ export function Component() {
               maxBarWidth={44}
               showValue
             />
-            <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
-              <b className="text-up">红 = 环比增多</b> / <b className="text-down">绿 = 环比减少</b> /
-              <b className="text-txt"> 蓝 = 家数持平</b>（符合本项目「改善红 / 恶化绿」的语义色板）。
-              柱长则恒为<b className="text-txt">今日绝对家数</b> —— 颜色与长度正交，
-              同一根柱子里同时读出「多大」与「比昨天多还是少」。
-              <br />
-              <b className="text-txt">灰色虚线短横 = 昨日无此题材</b>（`zt_prev` 为 null，属新晋），
-              <b>不是「昨日 0 家」</b> —— 无基准就无从谈增减，所以这类题材颜色取中性。
-              题材内总家数（`total_stocks`）未画进柱子：它与涨停家数不同量纲，
-              共轴会把涨停差异压平；该值请看上方列表。
+            <p className="text-sub text-[11.5px] mt-2">
+              <b className="text-up">红</b> = 较昨增加 · <b className="text-down">绿</b> = 较昨减少 · 灰色虚线 = 昨日无样本。
             </p>
           </>
         ) : (
@@ -239,6 +227,14 @@ export function Component() {
             </div>
           }
         >
+          {/* 龙头逻辑为实时快照原文；题材催化已随左侧每张强度卡展示。 */}
+          {expanded.leader?.desc && (
+            <div className="rounded-sm border border-lead/35 bg-lead/[0.035] px-3 py-2.5 mb-3">
+              <div className="text-[11.5px] text-lead font-semibold mb-1">龙头炒作逻辑</div>
+              <div className="text-[12.5px] leading-relaxed text-txt">{expanded.leader.desc}</div>
+            </div>
+          )}
+
           {/* ── 龙头详况 ── */}
           <div className="border border-line rounded-sm px-2.5 py-2 mb-3">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
@@ -255,9 +251,6 @@ export function Component() {
               <StatPair label="市值" value={expanded.leader?.cap_yi != null ? `${n1(expanded.leader.cap_yi)}亿` : '—'} />
               {expanded.leader?.seal && <span className="text-[12px]">{expanded.leader.seal}</span>}
             </div>
-            {expanded.leader?.desc && (
-              <div className="text-[12.5px] leading-relaxed mt-1.5">{expanded.leader.desc}</div>
-            )}
           </div>
 
           <div className="grid md:grid-cols-2 gap-3">

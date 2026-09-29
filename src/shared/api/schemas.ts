@@ -358,6 +358,10 @@ export const FeedbackMatrixSchema = z.object({
         /** 封单额（亿）· 仅真封板时非空 */
         seal_yi: nOrNull.optional(),
         sealed_today: b.optional(),
+        amount_yi: nOrNull.optional(),
+        quote_at: s.nullish(),
+        prev_boards: n.optional(),
+        sealed: b.nullish(),
         /** 今日涨停池首封时间；不能使用昨日快照时间代替。 */
         today_fbt: s.nullish(),
       }),

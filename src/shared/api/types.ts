@@ -409,6 +409,11 @@ export interface PromoteItem {
  * 未涨停的票买一也有挂单，但那不是封单 → 后端给 `null`，⛔ 前端不得退化成 0。
  */
 export interface QuoteItem {
+  /** 当日累计成交额（亿元），缺失保持为空。 */
+  amount_yi?: number | null
+  quote_at?: string | null
+  prev_boards?: number
+  sealed?: boolean | null
   name?: string
   /** 今日实时涨跌幅 % */
   pct?: number | null

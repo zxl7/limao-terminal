@@ -12,6 +12,7 @@ const summary = z.object({
   window_amount_yi: nullableNumber, window_pct_change: nullableNumber,
 })
 export const RelayEffectSchema = z.object({
+  historical: z.boolean().optional(), source_note: z.string().optional(),
   date: z.string(), prev_date: z.string(), generated_ts: z.string(), phase: z.enum(['live', 'closed']),
   overview: summary, groups: z.array(summary),
   stocks: z.array(point.extend({

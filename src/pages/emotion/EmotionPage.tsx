@@ -3,10 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type {
   EmotionDay,
-  MarketMemory,
   ZtHistoryDay,
   ZtIntradayPoint,
-  ZtPoolSnapshot,
 } from '@/shared/api'
 import {
   analyticsQueries,
@@ -15,7 +13,6 @@ import {
   StatPair,
   Tag,
   boardsLabel,
-  fileDate,
   fmtFbt,
   n1,
   pct,
@@ -24,12 +21,14 @@ import {
    *  直接导入会触发 no-shadow，且语义也确实不同（那是「序列色调」不是「涨跌色调」）。 */
   tone as toneCls,
 } from '@/features/analytics'
-import { buildTideState, marketQueries, TideCard, tideConflict } from '@/features/market'
+import { buildTideState, marketQueries, TideCard, type TideWindowDay } from '@/features/market'
 import { BarChart, Card, CardBadge, EmptyState, Icon, LineChart, Sparkline, StockLink, Zone, ZoneRow, maLine } from '@/shared/ui'
 import { cn, sentimentClass } from '@/shared/lib'
+import { APP_CONFIG } from '@/shared/config'
 
 /**
- * 情绪周期 —— 数据源 `cache/emotion_summary_5d.json` + `cache/zt_history_*.json`。
+ * 情绪周期首屏按 `feedback_matrix.json` 的实时潮位展示；
+ * `summary_5d.json`、`zt_history` 等日频资料收在历史复盘中。
  *
  * ## 窗口分层（原系统定义，不可自行改口径）
  *
@@ -52,12 +51,10 @@ import { cn, sentimentClass } from '@/shared/lib'
  */
 
 export async function loader() {
-  // 四份日频/归档数据独立产出；任一文件暂缺时保留其余数据与页面内空态。
+  // 实时反馈、盘中逐事件与日频归档独立产出；单一源暂缺时保留其他卡片。
   await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.emotionSummary5d()),
     queryClient.ensureQueryData(analyticsQueries.emotionZtHistory()),
-    queryClient.ensureQueryData(analyticsQueries.emotionMemory()),
-    queryClient.ensureQueryData(analyticsQueries.ztYesterday()),
     queryClient.ensureQueryData(marketQueries.feedback()),
   ])
   return null
@@ -82,13 +79,15 @@ const TURN_TONE: Record<string, { label: string; cls: string }> = {
 type IntradayRow = ZtHistoryDay & { intraday_points: ZtIntradayPoint[] }
 
 export function Component() {
-  const summary = useQuery(analyticsQueries.emotionSummary5d())
+  // 本页历史复盘也随归档链刷新；不改变其他页面的日频读取节拍。
+  const summary = useQuery({
+    ...analyticsQueries.emotionSummary5d(),
+    refetchInterval: APP_CONFIG.pollIntradayMs,
+    staleTime: 15_000,
+  })
   const ztHist = useQuery(analyticsQueries.emotionZtHistory())
-  const memory = useQuery(analyticsQueries.emotionMemory())
-  const yzt = useQuery(analyticsQueries.ztYesterday())
   const feedback = useQuery(marketQueries.feedback())
   const [tab, setTab] = useState<'days' | 'trajectory' | 'intraday'>('days')
-  const [memPick, setMemPick] = useState('')
 
   const s = summary.data
   /**
@@ -96,46 +95,15 @@ export function Component() {
    *    新建一个空数组**，引用一变，所有以它为依赖的 useMemo 都会失效 ——
    *    图表的比例尺与路径随之整表重算（最典型的表现是鼠标一划就卡）。
    */
-  const days = useMemo(() => s?.days ?? [], [s])
+  const days = useMemo(
+    () => (s?.days ?? []).filter((day) => day.date !== feedback.data?.date),
+    [s, feedback.data?.date],
+  )
   const traj = s?.trajectory
   const turn = traj?.turn_signal
   const turnStyle = turn ? (TURN_TONE[turn.dir] ?? TURN_TONE.flat) : null
   /** 实时潮位严格按候选链路的 feedback_matrix 门控映射，不能拿日频摘要替代。 */
   const tide = useMemo(() => buildTideState(feedback.data), [feedback.data])
-  const tideDirectionConflict = useMemo(() => tideConflict(tide, turn?.dir), [tide, turn?.dir])
-
-  /**
-   * 情绪快照（`market_memory_<日期>.json`）—— 盘中「情绪联动」的唯一数据源。
-   *
-   * 与 `summary_5d` 的分工**不是重复**：
-   *   · `summary_5d` 是**日频统计** —— 每天一个情绪分，回答「水平与方向」
-   *   · 情绪快照是**当日盘中的过程记录** —— 情绪何时生变（`event_log`）、
-   *     当天系统推过哪些题材（`pushed_topics`，含首推/末推时刻与次数）
-   * 复盘时「今天几点开始转暖、哪条线被反复推」只有后者答得了。
-   */
-  const memFiles = useMemo(
-    () =>
-      (memory.data ?? [])
-        .filter((f) => !!f.data)
-        .slice()
-        .sort((a, b) => b.file.localeCompare(a.file)),
-    [memory.data],
-  )
-  const memPickFile = memFiles.find((f) => f.file === memPick)?.file ?? memFiles[0]?.file ?? ''
-  const mem: MarketMemory | null | undefined = memFiles.find(
-    (f) => f.file === memPickFile,
-  )?.data
-
-  /** 昨日涨停池（**唯一涨停权威**）—— 本页其余口径若有分歧，一律以这份为准 */
-  const y: ZtPoolSnapshot | undefined = yzt.data
-  const yLadder = useMemo(
-    () =>
-      Object.entries(y?.ladder ?? {})
-        .map(([b, names]) => ({ boards: Number(b), names }))
-        .filter((x) => Number.isFinite(x.boards) && x.names.length > 0)
-        .sort((a, b) => b.boards - a.boards),
-    [y],
-  )
 
   /** 盘中时序按日期倒序，取最近 8 个交易日（仅保留确有逐窗口数据的归档日） */
   const intradayRows = useMemo<IntradayRow[]>(
@@ -143,9 +111,10 @@ export function Component() {
       (ztHist.data ?? [])
         .map((f) => f.data)
         .filter((x): x is IntradayRow => !!x && Array.isArray(x.intraday_points))
+        .filter((x) => x.date !== feedback.data?.date)
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 8),
-    [ztHist.data],
+    [ztHist.data, feedback.data?.date],
   )
 
   /**
@@ -189,6 +158,7 @@ export function Component() {
     const rows = (ztHist.data ?? [])
       .map((f) => f.data)
       .filter((x): x is ZtHistoryDay => !!x)
+      .filter((x) => x.date !== feedback.data?.date)
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-12)
 
@@ -212,7 +182,40 @@ export function Component() {
       }
     })
     return { bars, hasAny: values.some((v) => v != null) }
-  }, [ztHist.data])
+  }, [ztHist.data, feedback.data?.date])
+
+  /**
+   * 多日周期样本只读已经归档的交易日；当日盘中信息由时间轴承接，避免重复。
+   * 各字段按日期从自己的事实源合并，缺字段保留空值，绝不拿别日数据补齐。
+   */
+  const tideWindow = useMemo<TideWindowDay[]>(() => {
+    const feedbackDays = new Map((feedback.data?.trend?.history ?? []).map((x) => [x.date, x]))
+    const summaryDays = new Map(days.map((x) => [x.date, x]))
+    const ztDays = new Map<string, number | null>()
+    for (const file of ztHist.data ?? []) {
+      const row = file.data
+      if (!row) continue
+      const last = row.intraday_points?.at(-1)
+      ztDays.set(row.date, last?.total ?? row.zt_count ?? null)
+    }
+    const dates = new Set([...feedbackDays.keys(), ...summaryDays.keys(), ...ztDays.keys()])
+    return [...dates]
+      .filter((date) => date !== feedback.data?.date)
+      .sort((a, b) => a.localeCompare(b))
+      .slice(-5)
+      .map((date) => {
+        const feedbackDay = feedbackDays.get(date)
+        const summaryDay = summaryDays.get(date)
+        return {
+          date,
+          sentiment: summaryDay?.sentiment_score ?? null,
+          ztCount: ztDays.get(date) ?? null,
+          premium: feedbackDay?.ap ?? null,
+          promoteRate: feedbackDay?.pr ?? summaryDay?.promote_rate ?? null,
+          nukeCount: summaryDay?.nuke_count ?? null,
+        }
+      })
+  }, [days, feedback.data, ztHist.data])
 
   /** 最新归档日的盘中涨停节奏（逐快照窗口）—— 回答「涨停是堆早盘还是补午后」 */
   const todayRhythm = useMemo(() => {
@@ -241,9 +244,32 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ── 方向层：交易决策真正依赖的是方向，不是水平 ── */}
+      {/* 周期页只展示多日样本；当日盘中过程由日内时间轴承接。 */}
       <Card
-        title="🌡️ 情绪周期"
+        title="🌊 情绪潮汐周期"
+        extra={
+          <span className="flex items-center gap-2">
+            <CardBadge tone={tide.tone === 'neutral' ? 'neutral' : tide.tone}>{tide.label}</CardBadge>
+          </span>
+        }
+      >
+        {feedback.isError && (
+          <p role="status" className="text-[11px] text-warn mb-2">
+            {feedback.data ? '反馈更新失败，显示上次快照' : '反馈加载失败，潮位待确认'}
+          </p>
+        )}
+        <TideCard tide={tide} window={tideWindow} />
+      </Card>
+
+      {/* 日频与归档用于复盘，默认展开但不参与实时潮位判定。 */}
+      <details open className="border border-line rounded-sm bg-card px-3 py-2">
+        <summary className="cursor-pointer text-[12.5px] font-semibold text-txt">
+          历史复盘 · 日频方向与涨停归档
+        </summary>
+        <div className="flex flex-col gap-3 pt-3">
+      {/* ── 方向层：日频摘要只作复盘背景 ── */}
+      <Card
+        title="🌡️ 情绪周期 · 日频方向"
         extra={
           <CardBadge tone={turn?.dir === 'repair' ? 'up' : turn?.dir === 'ebb' ? 'down' : 'neutral'}>
             {s?.cycle_hint ?? '—'}
@@ -274,13 +300,6 @@ export function Component() {
         {!summary.isLoading && !s && (
           <EmptyState text="情绪摘要未生成" hint="cache/emotion_summary_5d.json 缺失" />
         )}
-      </Card>
-
-      <Card
-        title="🌊 盘中潮汐裁决"
-        extra={<CardBadge tone={tide.tone === 'neutral' ? 'neutral' : tide.tone}>{tide.label}</CardBadge>}
-      >
-        <TideCard tide={tide} conflict={tideDirectionConflict} />
       </Card>
 
       {/* ── 情绪轨迹图：把「方向」画出来，而不是只给一个水平值 ── */}
@@ -609,199 +628,8 @@ export function Component() {
         </Zone>
       </ZoneRow>
 
-      {/* ── 权威口径与过程留痕 ──
-          上半部分都是「统计口径」（summary_5d 的日频聚合 / zt_history 的盘中时序）。
-          这一行补两类**不可替代的原始件**：
-            · 昨日涨停池 —— 涨停家数的**唯一权威**（record_zt_snapshot 固化）。
-              本页任何地方读到的涨停数若与它不一致，一律以它为准。
-            · 情绪快照 —— 当日盘中的**过程留痕**（情绪几点生变、当天系统推过哪些题材）。
-              日频聚合天然看不到这一层，而复盘最需要的恰恰是「几点开始转的」。 */}
-      <ZoneRow>
-        <Zone label="昨日涨停池 · 唯一权威口径" dot="bg-up" className="xl:w-[58%]">
-          <Card
-            title="📌 昨日涨停池（唯一权威）"
-            extra={<CardBadge>{y?.date ?? '—'}</CardBadge>}
-          >
-            {!y ? (
-              <EmptyState text="昨日涨停池未落盘 —— record_zt_snapshot 未运行，本页所有涨停数口径均不可信" />
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-                  <StatPair label="涨停家数" value={y.zt_count} tone="up" />
-                  <StatPair label="最高板" value={boardsLabel(y.max_boards)} tone="rec" />
-                  <StatPair label="天梯层数" value={yLadder.length} />
-                  <StatPair label="明细条数" value={y.zt_list?.length ?? '—'} />
-                  <StatPair
-                    label="固化时间"
-                    value={y.generated_ts ? y.generated_ts.slice(11, 16) : '—'}
-                  />
-                </div>
-
-                {yLadder.length > 0 && (
-                  <div className="flex flex-col gap-1 border-t border-line-faint pt-2">
-                    {yLadder.map((l) => (
-                      <div key={l.boards} className="flex items-baseline gap-2">
-                        <span className="badge bg-up-soft text-up flex-none">
-                          {boardsLabel(l.boards)}
-                        </span>
-                        <span className="num text-[11.5px] text-sub flex-none w-[30px] text-right">
-                          {l.names.length}
-                        </span>
-                        <span className="text-[12.5px] text-txt">{l.names.join(' · ')}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {(y.zt_list?.length ?? 0) > 0 && (
-                  <div className="border-t border-line-faint pt-2 max-h-[420px] overflow-y-auto">
-                    <DataTable
-                      dense
-                      rows={y.zt_list ?? []}
-                      rowKey={(r) => r.code}
-                      columns={[
-                        { label: '名称', cell: (r) => <StockLink code={r.code} className="text-txt">{r.name}</StockLink> },
-                        { label: '板数', num: true, cell: (r) => boardsLabel(r.boards) },
-                        {
-                          label: '涨幅',
-                          num: true,
-                          cell: (r) => <span className={toneCls(r.pct)}>{pct(r.pct)}</span>,
-                        },
-                        {
-                          label: '换手',
-                          num: true,
-                          cell: (r) => <span className="num text-sub">{rate(r.hs)}</span>,
-                        },
-                        {
-                          label: '首封',
-                          num: true,
-                          cell: (r) => <span className="num text-sub">{fmtFbt(r.fbt)}</span>,
-                        },
-                        {
-                          label: '炸板',
-                          num: true,
-                          cell: (r) => <span className="num text-sub">{r.zbc}</span>,
-                        },
-                        { label: '板块', cell: (r) => <span className="text-sub">{r.sector || '—'}</span> },
-                      ]}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </Card>
-        </Zone>
-
-        <Zone label="情绪快照 · 盘中过程留痕" dot="bg-rec" className="xl:w-[42%]">
-          <Card
-            title="🧠 情绪快照"
-            extra={
-              <div className="flex items-center gap-2">
-                {memFiles.length > 1 && (
-                  <SegTabs
-                    items={memFiles.slice(0, 8).map((f) => ({
-                      key: f.file,
-                      label: fileDate(f.file).slice(5),
-                    }))}
-                    value={memPickFile}
-                    onChange={setMemPick}
-                  />
-                )}
-                <CardBadge>{memFiles.length} 期</CardBadge>
-              </div>
-            }
-          >
-            {!mem ? (
-              <EmptyState text="情绪快照未落盘（memory_lib 未运行）" />
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-                  <StatPair
-                    label="情绪定性"
-                    value={mem.market_state.sentiment}
-                    tone={memTone(mem.market_state.sentiment)}
-                  />
-                  <StatPair label="涨停家数" value={mem.market_state.total_zt} tone="up" />
-                  <StatPair label="主导板块" value={mem.market_state.dominant_sector || '—'} />
-                  <StatPair label="指数趋势" value={mem.market_state.index_trend || '—'} />
-                  <StatPair
-                    label="情绪生变于"
-                    value={mem.market_state.sentiment_change_at || '—'}
-                  />
-                </div>
-
-                {/* 情绪事件流 —— 「几点开始转暖/转衰」的唯一来源 */}
-                <div className="border-t border-line-faint pt-2">
-                  <div className="text-[11px] text-sub mb-1">
-                    情绪事件流（{(mem.event_log ?? []).length} 条）
-                  </div>
-                  {(mem.event_log ?? []).length === 0 ? (
-                    <div className="text-sub text-[12px]">当日无情绪事件记录</div>
-                  ) : (
-                    <ul className="flex flex-col max-h-[220px] overflow-y-auto">
-                      {(mem.event_log ?? []).map((e, i) => (
-                        <li
-                          // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：事件流与时间轴严格对齐，同一时刻可能重复同一句话，用内容做 key 反而会撞。
-                          key={i}
-                          className="flex items-baseline gap-2 py-1 border-b border-line-faint last:border-0"
-                        >
-                          <span className="num text-[11.5px] text-sub flex-none w-[38px]">
-                            {e.time}
-                          </span>
-                          {/*
-                            ⚠️ 刻意**不给 severity 上语义色** —— 'high' 说的是「信号强度」，
-                            与 A 股涨跌方向无关；套上红/绿会把「高强度利空」渲染成看多。
-                          */}
-                          <Tag title="原系统严重度标记（信号强度，非涨跌方向）">{e.severity}</Tag>
-                          <span className="text-[12.5px] text-txt">{e.event}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                {/* 当日推送台账 —— 「今天系统推过什么、推了几次」 */}
-                <div className="border-t border-line-faint pt-2">
-                  <div className="text-[11px] text-sub mb-1">
-                    当日推送题材（{(mem.pushed_topics ?? []).length} 条）
-                  </div>
-                  {(mem.pushed_topics ?? []).length === 0 ? (
-                    <div className="text-sub text-[12px]">当日无题材推送</div>
-                  ) : (
-                    <ul className="flex flex-col gap-1.5">
-                      {(mem.pushed_topics ?? []).map((t) => (
-                        <li key={t.name} className="flex flex-col gap-0.5">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-[12.5px] font-semibold text-txt">{t.name}</span>
-                            <span className="num text-[11px] text-sub">推 {t.push_count} 次</span>
-                            <span className="num text-[11px] text-sub">
-                              {t.first_pushed}~{t.last_pushed}
-                            </span>
-                          </div>
-                          {t.context && (
-                            <div className="text-[11.5px] text-sub leading-relaxed line-clamp-2">
-                              {t.context}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="border-t border-line-faint pt-1.5 text-sub text-[11px]">
-                  各任务最后推送：
-                  {Object.entries(mem.last_push_by_task ?? {}).length === 0
-                    ? '—'
-                    : Object.entries(mem.last_push_by_task)
-                        .map(([k, v]) => `${k} ${v}`)
-                        .join(' · ')}
-                </div>
-              </div>
-            )}
-          </Card>
-        </Zone>
-      </ZoneRow>
+        </div>
+      </details>
     </div>
   )
 }
@@ -810,28 +638,6 @@ export function Component() {
 function sentCls(score: number): string {
   const c = sentimentClass(score)
   return c === 'up' ? 'text-up' : c === 'down' ? 'text-down' : c === 'mid' ? 'text-mid' : 'text-txt'
-}
-
-/**
- * 情绪**定性词** → 语义色。
- *
- * ⚠️ 与 `sentCls` 不是同一件事：`sentCls` 吃的是 0–10 的**数值分**，
- *    这里吃的是原系统写进快照的**中文定性词**（`market_state.sentiment`）。
- *
- * ⚠️ 取值是开放集（实测近 20 期只出现「亢奋 / 分歧」两种，但不保证封版），
- *    故**未知词一律返回 `undefined`（保持中性灰）**，绝不按字面猜方向 ——
- *    猜错会把「退潮」渲染成看多，比不显色危险得多。
- */
-function memTone(
-  sentiment: string | null | undefined,
-): 'up' | 'down' | 'warn' | 'sub' | undefined {
-  if (!sentiment) return undefined
-  const s = sentiment.trim()
-  if (['亢奋', '修复', '回暖', '转强', '强势'].includes(s)) return 'up'
-  if (['退潮', '冰点', '低迷', '转弱', '弱势'].includes(s)) return 'down'
-  // 分歧 = 方向未定 —— 用警戒青绿而非涨跌色，避免被读成看多看空
-  if (['分歧', '震荡', '反复'].includes(s)) return 'warn'
-  return undefined
 }
 
 /** 序列横向滚动容器 —— 逐日值一行排开，便于肉眼比较相邻日 */
