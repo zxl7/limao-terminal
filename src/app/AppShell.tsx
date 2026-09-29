@@ -32,6 +32,8 @@ interface TabDef {
   end?: boolean
   /** 分组 —— 渲染时每段起首插入段名标签，段间加细分隔线 */
   group: TabGroup
+  /** 交易时段优先入口：即使未激活也保持可见高亮。 */
+  priority?: boolean
 }
 
 /**
@@ -64,22 +66,22 @@ interface TabDef {
  */
 export const TABS: readonly TabDef[] = [
   // ── 段1 · 实时（cadence=intraday）· 按短线交易优先级 ──
-  { to: '/', label: '盘中实时', end: true, group: '实时' },
+  { to: '/', label: '盘中实时', end: true, group: '实时', priority: true },
   { to: '/timeline', label: '日内时间轴', group: '实时' },
+  { to: '/mainline', label: '主线题材', group: '实时', priority: true },
   { to: '/effect', label: '赚钱效应', group: '实时' },
-  { to: '/rotation', label: '题材轮动', group: '实时' },
-  { to: '/mainline', label: '主线题材', group: '实时' },
-  { to: '/reflow', label: '题材回流', group: '实时' },
   { to: '/flow', label: '资金流向', group: '实时' },
+  { to: '/reflow', label: '题材回流', group: '实时' },
+  { to: '/rotation', label: '题材轮动', group: '实时' },
 
   // ── 段2 · 盘面定性（日频）──
-  { to: '/emotion', label: '情绪周期', group: '盘面' },
+  { to: '/emotion', label: '情绪周期', group: '盘面', priority: true },
   { to: '/board-core', label: '板块核心', group: '盘面' },
   { to: '/promotion', label: '连板晋级', group: '盘面' },
   { to: '/gene', label: '股性基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
-  { to: '/ai', label: 'AI台账', group: '决策' },
+  { to: '/ai', label: 'AI台账', group: '决策', priority: true },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },

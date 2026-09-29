@@ -69,6 +69,7 @@ export const ROUTES: Record<string, RouteDef> = {
   // ══════════════════════════════════════════════════════════════
   // 二、原 dashboard 内嵌、前端此前取不到的 5 个
   // ══════════════════════════════════════════════════════════════
+  '/api/market/relay-effect': { file: 'cache/relay_effect.json', cadence: 'intraday', desc: '连板量能与承接观察' },
   '/api/market/feedback':   { file: 'cache/feedback_matrix.json',              cadence: 'intraday', desc: '昨日涨停反馈矩阵（晋级率/核按钮/情绪分 12 因子）' },
   '/api/market/candidates': { file: 'cache/pulse_snapshots/candidates.json',   cadence: 'intraday', desc: '候选池' },
   '/api/theme/rotation':    { file: 'cache/theme_rotation.json',               cadence: 'intraday', desc: '题材轮动·回流预测·5日资金' },

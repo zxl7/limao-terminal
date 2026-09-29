@@ -25,6 +25,12 @@ import { inTrading } from '@/shared/lib'
 const pollMs = () => (inTrading() ? APP_CONFIG.pollIntradayMs : APP_CONFIG.pollOfflineMs)
 
 export const marketQueries = {
+  relayEffect: () => queryOptions({
+    queryKey: ['market', 'relay-effect'] as const,
+    queryFn: api.relayEffect,
+    refetchInterval: pollMs,
+    staleTime: 20_000,
+  }),
   /** 主快照（实时） */
   latest: () =>
     queryOptions({

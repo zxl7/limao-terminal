@@ -9,6 +9,7 @@ import {
   buildEffectHistory,
   buildScenarios,
   EffectAxesCard,
+  RelayEffectCard,
   EffectScenarioCard,
   EffectTrendCard,
   NextDayProjectionCard,
@@ -152,6 +153,8 @@ export function Component() {
           </Card>
         </div>
       </div>
+
+      <RelayEffectCard />
 
       {/* 历史只回答“在改善还是恶化”；情景只列观察条件，避免与当日事实混读。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">

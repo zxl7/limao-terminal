@@ -36,7 +36,6 @@ export function TideCard({ tide, conflict }: { tide: TideState; conflict: string
         </p>
       )}
       {tide.caveat && <p className="text-[11.5px] leading-relaxed text-sub">数据注记：{tide.caveat}</p>}
-      <p className="text-[11px] leading-relaxed text-sub">潮位是环境门控的展示，不替代 AI 对个股的最终裁决。</p>
     </div>
   )
 }

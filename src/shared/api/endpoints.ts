@@ -34,6 +34,7 @@ import type {
   EngineStateFile,
   EruptionDay,
   FeedbackMatrix,
+  RelayEffect,
   LearningConfig,
   PoolCallFile,
   PromoBacktest,
@@ -90,6 +91,7 @@ export interface RouteTypeMap {
   '/api/market/signals': ShortSpiritSignals
 
   // ── 二、反馈与题材 ──
+  '/api/market/relay-effect': RelayEffect
   '/api/market/feedback': FeedbackMatrix
   '/api/market/candidates': CandidatesFile
   '/api/theme/rotation': RotationData
@@ -236,6 +238,7 @@ export const api = {
   // ── 二、反馈与题材 ──
   /** 昨日涨停反馈矩阵 */
   feedback: () => fetchRoute('/api/market/feedback'),
+  relayEffect: () => fetchRoute('/api/market/relay-effect'),
   /** 候选池 */
   candidates: () => fetchRoute('/api/market/candidates'),
   /** 题材轮动 · 回流预测 · 5日资金 */

@@ -2468,3 +2468,5 @@ export interface IntradayLimitUpStock {
   boards?: string | number | null
   sector?: string | null
 }
+
+export type { RelayEffect, RelayStock } from './relayEffect'

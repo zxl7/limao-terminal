@@ -1,3 +1,4 @@
+import { RelayEffectSchema } from './relayEffect'
 /**
  * 运行时数据契约守卫（zod 4）。
  *
@@ -860,6 +861,7 @@ const SCHEMA_MAP = {
   '/api/market/auction': AuctionLiveSchema,
   '/api/market/signals': ShortSpiritSignalsSchema,
   '/api/market/feedback': FeedbackMatrixSchema,
+  '/api/market/relay-effect': RelayEffectSchema,
   '/api/market/candidates': CandidatesFileSchema,
   '/api/theme/rotation': RotationDataSchema,
   '/api/theme/series': ThemeSeriesSchema,

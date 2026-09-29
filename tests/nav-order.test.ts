@@ -10,7 +10,7 @@
  *
  * 顺序一旦被无意改动（新增页面时插错位置、或有人「顺手按字母序排一下」），
  * 单看界面很难察觉。故此处把三条不变量写死：
- *   1. 段序固定：实时 → 盘面 → 题材 → 决策 → 数据
+ *   1. 段序固定：实时 → 盘面 → 决策 → 题材 → 数据
  *   2. 「实时」段必须是**连续前缀**（不能有历史页插队到实时页之间）
  *   3. 「实时」段成员必须等于 cadence 审计结论 —— 且路由表若新增实时路由，
  *      本测试会失败以提醒重新审计导航
@@ -41,18 +41,18 @@ import { TABS } from '@/app/AppShell'
 const REALTIME_TABS = [
   '/',
   '/timeline',
-  '/effect',
-  '/rotation',
   '/mainline',
-  '/reflow',
+  '/effect',
   '/flow',
+  '/reflow',
+  '/rotation',
 ] as const
 
 /** 段序 —— 实时段置首是本次改动的核心，顺序即契约 */
-const GROUP_ORDER = ['实时', '盘面', '题材', '决策', '数据'] as const
+const GROUP_ORDER = ['实时', '盘面', '决策', '题材', '数据'] as const
 
 describe('导航顺序 —— 实时优先', () => {
-  it('分段顺序固定为 实时 → 盘面 → 题材 → 决策 → 数据', () => {
+  it('分段顺序固定为 实时 → 盘面 → 决策 → 题材 → 数据', () => {
     // 按出现次序去重，得到实际段序
     const seen: string[] = []
     for (const t of TABS) if (seen[seen.length - 1] !== t.group) seen.push(t.group)
@@ -83,17 +83,17 @@ describe('导航顺序 —— 实时优先', () => {
   })
 
   it('「实时」段顺序 = 声明的短线优先级（顺序即契约 · ⛔ 不许重排）', () => {
-    // 首页（盘中实时）恒在首位；其后 时间轴 → 赚钱效应 → 题材轮动/主线 → 回流/资金。
+    // 首页（盘中实时）恒在首位；其后时间轴 → 主线 → 赚钱效应 → 资金 → 回流 → 轮动。
     // ⛔ 2026-09-22 起数据/运维类（/record·/ops）已移出实时段，不再参与本排序。
     // ⛔ 2026-09-23 新增 /effect（赚钱效应）—— 与 /timeline 同属「盘中定性」组，紧邻其后。
     expect([...REALTIME_TABS]).toEqual([
       '/',
       '/timeline',
-      '/effect',
-      '/rotation',
       '/mainline',
-      '/reflow',
+      '/effect',
       '/flow',
+      '/reflow',
+      '/rotation',
     ])
   })
 
@@ -121,7 +121,7 @@ describe('导航顺序 —— 实时优先', () => {
      *      导航段是**页面级**决策，两者本来就不是一一对应。
      */
     /**
-     * ⚠️ 2026-09-17 审计记录（新增 `/api/intraday/timeline` 后重跑本锁）：9 → **10**。
+     * ⚠️ 2026-09-17 审计记录（新增 `/api/intraday/timeline` 后重跑本锁）：9 → 10。
      *    新路由 = 「盘中情绪时间轴」逐事件日志（`intraday_timeline.py` 每轮追加 · cadence=intraday，名副其实）。
      *    它被 **`/timeline` 页面**消费（该页已在「实时」段首位之后），
      *    ⇒ 无需增删「实时」段成员，只更新计数。
@@ -130,6 +130,6 @@ describe('导航顺序 —— 实时优先', () => {
     expect(
       intraday,
       'intraday 路由数量变了 —— 请重新跑「页面 × cadence」审计，确认「实时」段是否需要增删成员',
-    ).toBe(10)
+    ).toBe(12)
   })
 })

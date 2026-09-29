@@ -13,13 +13,14 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppShell } from '@/app/AppShell'
 
 /** 段名标签的合法取值 —— 与 `TabGroup` 联合类型同步 */
 const GROUP_LABELS = /^(实时|盘面|题材|决策|数据)$/
+const groupText = (el: Element) => (el.textContent ?? '').replace(/[⌃⌄]/g, '').trim()
 
 function renderShell() {
   // TopBar 是 AppShell 的一部分且订阅 market/latest，故需要 QueryClient；
@@ -47,33 +48,33 @@ function renderShell() {
 }
 
 describe('AppShell 导航渲染', () => {
-  it('段名标签按「实时 → 盘面 → 题材 → 决策 → 数据」出现', () => {
+  it('段名标签按「实时 → 盘面 → 决策 → 题材 → 数据」出现', () => {
     renderShell()
     // 必须限定在「主导航」（PC 侧栏）内：AppShell 同时渲染了窄屏回退的
     // 「顶部导航」，全屏 getAllByText 会把两套导航的段名一起匹配进来。
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    const labels = Array.from(nav.querySelectorAll('span'))
-      .filter((s) => GROUP_LABELS.test((s.textContent ?? '').trim()))
-      .map((s) => (s.textContent ?? '').trim())
-    expect(labels).toEqual(['实时', '盘面', '题材', '决策', '数据'])
+    const labels = Array.from(nav.querySelectorAll('span, button'))
+      .filter((s) => GROUP_LABELS.test(groupText(s)))
+      .map(groupText)
+    expect(labels).toEqual(['实时', '盘面', '决策', '题材', '数据'])
   })
 
   it('「实时」段名排在导航最前 —— 即排序结果肉眼可见', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    const labels = Array.from(nav.querySelectorAll('span')).filter((s) =>
-      GROUP_LABELS.test((s.textContent ?? '').trim()),
+    const labels = Array.from(nav.querySelectorAll('span, button')).filter((s) =>
+      GROUP_LABELS.test(groupText(s)),
     )
-    expect((labels[0]?.textContent ?? '').trim()).toBe('实时')
+    expect(groupText(labels[0])).toBe('实时')
   })
 
   it('「实时」段名用强调色 + 呼吸点，与后续历史段在视觉上可区分', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    const groupSpans = Array.from(nav.querySelectorAll('span')).filter((s) =>
-      GROUP_LABELS.test((s.textContent ?? '').trim()),
+    const groupSpans = Array.from(nav.querySelectorAll('span, button')).filter((s) =>
+      GROUP_LABELS.test(groupText(s)),
     )
-    const live = groupSpans.find((el) => (el.textContent ?? '').trim() === '实时')!
+    const live = groupSpans.find((el) => groupText(el) === '实时')!
     // 强调色：侧栏是深底，必须用深底专用红 `text-head-up`；
     // 浅底用的 `text-up` 在 #1c2130 上对比度不足，属双套色（见 theme.css）
     expect(live.className).toContain('text-head-up')
@@ -85,22 +86,42 @@ describe('AppShell 导航渲染', () => {
 
     // 历史段不得带呼吸点与强调色
     for (const g of ['盘面', '题材', '决策', '数据']) {
-      const el = groupSpans.find((x) => (x.textContent ?? '').trim() === g)!
+      const el = groupSpans.find((x) => groupText(x) === g)!
       expect(el.className, `${g} 段不应使用实时强调色`).not.toContain('text-head-up')
     }
   })
 
-  it('导航渲染出全部 27 个 Tab（含实时段 7 个）', () => {
+  it('导航渲染出全部 28 个 Tab（含实时段 7 个）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
-    expect(links.length).toBe(27)
+    expect(links.length).toBe(28)
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
-    const realtimeTo = ['/', '/timeline', '/effect', '/rotation', '/mainline', '/reflow', '/flow']
+    const realtimeTo = ['/', '/timeline', '/mainline', '/effect', '/flow', '/reflow', '/rotation']
     const actual = Array.from(links)
       .slice(0, realtimeTo.length)
       .map((a) => a.getAttribute('href'))
     expect(actual).toEqual(realtimeTo)
+  })
+
+  it('交易优先入口在未激活时仍保持高亮', () => {
+    renderShell()
+    const nav = screen.getByRole('navigation', { name: '主导航' })
+    const labels = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[data-priority="true"]')).map((a) => a.textContent?.trim())
+    expect(labels).toEqual(['盘中实时', '主线题材', '情绪周期', 'AI台账'])
+  })
+
+  it('顶部导航的数据子 Tab 默认收起，点击“数据”后展开', () => {
+    renderShell()
+    const topNav = screen.getByRole('navigation', { name: '顶部导航' })
+    expect(topNav.querySelector('a[href="/record"]')).toBeNull()
+
+    const trigger = screen.getByRole('button', { name: /数据/ })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger)
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(topNav.querySelector('a[href="/record"]')).toBeTruthy()
   })
 })

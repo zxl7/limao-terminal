@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { NavLink } from 'react-router'
 import { TABS, type TabGroup } from './AppShell'
 import { cn } from '@/shared/lib'
@@ -130,12 +130,15 @@ export function Sidebar() {
                     key={t.to}
                     to={t.to}
                     end={t.end}
+                    data-priority={t.priority ? 'true' : undefined}
                     className={({ isActive }) =>
                       cn(
                         'flex items-center gap-2 px-2.5 py-[7px] rounded-md text-[13px] no-underline transition-colors',
                         isActive
                           ? 'bg-white/10 text-white shadow-[inset_2px_0_0_var(--color-up)]'
-                          : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
+                          : t.priority
+                            ? 'bg-white/[0.07] text-white font-medium shadow-[inset_2px_0_0_var(--color-head-up)] hover:bg-white/10'
+                            : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
                       )
                     }
                   >
@@ -159,6 +162,8 @@ export function Sidebar() {
 
 /** 窄屏（<lg）回退导航 —— 侧栏隐藏时退化为顶部横向 tab 条，避免移动端无导航。 */
 export function TopNavFallback() {
+  const [dataOpen, setDataOpen] = useState(false)
+
   return (
     <nav
       className="lg:hidden flex items-stretch gap-1 px-3 pt-2 bg-bg flex-none overflow-x-auto border-b border-line"
@@ -175,33 +180,49 @@ export function TopNavFallback() {
                 {live && (
                   <span className="w-1.5 h-1.5 rounded-full bg-up animate-pulse" aria-hidden />
                 )}
-                <span
-                  className={
-                    live
-                      ? 'text-[10.5px] font-semibold text-up whitespace-nowrap'
-                      : 'text-[10.5px] text-sub whitespace-nowrap'
-                  }
-                >
-                  {t.group}
-                </span>
+                {t.group === '数据' ? (
+                  <button
+                    type="button"
+                    aria-expanded={dataOpen}
+                    onClick={() => setDataOpen((open) => !open)}
+                    className="text-[10.5px] text-sub whitespace-nowrap cursor-pointer hover:text-txt"
+                  >
+                    数据 {dataOpen ? '⌃' : '⌄'}
+                  </button>
+                ) : (
+                  <span
+                    className={
+                      live
+                        ? 'text-[10.5px] font-semibold text-up whitespace-nowrap'
+                        : 'text-[10.5px] text-sub whitespace-nowrap'
+                    }
+                  >
+                    {t.group}
+                  </span>
+                )}
               </span>
             )}
-            <NavLink
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                [
-                  'border border-b-0 border-line bg-card text-sub px-3 py-1.5',
-                  'rounded-t-[var(--radius-sm)] text-[13px] whitespace-nowrap no-underline',
-                  'hover:text-txt transition-colors flex-none',
-                  isActive
-                    ? 'text-txt font-semibold border-line-strong shadow-[inset_0_-2px_0_var(--color-up)]'
-                    : '',
-                ].join(' ')
-              }
-            >
-              {t.label}
-            </NavLink>
+            {(t.group !== '数据' || dataOpen) && (
+              <NavLink
+                to={t.to}
+                end={t.end}
+                data-priority={t.priority ? 'true' : undefined}
+                className={({ isActive }) =>
+                  [
+                    'border border-b-0 border-line bg-card text-sub px-3 py-1.5',
+                    'rounded-t-[var(--radius-sm)] text-[13px] whitespace-nowrap no-underline',
+                    'hover:text-txt transition-colors flex-none',
+                    isActive
+                      ? 'text-txt font-semibold border-line-strong shadow-[inset_0_-2px_0_var(--color-up)]'
+                      : t.priority
+                        ? 'text-up font-medium border-up/50 shadow-[inset_0_-2px_0_var(--color-up)]'
+                        : '',
+                  ].join(' ')
+                }
+              >
+                {t.label}
+              </NavLink>
+            )}
           </Fragment>
         )
       })}

@@ -189,3 +189,5 @@ export {
   EffectWindowCard,
   NextDayProjectionCard,
 } from './components/EffectCards'
+
+export { RelayEffectCard } from './components/RelayEffectCard'
