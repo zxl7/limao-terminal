@@ -1,6 +1,7 @@
 import type {
   EmotionSummary5D,
   FeedbackMatrix,
+  LadderGroup,
   PromoSummary,
   ZtPoolStock,
 } from '@/shared/api'
@@ -493,6 +494,27 @@ export function boardsDistribution(
 }
 
 /**
+ * 决策时点快照的连板结构 → T+1 推演输入。
+ * 快照只提供板数与各层股票数量；本页不读取逐票价格、成交额或封板状态。
+ */
+export function boardsDistributionFromLadder(
+  ladder: LadderGroup[] | null | undefined,
+): Map<string, number> | null {
+  if (!ladder || ladder.length === 0) return null
+  const m = new Map<string, number>()
+  let counted = 0
+  for (const group of ladder) {
+    const boards = Number(group.boards)
+    const count = Array.isArray(group.stocks) ? group.stocks.length : 0
+    if (!Number.isFinite(boards) || boards <= 0 || count <= 0) continue
+    const stage = stageOfBoards(boards)
+    m.set(stage, (m.get(stage) ?? 0) + count)
+    counted += count
+  }
+  return counted > 0 ? m : null
+}
+
+/**
  * T+1 **条件期望**（⛔ 不是预测）：
  *
  * ```
@@ -512,7 +534,7 @@ export function projectNextDay(
   if (!dist) {
     return {
       stages: [], poolTotal: 0, expPromoteCount: null, gainPremMed: null, lossFailMed: null,
-      uncovered: [], caveats: ['当日涨停池板数分布不可用（盘中待收盘落盘）'],
+      uncovered: [], caveats: ['当前快照未提供有效连板梯队，无法生成条件期望'],
     }
   }
   if (rows.length === 0) {

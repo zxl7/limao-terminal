@@ -1,15 +1,13 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
-import type { ZtHistoryDay, ZtPoolStock } from '@/shared/api'
 import {
   analyticsQueries,
-  boardsDistribution,
+  boardsDistributionFromLadder,
   buildEffectAxes,
   buildEffectHistory,
   buildScenarios,
   EffectAxesCard,
-  RelayEffectCard,
   EffectScenarioCard,
   EffectTrendCard,
   NextDayProjectionCard,
@@ -37,7 +35,7 @@ function lossWord(word: string): string {
  * |---|---|---|
  * | **T 当日双轴** | `marketQueries.feedback()`（30s 实时） | **事实** —— 昨涨停池今日的实际表现 |
  * | **T-3~T 历史** | `feedback.trend.history` + `emotionSummary5d`（日频 17:19） | **事实** —— 已落盘记录的聚合，零推断 |
- * | **T+1~T+4 推演** | `promotionSummary` 分阶段历史统计 + `turn_signal` | **条件期望 / 情景** —— ⛔ 不是预测 |
+ * | **T+1~T+4 推演** | 历史 `promotionSummary` + 决策时点 `latest.ladder` 快照 | **条件期望 / 情景** —— ⛔ 不是预测 |
  *
  * ## ⛔ 口径铁律
  *
@@ -55,8 +53,8 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.emotionSummary5d())
   // T+1 推演基线（日频）
   await queryClient.ensureQueryData(analyticsQueries.promotionSummary())
-  // 当日涨停池（板数分布 → T+1 推演的输入）
-  await queryClient.ensureQueryData(analyticsQueries.emotionZtHistory())
+  // 决策时点市场快照（只取 ladder 板数分布作为 T+1 推演输入）
+  await queryClient.ensureQueryData(marketQueries.latest())
   return null
 }
 
@@ -67,8 +65,8 @@ export function Component() {
   const sumQ = useQuery(analyticsQueries.emotionSummary5d())
   /** 日频：分阶段成功率与溢价（T+1 条件期望的基线） */
   const promoQ = useQuery(analyticsQueries.promotionSummary())
-  /** 日频：涨停池历史（取当日池的板数分布） */
-  const ztQ = useQuery(analyticsQueries.emotionZtHistory())
+  /** 决策时点快照：只读取连板梯队家数，不读取逐票实时量价。 */
+  const latestQ = useQuery(marketQueries.latest())
 
   const fb = fbQ.data ?? null
   const summary = sumQ.data ?? null
@@ -78,19 +76,15 @@ export function Component() {
   const history = useMemo(() => buildEffectHistory(fb, summary), [fb, summary])
   const scenarios = useMemo(() => buildScenarios(fb, summary), [fb, summary])
 
-  /**
-   * 当日涨停池的板数分布（T+1 推演的唯一输入）。
-   *
-   * ⛔ 只取 `date === feedback.date` 的那一期 —— 跨日取会把昨日结构当成今日的。
-   * 盘中该日归档尚无 `zt_list`（收盘才落盘）→ `boardsDistribution` 返回 `null`，
-   * 推演卡走空态，⛔ 不编造分布。
-   */
-  const dist = useMemo(() => {
-    const files = (ztQ.data ?? []) as Array<{ data?: ZtHistoryDay | null }>
-    const day = files.find((f) => f.data?.date && f.data.date === fb?.date)?.data
-    const list = (day?.zt_list ?? []) as ZtPoolStock[]
-    return boardsDistribution(list)
-  }, [ztQ.data, fb?.date])
+  /** 决策时点快照只输入当前各板数家数，统计回报仍完全来自历史晋级样本。 */
+  const dist = useMemo(() => boardsDistributionFromLadder(latestQ.data?.ladder), [latestQ.data?.ladder])
+  const snapshot = useMemo(() => {
+    const ladder = latestQ.data?.ladder ?? []
+    return {
+      ts: latestQ.data?.ts ?? null,
+      highestBoards: ladder.length ? Math.max(...ladder.map((group) => group.boards)) : null,
+    }
+  }, [latestQ.data?.ladder, latestQ.data?.ts])
 
   const projection = useMemo(() => projectNextDay(dist, promo), [dist, promo])
 
@@ -100,7 +94,8 @@ export function Component() {
     return typeof m === 'number' ? `${m}/10 · ${fb?.sentiment_label ?? '—'}` : '—'
   }, [fb])
 
-  const err = fbQ.error ?? sumQ.error ?? promoQ.error ?? ztQ.error
+  // 快照缺失只影响条件期望；既有反馈和历史模块仍可照常展示。
+  const err = fbQ.error ?? sumQ.error ?? promoQ.error
 
   return (
     <div className="flex flex-col gap-3">
@@ -133,7 +128,7 @@ export function Component() {
         </p>
       </Card>
 
-      {/* 第一步是今日事实，第二步才是基于今日涨停结构的统计基线。 */}
+      {/* 第一步是今日事实，第二步用决策时点快照与历史基线形成条件期望。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">
         <div className="xl:w-[60%] xl:flex-none min-w-0 flex flex-col gap-3">
           <Card title="① 今天：赚钱回报与亏钱压力" extra={<CardBadge>实时反馈</CardBadge>}>
@@ -143,15 +138,13 @@ export function Component() {
 
         <div className="flex-1 min-w-0 flex flex-col gap-3">
           <Card
-            title="② 下一交易日：今日结构的统计基线"
+            title="② 下一交易日：当前连板结构的历史条件期望"
             extra={<CardBadge>条件期望 · 非预测</CardBadge>}
           >
-            <NextDayProjectionCard projection={projection} />
+            <NextDayProjectionCard projection={projection} snapshot={snapshot} />
           </Card>
         </div>
       </div>
-
-      <RelayEffectCard />
 
       {/* 历史只回答“在改善还是恶化”；情景只列观察条件，避免与当日事实混读。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">

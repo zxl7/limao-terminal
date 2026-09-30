@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   boardsDistribution,
+  boardsDistributionFromLadder,
   buildEffectAxes,
   buildEffectHistory,
   buildScenarios,
@@ -8,7 +9,7 @@ import {
   stageOfBoards,
   STAGE_MIN_SAMPLE,
 } from '@/features/analytics'
-import type { EmotionSummary5D, FeedbackMatrix, PromoSummary, ZtPoolStock } from '@/shared/api'
+import type { EmotionSummary5D, FeedbackMatrix, LadderGroup, PromoSummary, ZtPoolStock } from '@/shared/api'
 
 /**
  * 赚钱效应 / 亏钱效应 纯计算内核的回归锁。
@@ -248,11 +249,11 @@ describe('T+1 条件期望：小样本只呈现不裁决', () => {
     expect(p.lossFailMed).toBeCloseTo(-0.93, 1)
   })
 
-  it('④ 池子分布不可用 → 空态 + caveat（⛔ 不编造分布）', () => {
+  it('④ 当前快照没有有效梯队 → 空态 + caveat（⛔ 不编造分布）', () => {
     const p = projectNextDay(null, promo)
     expect(p.expPromoteCount).toBeNull()
     expect(p.poolTotal).toBe(0)
-    expect(p.caveats.join(' ')).toContain('板数分布不可用')
+    expect(p.caveats.join(' ')).toContain('当前快照')
   })
 
   it('⑤ 基线缺失 → 仍给出池子总数，期望为 null（⛔ 不伪造成功率）', () => {
@@ -280,6 +281,19 @@ describe('T+1 条件期望：小样本只呈现不裁决', () => {
     const d = boardsDistribution(ok)!
     expect(d.get('1to2')).toBe(2)
     expect(d.get('3to4')).toBe(1)
+  })
+
+  it('⑧ 决策时点快照只按板数和家数归并，不读取逐票行情', () => {
+    expect(boardsDistributionFromLadder(null)).toBeNull()
+    expect(boardsDistributionFromLadder([])).toBeNull()
+    const dist = boardsDistributionFromLadder([
+      { boards: 1, stocks: ['a', 'b'] },
+      { boards: 3, stocks: ['c'] },
+      { boards: 4, stocks: ['d', 'e', 'f'] },
+    ] as LadderGroup[])!
+    expect(dist.get('1to2')).toBe(2)
+    expect(dist.get('3to4')).toBe(1)
+    expect(dist.get('4to5+')).toBe(3)
   })
 })
 

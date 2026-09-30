@@ -222,10 +222,22 @@ export function EffectTrendCard({ points }: { points: EffectHistoryPoint[] }) {
 }
 
 /** ── 卡 3：T+1 条件期望 ── */
-export function NextDayProjectionCard({ projection: p }: { projection: NextDayProjection }) {
+export function NextDayProjectionCard({
+  projection: p,
+  snapshot,
+}: {
+  projection: NextDayProjection
+  snapshot?: { ts: string | null; highestBoards: number | null }
+}) {
   const decisiveStages = p.stages.filter((s) => s.decisive)
+  const maxCount = Math.max(...p.stages.map((s) => s.count), 1)
   return (
     <div className="flex flex-col gap-2.5 min-w-0">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[10.5px] text-sub">
+        <span>当前结构快照：<span className="num text-txt">{snapshot?.ts || '—'}</span></span>
+        <span>最高板：<span className="num text-txt">{snapshot?.highestBoards == null ? '—' : `${snapshot.highestBoards} 板`}</span></span>
+        <span>历史基线：晋级样本</span>
+      </div>
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
         <StatPair
           label="期望晋级"
@@ -247,6 +259,39 @@ export function NextDayProjectionCard({ projection: p }: { projection: NextDayPr
         />
         <StatPair label="今日池" value={`${p.poolTotal} 只`} />
       </div>
+
+      {p.stages.length > 0 && (
+        <div className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1">
+          <div className="rounded-[var(--radius-sm)] border border-line p-2">
+            <div className="mb-1.5 text-[10.5px] text-sub">当前快照 · 梯队家数</div>
+            <div className="flex flex-col gap-1.5">
+              {p.stages.map((s) => (
+                <div key={s.stage} className="grid grid-cols-[38px_1fr_26px] items-center gap-1.5 text-[10.5px]">
+                  <span className="num text-sub">{s.stage}</span>
+                  <div className="h-2 overflow-hidden rounded-full bg-line-faint">
+                    <div className="h-full rounded-full bg-up" style={{ width: `${(s.count / maxCount) * 100}%` }} />
+                  </div>
+                  <span className="num text-right text-txt">{s.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-[var(--radius-sm)] border border-line p-2">
+            <div className="mb-1.5 text-[10.5px] text-sub">历史样本 · 晋级成功率</div>
+            <div className="flex flex-col gap-1.5">
+              {p.stages.map((s) => (
+                <div key={s.stage} className="grid grid-cols-[38px_1fr_38px] items-center gap-1.5 text-[10.5px]">
+                  <span className="num text-sub">{s.stage}</span>
+                  <div className="h-2 overflow-hidden rounded-full bg-line-faint">
+                    <div className="h-full rounded-full bg-up" style={{ width: `${Math.max(0, (s.succRate ?? 0) * 100)}%` }} />
+                  </div>
+                  <span className="num text-right text-txt">{s.succRate == null ? '—' : `${(s.succRate * 100).toFixed(1)}%`}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <DataTable
         rows={p.stages}
@@ -283,8 +328,7 @@ export function NextDayProjectionCard({ projection: p }: { projection: NextDayPr
           </div>
         ))}
         <div className="text-[10.5px] text-sub leading-relaxed">
-          基于全历史阶段统计（{decisiveStages.length} 个阶段样本 ≥{STAGE_MIN_SAMPLE}）的**条件期望**，非预测；
-          展示中位数（均值受尾部极值影响）。
+          当前快照仅提供梯队家数；收益与成功率均来自全历史阶段统计（{decisiveStages.length} 个阶段样本 ≥{STAGE_MIN_SAMPLE}）的条件期望，非预测；展示中位数（均值受尾部极值影响）。
         </div>
       </div>
     </div>

@@ -166,6 +166,7 @@ export {
 // 权威设计：狸猫猎手/config/design_赚钱效应亏钱效应_EffectEngine.md
 export {
   boardsDistribution,
+  boardsDistributionFromLadder,
   buildEffectAxes,
   buildEffectHistory,
   buildScenarios,
