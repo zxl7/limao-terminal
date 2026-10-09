@@ -228,7 +228,19 @@ export const ROUTES: Record<string, RouteDef> = {
   },
 
   // ══════════════════════════════════════════════════════════════
-  // 九、净值与战绩（脚本轨）
+  // 九、尾盘潜伏研究账本（与接力账户严格隔离）
+  // ══════════════════════════════════════════════════════════════
+  '/api/ambush/pullback/signals': {
+    file: 'cache/ambush_pullback_signal_log.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: '尾盘潜伏信号账本（14:30冻结、14:50计划买入；研究记录）',
+  },
+  '/api/ambush/pullback/settlements': {
+    file: 'cache/ambush_pullback_settlement_log.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: '尾盘潜伏结算账本（14:50至下一交易日10:00；研究结算）',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 十、净值与战绩（脚本轨）
   // ══════════════════════════════════════════════════════════════
   '/api/account/nav': {
     file: 'wealth_code/cache/account_nav_history.jsonl', format: 'jsonl', cadence: 'daily',

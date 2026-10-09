@@ -11,10 +11,12 @@
  * `MarketSnapshot`，路由字符串与类型**编译期绑定** —— 写错路由直接编译失败。
  */
 
-import { getJson } from './client'
+import { DataUnavailableError, getJson } from './client'
 import { SCHEMAS } from './schemas'
 import type {
   AccountNavEntry,
+  AmbushPullbackSettlementEntry,
+  AmbushPullbackSignalEntry,
   AiDecisionEntry,
   AiNavEntry,
   AiViewFile,
@@ -140,7 +142,11 @@ export interface RouteTypeMap {
   '/api/ai/decisions': AiDecisionEntry[]
   '/api/ai/nav': AiNavEntry[]
 
-  // ── 九、净值与战绩（脚本轨）──
+  // ── 九、尾盘潜伏研究账本 ──
+  '/api/ambush/pullback/signals': AmbushPullbackSignalEntry[]
+  '/api/ambush/pullback/settlements': AmbushPullbackSettlementEntry[]
+
+  // ── 十、净值与战绩（脚本轨）──
   '/api/account/nav': AccountNavEntry[]
   '/api/account/metrics': StrategyMetricsFile
 
@@ -324,7 +330,27 @@ export const api = {
   /** AI 轨净值（首行由当日 15:30 settle 落，早于该时点为空属正常） */
   aiNav: () => fetchRoute('/api/ai/nav'),
 
-  // ── 九、净值与战绩（脚本轨）──
+  // ── 九、尾盘潜伏研究账本（独立于接力账户）──
+  // 账本首次在 14:30 研究扫描落盘前不存在是正常空态，不应让整个交易页 loader 失败。
+  // 其他读取/契约错误仍向上抛出，避免吞掉真实故障。
+  ambushPullbackSignals: async () => {
+    try {
+      return await fetchRoute('/api/ambush/pullback/signals')
+    } catch (error) {
+      if (error instanceof DataUnavailableError) return []
+      throw error
+    }
+  },
+  ambushPullbackSettlements: async () => {
+    try {
+      return await fetchRoute('/api/ambush/pullback/settlements')
+    } catch (error) {
+      if (error instanceof DataUnavailableError) return []
+      throw error
+    }
+  },
+
+  // ── 十、净值与战绩（脚本轨）──
   /** 净值账本 */
   accountNav: () => fetchRoute('/api/account/nav'),
   /** 策略指标（逐日样本数/可交易数） */

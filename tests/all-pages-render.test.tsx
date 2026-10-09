@@ -87,6 +87,7 @@ const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['risk', () => import('@/pages/risk/RiskPage')],
   ['hithink', () => import('@/pages/hithink/HithinkPage')],
   ['ai', () => import('@/pages/ai/AiPage')],
+  ['ambush', () => import('@/pages/ambush/AmbushPage')],
   ['trade', () => import('@/pages/trade/TradePage')],
   ['backtest', () => import('@/pages/backtest/BacktestPage')],
   ['institution', () => import('@/pages/institution/InstitutionPage')],

@@ -182,7 +182,7 @@ function actionableWarning(warning?: string): string | undefined {
     : warning
 }
 
-export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
+export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisionDate?: string }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const needle = search.trim().toLowerCase()
@@ -256,7 +256,7 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
               {/* 身份统一在下方展示，机械证据融入原有理由，不另增指标。 */}
               {c && r.bias && <Chip>昨预案 {biasText(r.bias)}</Chip>}
               {r.bucketLabel && <Chip>{r.bucketLabel}</Chip>}
-              {s?.boards != null && <Chip>{s.boards}板</Chip>}
+              {s?.boards != null && <Chip>昨{s.boards}板</Chip>}
               {s?.style_tag && <Chip>{s.style_tag}</Chip>}
               {s?.is_20cm && <Chip>20cm</Chip>}
               {tags.map((t) => (
@@ -368,7 +368,7 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                   </Row>
                 )}
 
-                <Row label="量价">
+                <Row label="昨量价">
                   成交 <span className="num">{n2(s.cje_yi)}亿</span>
                   <span className="text-sub mx-1">·</span>封单{' '}
                   <span className="num">{n2(s.seal_amt)}亿</span>
@@ -401,7 +401,7 @@ export function AiJudgeDetail({ rows }: { rows: JudgeRow[] }) {
                 ⚠️ 与上面的「今晨裁决」是两个时点、两套结论 —— 必须标清来源，否则会被误读 */}
             {(r.reason || s?.leader_evidence?.note) && (
               <div className="mt-1.5 border-t border-line-faint pt-1.5">
-                <div className="text-[10.5px] text-sub mb-0.5">🤖 AI 盘后理由（昨日 15:30 写）</div>
+                <div className="text-[10.5px] text-sub mb-0.5">🤖 AI 盘后理由（{decisionDate ?? '昨日'} 15:30 写）</div>
                 <div className="text-[12px] leading-relaxed text-txt whitespace-pre-wrap break-all">
                   {[r.reason, !c && s?.leader_evidence?.note].filter(Boolean).join('\n')}
                 </div>

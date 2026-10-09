@@ -146,6 +146,25 @@ describe('TradePage —— 全部交易走势 / 逐日收益', () => {
     // 逐日收益柱：空仓日以中性色呈现，但仍应是实心柱而非透明热区
     expect(dataRects(container).length, '逐日收益柱未生成 rect').toBeGreaterThan(0)
   })
+
+  it('不含尾盘潜伏页签 —— 该板块已独立为 AI尾盘潜伏页', async () => {
+    await renderPage(await import('@/pages/trade/TradePage'))
+    const tabs = screen.queryAllByRole('button').map((button) => button.textContent ?? '')
+    expect(tabs.some((text) => /尾盘潜伏/.test(text)), '交易战绩页不应再内嵌尾盘潜伏页签').toBe(false)
+    expect(screen.queryByText(/尾盘潜伏战绩/)).not.toBeInTheDocument()
+  })
+})
+
+describe('AmbushPage —— AI尾盘潜伏研究结算', () => {
+  it('独立展示研究结算流水与待结算信号，缺账本时保持空态', async () => {
+    await renderPage(await import('@/pages/ambush/AmbushPage'))
+
+    expect(screen.getByText(/^🎯 AI尾盘潜伏战绩$/)).toBeInTheDocument()
+    expect(screen.getByText(/研究结算流水/)).toBeInTheDocument()
+    expect(screen.getAllByText(/待结算信号/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/暂无尾盘潜伏结算记录/)).toBeInTheDocument()
+    expect(screen.getByText(/暂无待结算信号/)).toBeInTheDocument()
+  })
 })
 
 describe('FlowPage —— 跨日资金矩阵', () => {

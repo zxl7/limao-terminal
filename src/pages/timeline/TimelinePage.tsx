@@ -35,7 +35,7 @@ import {
 } from '@/features/analytics'
 import { Card, CardBadge, StockLink } from '@/shared/ui'
 import { APP_CONFIG } from '@/shared/config'
-import { cn, inTrading, isStarMarket } from '@/shared/lib'
+import { bjDateString, cn, inTrading, isStarMarket } from '@/shared/lib'
 import { useNow } from '@/shared/hooks'
 
 /**
@@ -75,6 +75,11 @@ export async function loader() {
     queryClient.ensureQueryData(analyticsQueries.hithinkZt()),
   ])
   return null
+}
+
+/** 有涨停池才有首封时刻，可将个股定位到分钟轴。 */
+function hasPool(day?: ZtHistoryDay | null): boolean {
+  return (day?.zt_list?.length ?? 0) > 0
 }
 
 export function Component() {
@@ -117,9 +122,6 @@ export function Component() {
    * 「今天每个时间节点哪些题材爆发/衰竭」一起藏起来（用户 2026-09-17 抓包「9月17的都不见了」）。
    * 正确做法：**今天照常可选**，个股/板块部分缺 `fbt` 就如实标注为「待收盘落盘」。
    */
-  /** 有涨停池 = 该日个股才**有首封时刻、可做时间定位** */
-  const hasPool = (d?: ZtHistoryDay | null): boolean => (d?.zt_list?.length ?? 0) > 0
-
   /**
    * 默认选中：优先「**有个股数据**的最近一天」，其次才是最新一天。
    *
@@ -141,11 +143,15 @@ export function Component() {
    *    非交易时段看今天只会得到一片没有个股的轴；故**只在盘中**这样做（该日同时标 `·盘`）。
    * ⛔ `inTrading` 必须传 `now`：React Compiler 会把无参纯调用当常量折叠，直接调会停在首帧。
    */
-  const day: ZtHistoryDay | null | undefined =
-    days.find((f) => f.file === dayFile)?.data ??
-    (inTrading(undefined, now) ? days[0]?.data : undefined) ??
-    days.find((f) => hasPool(f.data))?.data ??
-    days[0]?.data
+  const day = useMemo<ZtHistoryDay | null | undefined>(() => {
+    const today = bjDateString(now)
+    return days.find((f) => f.file === dayFile)?.data ??
+      // 盘前当日 zt_history 尚未落盘时，仍要切到今天，不能回显上一交易日的时间轴。
+      // 当天的逐事件账本会从 09:25 起逐步填充；此前保持空轴才符合当前盘面。
+      (inTrading(undefined, now) ? days.find((f) => f.data?.date === today)?.data ?? { date: today } as ZtHistoryDay : undefined) ??
+      days.find((f) => hasPool(f.data))?.data ??
+      days[0]?.data
+  }, [days, dayFile, now])
 
   /** 该日是否「完整交易日」（含涨停池 → 个股有首封时刻可定位） */
   const isFullDay = hasPool(day)

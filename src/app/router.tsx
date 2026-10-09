@@ -52,6 +52,7 @@ export const router = createBrowserRouter([
 
       // ── 决策与战绩 ──
       { path: 'ai', lazy: () => import('@/pages/ai/AiPage') },
+      { path: 'ambush', lazy: () => import('@/pages/ambush/AmbushPage') },
       { path: 'trade', lazy: () => import('@/pages/trade/TradePage') },
       { path: 'backtest', lazy: () => import('@/pages/backtest/BacktestPage') },
       { path: 'institution', lazy: () => import('@/pages/institution/InstitutionPage') },

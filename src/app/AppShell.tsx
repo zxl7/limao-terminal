@@ -81,7 +81,8 @@ export const TABS: readonly TabDef[] = [
   { to: '/gene', label: '股性基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
-  { to: '/ai', label: 'AI台账', group: '决策', priority: true },
+  { to: '/ai', label: 'AI竞价', group: '决策', priority: true },
+  { to: '/ambush', label: 'AI尾盘潜伏', group: '决策', priority: true },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },

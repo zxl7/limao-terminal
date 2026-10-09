@@ -224,6 +224,20 @@ export const analyticsQueries = {
       staleTime: DAILY_STALE,
     }),
 
+  // ══════════════ 尾盘潜伏研究账本 ══════════════
+  ambushPullbackSignals: () =>
+    queryOptions({
+      queryKey: ['ambush', 'pullback', 'signals'] as const,
+      queryFn: api.ambushPullbackSignals,
+      staleTime: DAILY_STALE,
+    }),
+  ambushPullbackSettlements: () =>
+    queryOptions({
+      queryKey: ['ambush', 'pullback', 'settlements'] as const,
+      queryFn: api.ambushPullbackSettlements,
+      staleTime: DAILY_STALE,
+    }),
+
   // ══════════════ 净值与战绩 ══════════════
   /** 净值账本（脚本轨） */
   accountNav: () =>

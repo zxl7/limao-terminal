@@ -373,12 +373,12 @@ export function Component() {
     <div className="flex flex-col gap-3">
       {tab === 'view' && activeView && (
         <Card
-          title="今日决策变化"
-          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{activeView.date}</CardBadge>}
+          title="竞价后决策变化"
+          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>执行日 {activeView.date}</CardBadge>}
         >
           <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
             <ChangeBlock
-              label="今日最终结论"
+              label="竞价后最终结论"
               empty="暂无参与标的"
               tone="warn"
               summary={<>参与 {decisionChanges.finalCounts.participate ?? 0} · 观察 {decisionChanges.finalCounts.watch ?? 0} · 放弃 {decisionChanges.finalCounts.skip ?? 0} · 待裁决 {decisionChanges.finalCounts.pending ?? 0}</>}
@@ -564,7 +564,7 @@ export function Component() {
             )}
             {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘财富密码接力卡真实字段。
                 ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
-            <AiJudgeDetail rows={judgeRows} />
+            <AiJudgeDetail rows={judgeRows} decisionDate={activeView?.decision_date} />
           </>
         )}
 
@@ -692,7 +692,7 @@ export function Component() {
 
         {!view.isLoading && !viewRows.length && !decRows.length && !navRows.length && (
           <EmptyState
-            text="AI 台账尚无数据"
+            text="AI竞价尚无数据"
             hint="wealth_code/cache/ai_view/ 与 ai_decisions.jsonl 未生成"
           />
         )}

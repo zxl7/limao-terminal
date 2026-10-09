@@ -511,8 +511,8 @@ export interface FeedbackMatrix {
    * 误判成「未晋级」（假阴性 —— 不报错、只是标错）。
    */
   promote_codes: string[]
-  /** 逐票实时行情（code → 涨幅/封单）· 全量不截断 · 旧数据缺该字段 */
-  quotes: Record<string, QuoteItem>
+  /** 逐票实时行情（code → 涨幅/封单）· 全量不截断 · 旧快照可能缺该字段 */
+  quotes?: Record<string, QuoteItem>
   sentiment_score: number
   sentiment_label: string
   regulatory_pressure: number
@@ -1761,6 +1761,49 @@ export interface AccountNavStock {
   /** 该票从系统成交价到当日结算价的实际收益（%）；旧账本可缺失 */
   return_pct?: number
   [k: string]: unknown
+}
+
+export interface AmbushPullbackSnapshot {
+  hot_date?: string
+  sector_zt_count?: number
+  max_boards?: number
+  close?: number
+  ma10?: number
+  ma10_gap_pct?: number
+  volume_ratio?: number
+  score?: number
+  [k: string]: unknown
+}
+
+/** 尾盘潜伏 14:30 冻结信号；研究记录，不等于真实成交。 */
+export interface AmbushPullbackSignalEntry {
+  strategy: string
+  decision_date: string
+  code: string
+  name: string
+  status: string
+  planned_entry_time: string
+  planned_exit_time: string
+  entry_price: number | null
+  exit_price: number | null
+  return_pct: number | null
+  candidate_snapshot: AmbushPullbackSnapshot
+  recorded_at: string
+}
+
+/** 尾盘潜伏 14:50 至次交易日 10:00 的研究结算。 */
+export interface AmbushPullbackSettlementEntry {
+  strategy: string
+  decision_date: string
+  trade_date: string
+  code: string
+  name: string
+  entry_time: string
+  exit_time: string
+  entry_price: number
+  exit_price: number
+  return_pct: number
+  status: string
 }
 
 export interface AccountNavEntry {

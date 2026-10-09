@@ -91,11 +91,11 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 28 个 Tab（含实时段 7 个）', () => {
+  it('导航渲染出全部 29 个 Tab（含实时段 7 个）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
-    expect(links.length).toBe(28)
+    expect(links.length).toBe(29)
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
     const realtimeTo = ['/', '/timeline', '/mainline', '/effect', '/flow', '/reflow', '/rotation']
@@ -109,7 +109,7 @@ describe('AppShell 导航渲染', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const labels = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[data-priority="true"]')).map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['盘中实时', '主线题材', '情绪周期', 'AI台账'])
+    expect(labels).toEqual(['盘中实时', '主线题材', '情绪周期', 'AI竞价', 'AI尾盘潜伏'])
   })
 
   it('顶部导航的数据子 Tab 默认收起，点击“数据”后展开', () => {

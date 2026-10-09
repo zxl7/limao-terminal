@@ -12,10 +12,76 @@ import {
   EffectTrendCard,
   NextDayProjectionCard,
   projectNextDay,
+  DataTable,
   StatPair,
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { Card, CardBadge } from '@/shared/ui'
+import { APP_CONFIG } from '@/shared/config'
+import { inTrading } from '@/shared/lib'
+import { Card, CardBadge, StockLink } from '@/shared/ui'
+import type { FeedbackMatrix, MarketSnapshot } from '@/shared/api'
+
+const pctTone = (value: number | null | undefined) => value == null ? 'text-sub' : value > 0 ? 'text-up' : value < 0 ? 'text-down' : 'text-txt'
+
+function premium(value: number | null | undefined): string {
+  return value == null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
+}
+
+function ratio(num: number | null | undefined, den: number | null | undefined, digits = 1): string {
+  return num == null || den == null || den <= 0 ? '—' : `${num}/${den} · ${(num / den * 100).toFixed(digits)}%`
+}
+
+function SelectionLogicSection({ feedback, snapshot }: { feedback: FeedbackMatrix | null; snapshot?: MarketSnapshot }) {
+  // 选股文件是盘后产物，但页面继续轮询，保证脚本重算后能自动同步最新结果。
+  const planQ = useQuery({ ...analyticsQueries.decisionLatest(), refetchInterval: () => inTrading() ? APP_CONFIG.pollIntradayMs : APP_CONFIG.pollOfflineMs })
+  const plan = planQ.data
+  // 旧版反馈快照可能尚无逐票 quotes；缺字段按无可用样本处理，不调用 Object.entries(undefined)。
+  const quotes = feedback?.quotes ?? {}
+  const relayEntries = Object.entries(quotes).filter(([, quote]) => (quote.prev_boards ?? 0) >= 2)
+  const relay = relayEntries.map(([, quote]) => quote)
+  const promoted = new Set(feedback?.promote_codes ?? [])
+  const failedRelay = relayEntries.filter(([code]) => !promoted.has(code)).map(([, quote]) => quote)
+  // 失败后的形态只在同一批“昨连板”样本内统计：上涨视为修复，跌幅≤-5%视为核按钮，避免混入首板。
+  const repairCount = failedRelay.filter((quote) => quote.pct != null && quote.pct > 0).length
+  const nukeCount = failedRelay.filter((quote) => quote.pct != null && quote.pct <= -5).length
+  // 跌停只认 latest 的跌停名单；单靠 -10% 涨幅不能证明可靠跌停事实。
+  const limitDownNames = new Set(snapshot?.limit_down?.names ?? [])
+  const limitDownCount = failedRelay.filter((quote) => quote.name != null && limitDownNames.has(quote.name)).length
+  const failureRatio = (count: number) => feedback == null || failedRelay.length === 0 ? '—' : `${count}/${failedRelay.length}`
+  const limitDownRatio = feedback == null || snapshot == null || failedRelay.length === 0 ? '—' : `${limitDownCount}/${failedRelay.length}`
+  // 溢价直接取反馈矩阵的昨连板逐票涨幅；均值和中位数都只排除缺失行情，不补 0。
+  const relayPcts = relay.map((quote) => quote.pct).filter((value): value is number => value != null)
+  const relayAvg = relayPcts.length ? relayPcts.reduce((sum, value) => sum + value, 0) / relayPcts.length : null
+  const relayMedian = relayPcts.length ? [...relayPcts].sort((a, b) => a - b)[Math.floor(relayPcts.length / 2)] : null
+  const rows = [...(plan?.relay ?? []), ...(plan?.watch ?? [])]
+
+  return <Card title="选股逻辑同步｜晋级 · 溢价 · 失败反馈" extra={<CardBadge>{plan?.date ? `${plan.date} 选股结果` : '等待选股结果'}</CardBadge>}>
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <StatPair label="连板晋级率" value={ratio(feedback?.lb_promote_count, feedback?.lb_prev_count)} tone="up" />
+        <StatPair label="昨连板今均涨" value={premium(relayAvg)} tone={relayAvg != null && relayAvg < 0 ? 'down' : 'up'} />
+        <StatPair label="昨连板今中位" value={premium(relayMedian)} tone={relayMedian != null && relayMedian < 0 ? 'down' : 'up'} />
+        <StatPair label="失败后修复" value={failureRatio(repairCount)} tone="up" />
+        <StatPair label="失败后核按钮" value={failureRatio(nukeCount)} tone="down" />
+        <StatPair label="确认跌停" value={limitDownRatio} tone="down" />
+      </div>
+      <p className="text-[11px] text-sub">{feedback?.prev_date ?? '—'} → {feedback?.date ?? '—'} · 溢价按昨连板样本的当日涨幅计算；失败形态仅统计未进入 `promote_codes` 的昨连板。</p>
+
+      <div>
+        <p className="mb-1 text-[12px] font-medium text-txt">当前选股结果 · 接力池优先，观察池待确认</p>
+        {!plan ? <p role="status" className="text-[12px] text-sub">{planQ.isPending ? '正在读取选股结果…' : '选股结果尚未发布。'}</p> : <DataTable dense rows={rows} rowKey={(row) => `${row.code}-${row.bucket ?? 'pool'}`} columns={[
+          { label: '池位 / 标的', cell: (row) => <span><StockLink code={row.code}>{row.name}</StockLink><span className="ml-1 text-sub">{row.bucket === 'relay' ? `接力 ${row.relay_rank ?? '—'}` : `观察 ${row.watch_rank ?? '—'}`}</span></span> },
+          { label: '板数', num: true, cell: (row) => row.boards == null ? '—' : `${row.boards}板` },
+          { label: '同高度历史晋级', num: true, cell: (row) => <span>{row.history_relay_prob == null ? '—' : `${(row.history_relay_prob * 100).toFixed(1)}%`}<small className="block text-sub">样本 {row.history_relay_samples ?? '—'}</small></span> },
+          { label: '预期开盘区间', num: true, cell: (row) => row.expectation?.expected_range?.length === 2 ? `${row.expectation.expected_range[0].toFixed(1)}% ~ ${row.expectation.expected_range[1].toFixed(1)}%` : '—' },
+          { label: '实时涨幅', num: true, cell: (row) => <span className={pctTone(quotes[row.code]?.pct)}>{premium(quotes[row.code]?.pct)}<small className="block text-sub">选股快照 {premium(row.pct)}</small></span> },
+          { label: '候选阶段 / 形态', cell: (row) => <span className="text-sub">{row.expectation?.phase ?? '—'} · {row.expectation?.seal_form ?? '—'}</span> },
+        ]} />}
+      </div>
+      <p className="text-[10.5px] text-sub">实时反馈 {feedback?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj} · 环境晋级率 ${plan.environment?.promote_rate == null ? '—' : `${plan.environment.promote_rate.toFixed(1)}%`} · 核按钮 ${plan.environment?.nuke_count ?? '—'}` : ''}。候选未被当前反馈矩阵覆盖时实时涨幅显示“—”；历史成功率与成功/失败组溢价见下方“下一交易日”基线，避免重复占位。</p>
+    </div>
+  </Card>
+}
 
 /** 亏钱轴用压力高低表达，避免“亏钱效应强”在总览中被误读成正向结论。 */
 function lossWord(word: string): string {
@@ -29,13 +95,14 @@ function lossWord(word: string): string {
  *
  * 昨天出手的人，今天赚了还是亏了；以及今天的涨停结构，明天能提供什么条件基线。
  *
- * ## 三份数据各管一段（⛔ 不要混读）
+ * ## 四份数据各管一段（⛔ 不要混读）
  *
  * | 段 | 来源 | 性质 |
  * |---|---|---|
  * | **T 当日双轴** | `marketQueries.feedback()`（30s 实时） | **事实** —— 昨涨停池今日的实际表现 |
  * | **T-3~T 历史** | `feedback.trend.history` + `emotionSummary5d`（日频 17:19） | **事实** —— 已落盘记录的聚合，零推断 |
  * | **T+1~T+4 推演** | 历史 `promotionSummary` + 决策时点 `latest.ladder` 快照 | **条件期望 / 情景** —— ⛔ 不是预测 |
+ * | **选股结果** | `decisionLatest`（盘后档案，页面按行情节拍重新读取） | **原系统选股原件** —— 展示同高度晋级率与候选预期开盘区间 |
  *
  * ## ⛔ 口径铁律
  *
@@ -53,6 +120,8 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.emotionSummary5d())
   // T+1 推演基线（日频）
   await queryClient.ensureQueryData(analyticsQueries.promotionSummary())
+  // 选股结果文件盘后生成，先读入缓存，组件内继续按行情节拍发现重算结果。
+  await queryClient.ensureQueryData(analyticsQueries.decisionLatest())
   // 决策时点市场快照（只取 ladder 板数分布作为 T+1 推演输入）
   await queryClient.ensureQueryData(marketQueries.latest())
   return null
@@ -127,6 +196,8 @@ export function Component() {
           当前情绪 <span className="num text-txt">{sentiment}</span>。先读“赚钱回报”和“亏钱压力”是否同步恶化，再看历史与下一交易日的条件基线。
         </p>
       </Card>
+
+      <SelectionLogicSection feedback={fb} snapshot={latestQ.data} />
 
       {/* 第一步是今日事实，第二步用决策时点快照与历史基线形成条件期望。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">
