@@ -46,8 +46,29 @@ export interface IndexQuote {
   amount_yi?: number
 }
 
+/**
+ * 弱板块聚焦命中（`latest.weak_sectors.focus_hits` 元素）。
+ *
+ * ⚠️ 2026-10-14 修正：本字段**曾是 `string[]`**（旧类型声明），但生产侧
+ *    `scripts/intraday_pulse.py:622` 实际写的是对象
+ *    `{"sector": ..., "ld": [...], "broken": [...], "total": N}`（四个键恒存在），
+ *    后端自用方 `wealth_code/pipelines/build_cards.py:964-967` 也按 dict 读取。
+ *    旧声明只存在于前端类型/schema，导致契约守卫长期打印
+ *    `focus_hits.0: expected string, received object`（不阻断但噪声）。
+ */
+export interface WeakSectorFocusHit {
+  /** 板块名（如「锂电池」） */
+  sector: string
+  /** 该板块内跌停股名 */
+  ld: string[]
+  /** 该板块内炸板股名 */
+  broken: string[]
+  /** 命中数 = ld + broken 长度（生产侧据此降序排序） */
+  total: number
+}
+
 export interface WeakSectors {
-  focus_hits: string[]
+  focus_hits: WeakSectorFocusHit[]
   ld_count: number
   broken_count: number
   ld_names: string[]
@@ -519,6 +540,78 @@ export interface FeedbackMatrix {
   trend: FeedbackTrend
   /** 原系统异常态标记（存在时该文件不可用） */
   error?: string
+}
+
+// ════════════════════════════════════════════════════════════════
+// /api/market/selection-effect —— 盘后候选的次日反馈
+// ════════════════════════════════════════════════════════════════
+
+/** 按昨日板数分段的晋级与竞价事实。小样本只展示，不转成买入门控。 */
+export interface SelectionEffectStage {
+  sample_count: number
+  promote_count: number
+  promote_rate: number | null
+  auction_quoted: number
+  auction_premium_avg: number | null
+  failed_count: number
+  failed_nuke_count: number
+  mood: string
+}
+
+/** N+N 断板回补事实，与连板晋级分段结构不同。 */
+export interface SelectionEffectRepairStage {
+  sample_count: number | null
+  repair_count: number | null
+  repair_rate: number | null
+  mood: string
+}
+
+export interface SelectionEffectMarket {
+  sample_count: number
+  promote_count: number
+  promote_rate: number | null
+  auction_quoted: number
+  auction_premium_avg: number | null
+  auction_premium_median: number | null
+  promoted_auction_premium_avg: number | null
+  failed_auction_premium_avg: number | null
+  failed_count: number
+  failed_nuke_count: number
+  failed_nuke_codes: string[]
+  repair_sample_count: number | null
+  repair_count: number | null
+  repair_codes: string[] | null
+  confirmed_limit_down_count: number | null
+  stages: {
+    one_to_two: SelectionEffectStage
+    two_to_three: SelectionEffectStage
+    high_relay: SelectionEffectStage
+    n_plus_n: SelectionEffectRepairStage
+  }
+  pressure: boolean
+}
+
+/** 猎手原样发布的候选次日反馈，不在终端重新计算晋级或核按钮。 */
+export interface SelectionEffectCandidate {
+  code: string
+  name: string
+  bucket: string
+  rank: number | null
+  boards: number
+  raw_score: number | null
+  auction_gap_pct: number | null
+  current_pct: number | null
+  quote_at: string | null
+  promoted: boolean
+  nuke: boolean
+}
+
+export interface SelectionEffect {
+  date: string
+  prev_date: string
+  generated_ts: string
+  market: SelectionEffectMarket
+  candidates: SelectionEffectCandidate[]
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1161,6 +1254,8 @@ export interface HealthFile {
   route: string
   file: string | undefined
   desc: string
+  /** ⚠️ 该链路在产侧已无写入方（`routes.ts` 的 `retired` 标记透传），文件仅留档 */
+  retired?: boolean
   exists: boolean
   mtime: string | null
   age_sec: number | null
@@ -1472,6 +1567,25 @@ export interface EmotionDay {
    * 日频归档早期记录可能未生成题材聚合；缺失表示无可用归因，不能当作空题材或 0。
    */
   main_themes?: string[]
+}
+
+/** 情绪日档（`cache/short_term/daily/emotion_*.json`）· 周期温度历史原始事实。 */
+export interface EmotionDailySnapshot {
+  date: string
+  prev_date?: string
+  prev_zt_count?: number | null
+  zt_count?: number | null
+  promote_rate?: number | null
+  lb_promote_rate?: number | null
+  avg_pct?: number | null
+  up_rate?: number | null
+  nuke_count?: number | null
+  break_count?: number | null
+  max_boards?: number | null
+  prev_max_boards?: number | null
+  sentiment_score?: number | null
+  sentiment_label?: string | null
+  generated_ts?: string
 }
 
 /** 3 日窗转折信号 —— `ebb_warn` = 假修复，`repair_warn` = 修复前兆 */
@@ -1804,6 +1918,30 @@ export interface AmbushPullbackSettlementEntry {
   exit_price: number
   return_pct: number
   status: string
+}
+
+/** 尾盘潜伏「账户当日收益」（动态仓位加权后）。2026-10-15 起取代满仓连乘口径。 */
+export interface AmbushWeightedPnlEntry {
+  decision_date: string
+  trade_date: string | null
+  /** 账户当日收益（动态仓位加权后，%） */
+  weighted_return_pct: number
+  /** 截至该决策日的复利净值（base 1.0） */
+  nav: number
+  stock_count: number
+  plan: {
+    tier: string | null
+    per_pick_cap: number
+    total_cap: number
+    /** 缺当日 relay 动态仓位方案 → 走中性档兜底（诚实降级） */
+    missing: boolean
+  }
+  stocks: Array<{
+    code: string | null
+    name: string | null
+    return_pct: number
+    weight: number
+  }>
 }
 
 export interface AccountNavEntry {

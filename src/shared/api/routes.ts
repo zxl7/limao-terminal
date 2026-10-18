@@ -53,6 +53,18 @@ export interface RouteDef {
   format?: 'json' | 'jsonl' | 'text'
   /** 刷新节拍：intraday=盘中 30s；daily=日频不轮询；manual=仅手动刷新 */
   cadence?: 'intraday' | 'daily' | 'manual'
+  /**
+   * ⚠️ 已停更（**2026-10-14 审计新增**）。
+   *
+   * 语义 = 「这条链路**在产侧已无写入方**，文件只是留档」——区别于「今天恰好没数据」。
+   * 与 `cadence: 'manual'` 配对使用：既不参与轮询，也不再被算进
+   * `/record` 的「龄期 > 1 天」告警（否则它会天天误报，把真异常淹掉）。
+   *
+   * 判定依据必须可复现：全仓 grep 产物文件名，**确认无写入方**才可打此标。
+   * 已标：`/api/market/auction`（auction_live.json 无写入方）、
+   * `/api/theme/sequence`（theme_sequence.json 停在 09-03、已被 theme/series 取代）。
+   */
+  retired?: boolean
   /** 用途说明 */
   desc: string
 }
@@ -63,7 +75,13 @@ export const ROUTES: Record<string, RouteDef> = {
   // ══════════════════════════════════════════════════════════════
   '/api/market/latest':     { file: 'cache/pulse_snapshots/latest.json',       cadence: 'intraday', desc: '主快照（实时·含梯队/核心标的/板块风险/情绪）' },
   '/api/market/prev':       { file: 'cache/pulse_snapshots/prev.json',         cadence: 'intraday', desc: '上一版快照（环比对比用）' },
-  '/api/market/auction':    { file: 'cache/pulse_snapshots/auction_live.json', cadence: 'intraday', desc: '竞价实时报价' },
+  // ⚠️ 2026-10-14 审计（A3）：**全仓无任何写入方**产出 `auction_live.json`
+  //    （最后内容 2026-09-25 15:30 · 46 B · 旧看板时代遗留件）。真实竞价数据在
+  //    `wealth_code/cache/auction_quotes-<date>.json`（09:25 落盘），已由
+  //    `/api/decision/auction-history` 暴露。
+  //    故 cadence intraday→manual（**停止每 30s 轮询一个死文件**）+ retired：
+  //    AuctionPage 的「竞价报价」卡按「已停更」降级，不把 19 天前的报价当今日。
+  '/api/market/auction':    { file: 'cache/pulse_snapshots/auction_live.json', cadence: 'manual', retired: true, desc: '竞价实时报价（⚠️ 已停更 · 无写入方 · 真实竞价见 /api/decision/auction-history）' },
   '/api/market/signals':    { file: 'cache/short_spirit_signals.json',         cadence: 'intraday', desc: '短线精灵信号' },
 
   // ══════════════════════════════════════════════════════════════
@@ -71,18 +89,20 @@ export const ROUTES: Record<string, RouteDef> = {
   // ══════════════════════════════════════════════════════════════
   '/api/market/relay-effect': { file: 'cache/relay_effect.json', cadence: 'intraday', desc: '连板量能与承接观察' },
   '/api/market/feedback':   { file: 'cache/feedback_matrix.json',              cadence: 'intraday', desc: '昨日涨停反馈矩阵（晋级率/核按钮/情绪分 12 因子）' },
+  '/api/market/selection-effect': { file: 'cache/selection_effect.json', cadence: 'intraday', desc: '盘后候选次日反馈（晋级/竞价溢价/失败核按钮）' },
   '/api/market/candidates': { file: 'cache/pulse_snapshots/candidates.json',   cadence: 'intraday', desc: '候选池' },
   '/api/theme/rotation':    { file: 'cache/theme_rotation.json',               cadence: 'intraday', desc: '题材轮动·回流预测·5日资金' },
   '/api/theme/series':      { file: 'cache/theme_series.json',                 cadence: 'daily',    desc: '题材多日序列（数据堆叠 Tab 数据源）' },
-  // ⚠️ 2026-09-16 状态：**疑似停更**（最后写入 2026-09-03），已被 `/api/theme/series`
+  // ⚠️ 2026-09-16 状态：**停更**（最后写入 2026-09-03 · 0 B），已被 `/api/theme/series`
   //    （theme_series.json，当日仍在更新）取代 —— 后者含 dates/daily_totals/
   //    daily_details/themes/theme_leaders/table_rows 完整结构，
   //    而本件只有 `{date, themes: string[], updated}` 三个键。
   //    刻意**不删也不接页面**：① 用户明确「先增量、后统一裁剪」；
-  //    ② 它的停更状态**已由 `/record` 的「文件新鲜度」表自动暴露**（逐路由列龄期、
-  //       >1 天高亮），不需要再为它专门做一块 UI。
+  //    ② 它的停更状态由 `/record` 的「文件新鲜度」表暴露（逐路由列龄期）。
+  //    2026-10-14 审计追加：cadence daily→manual + `retired: true` —— 它是**留档**，
+  //    不是「日频在产」，不该再计入「龄期 > 1 天」告警（天天误报会把真异常淹掉）。
   //    裁剪决策点：若确认不再产出，连同 `sequence` endpoint 一并删除。
-  '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'daily',    desc: '题材序列（⚠️ 疑似停更 · 已被 theme/series 取代 · 仅留档）' },
+  '/api/theme/sequence':    { file: 'cache/theme_sequence.json',               cadence: 'manual', retired: true, desc: '题材序列（⚠️ 已停更 · 已被 theme/series 取代 · 仅留档）' },
   '/api/flow/history':      { dir: 'cache/sector_flow_history', pattern: '^sector_flow_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily', desc: '板块资金历史（多日合并）' },
   // 盘中全量板块资金池：与收盘后逐日归档并列，终端只读此实时快照补齐今日。
   '/api/flow/live':         { file: 'cache/pulse_snapshots/sector_fund_pool.json', cadence: 'intraday', desc: '板块资金盘中全量快照（今日）' },
@@ -144,6 +164,10 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/emotion/memory': {
     dir: 'cache', pattern: '^market_memory_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
     desc: '情绪快照（memory_lib 情绪联动唯一数据源 market_state.sentiment）',
+  },
+  '/api/emotion/daily': {
+    dir: 'cache/short_term/daily', pattern: '^emotion_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', cadence: 'daily',
+    desc: '情绪日档历史（周期温度）',
   },
   '/api/zt/yesterday': {
     file: 'cache/yesterday_zt.json', cadence: 'daily',
@@ -236,6 +260,10 @@ export const ROUTES: Record<string, RouteDef> = {
   },
   '/api/ambush/pullback/settlements': {
     file: 'cache/ambush_pullback_settlement_log.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: '尾盘潜伏逐笔结算记录',
+  },
+  '/api/ambush/pullback/weighted-pnl': {
+    file: 'cache/ambush_pullback_daily_pnl.jsonl', format: 'jsonl', cadence: 'daily',
     desc: '尾盘潜伏结算账本（14:50至下一交易日10:00；研究结算）',
   },
 
@@ -298,9 +326,11 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache', pattern: '^institution_pool_\\d{4}-?\\d{2}-?\\d{2}\\.json$', mode: 'all', limit: 10, cadence: 'daily',
     desc: '机构池（机构关注标的）',
   },
+  // ⚠️ 2026-10-14 审计（A2）：原指向 `gangtise_morning_full_v5.json` —— 那是**版式定版样本**
+  //    （停在 2026-09-03），每日真实产物是 `gangtise_morning_research.json`（当日 07:54 更新）。
   '/api/institution/morning': {
-    file: 'cache/gangtise_morning_full_v5.json', cadence: 'daily',
-    desc: '机构研报·早盘卡（版式 v5 定版样本）',
+    file: 'cache/gangtise_morning_research.json', cadence: 'daily',
+    desc: '机构研报·早盘卡（每日真实产物）',
   },
   '/api/institution/evening': {
     file: 'cache/gangtise_evening_research.json', cadence: 'daily',
@@ -393,9 +423,19 @@ export const ROUTES: Record<string, RouteDef> = {
   // ══════════════════════════════════════════════════════════════
   // 十八、盘中脉冲窗口存档（事件层留痕）
   // ══════════════════════════════════════════════════════════════
+  // ⚠️ 2026-10-14 审计（P2-⑪）：**产侧已无写入方** —— `window_*.json` 最新一份停在
+  //    `20260903_1455`（mtime 2026-09-03 15:00），正是 `pulse_fetcher.sh` 的
+  //    `close_window_step` 被注释停用（HIGH_FREQ_INTRADAY 高频模式）的那一天；
+  //    `focus_buffer.json` 已不存在；`pulse_fetcher.sh` / launchd / tasks.yaml
+  //    全仓零引用 `pulse_aggregator`（`live_signal.py` 仅保留一个未使用的防御性 import）。
+  //    ⇒ 故 cadence daily→manual + `retired: true`：不再把 41 天前的窗口卡当「日频在产」，
+  //    也不再计入 `/record` 的「龄期 > 1 天」告警（天天误报会把真异常淹掉）。
+  //    目录与保留期仍在（`capture_daily.prune_history` 保留最新 60 份），**⛔ 不删文件**：
+  //    用户明确「先增量、后统一裁剪」；若将来恢复 `close_window_step`，取消本标记即可。
   '/api/pulse/windows': {
-    dir: 'cache/pulse_windows', pattern: '^window_\\d{8}_\\d{4}\\.json$', mode: 'all', limit: 40, cadence: 'daily',
-    desc: '盘中脉冲窗口存档（标题/色标/elements/note · 15min 节拍）',
+    dir: 'cache/pulse_windows', pattern: '^window_\\d{8}_\\d{4}\\.json$', mode: 'all', limit: 40,
+    cadence: 'manual', retired: true,
+    desc: '盘中脉冲窗口存档（标题/色标/elements/note · 15min 节拍）（⚠️ 已停更 · 产侧无写入方 · 仅留档）',
   },
   '/api/pulse/pushed-signals': {
     dir: 'cache', pattern: '^pushed_signals_\\d+\\.json$', mode: 'all', limit: 5, cadence: 'daily',

@@ -1,0 +1,315 @@
+import type { ReactNode } from 'react'
+import type { CycleTemperatureResult, CyclePhase, HeatSignal, HeatLevel } from '../lib/cycle-temperature'
+import { CYCLE_PHASE_LABEL, CYCLE_PHASE_TONE, HEAT_LABEL } from '../lib/cycle-temperature'
+import { BarChart, Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
+import { n1 } from '../lib/format'
+
+function pct(value: number | null): string {
+  return value == null ? '—' : `${n1(value)}%`
+}
+
+function yi(value: number | null): string {
+  return value == null ? '—' : `${value > 0 ? '+' : ''}${n1(value)}亿`
+}
+
+function bjTime(value: string | undefined): string {
+  if (!value) return '更新'
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
+function phaseOf(result: CycleTemperatureResult): {
+  label: string
+  tone: 'down' | 'warn' | 'mid' | 'up' | 'rec' | 'neutral'
+  phase: CyclePhase | null
+} {
+  const phase = result.latest.cycle?.phase ?? null
+  return phase
+    ? { label: CYCLE_PHASE_LABEL[phase], tone: CYCLE_PHASE_TONE[phase], phase }
+    : { label: '待确认', tone: 'neutral', phase: null }
+}
+
+const HEAT_CLASS: Record<HeatLevel, string> = {
+  cold: 'text-down border-down bg-down-soft',
+  cool: 'text-warn border-warn bg-warn-soft',
+  neutral: 'text-mid border-line bg-line-faint',
+  warm: 'text-up border-up bg-up-soft',
+  hot: 'text-rec border-rec bg-rec-soft',
+  unknown: 'text-sub border-line bg-line-faint',
+}
+
+const HEAT_SURFACE: Record<HeatLevel, string> = {
+  cold: 'border-down/30 bg-down-soft/35',
+  cool: 'border-warn/30 bg-warn-soft/35',
+  neutral: 'border-line bg-line-faint/35',
+  warm: 'border-up/30 bg-up-soft/35',
+  hot: 'border-rec/30 bg-rec-soft/35',
+  unknown: 'border-line bg-line-faint/35',
+}
+
+const PHASE_SURFACE: Record<'down' | 'warn' | 'mid' | 'up' | 'rec' | 'neutral', string> = {
+  down: 'border-down/35 bg-down-soft/45',
+  warn: 'border-warn/35 bg-warn-soft/45',
+  mid: 'border-line bg-line-faint/50',
+  up: 'border-up/35 bg-up-soft/45',
+  rec: 'border-rec/35 bg-rec-soft/45',
+  neutral: 'border-line bg-line-faint/50',
+}
+
+function HeatBadge({ signal, risk = false }: { signal: HeatSignal; risk?: boolean }) {
+  const text = signal.level === 'unknown' ? '待确认' : `${HEAT_LABEL[signal.level]}${risk ? '·风险' : ''}`
+  return <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] leading-none ${HEAT_CLASS[signal.level]}`}>{text}</span>
+}
+
+function HeatItem({
+  label,
+  value,
+  unit,
+  signal,
+  risk = false,
+}: {
+  label: string
+  value: string
+  unit?: string
+  signal: HeatSignal
+  risk?: boolean
+}) {
+  return (
+    <div className={`min-w-0 rounded border px-3 py-2.5 ${HEAT_SURFACE[signal.level]}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] text-sub">{label}</span>
+        <HeatBadge signal={signal} risk={risk} />
+      </div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="num text-[21px] font-semibold leading-none text-txt">{value}</span>
+        {unit && <span className="text-[11px] text-sub">{unit}</span>}
+      </div>
+      <div className="mt-1 text-[10px] text-sub">
+        {signal.sampleCount > 0 ? `当前有效窗口 ${signal.sampleCount} 日` : '暂无有效样本'}
+      </div>
+    </div>
+  )
+}
+
+function HeatLegend() {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-faint pt-2 text-[10px] text-sub">
+      <span className="font-medium text-txt">周期冷热</span>
+      <span className="text-down">冷</span>
+      <span className="text-warn">偏冷</span>
+      <span className="text-mid">中性</span>
+      <span className="text-up">偏热</span>
+      <span className="text-rec">热</span>
+      <span>按当前有效历史窗口相对比较，不等同于利好/利空。</span>
+    </div>
+  )
+}
+
+function PhaseTrack({ phase }: { phase: CyclePhase | null }) {
+  const phases: CyclePhase[] = ['ice', 'ebb', 'repair', 'warming', 'high']
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 flex items-center justify-between text-[10px] text-sub">
+        <span>周期位置</span>
+        <span>冷 → 热</span>
+      </div>
+      <div className="grid grid-cols-5 gap-1">
+        {phases.map((item) => {
+          const tone = CYCLE_PHASE_TONE[item]
+          const active = item === phase
+          const surface = tone === 'down' ? 'bg-down-soft' : tone === 'warn' ? 'bg-warn-soft' : tone === 'mid' ? 'bg-line-faint' : tone === 'up' ? 'bg-up-soft' : 'bg-rec-soft'
+          return (
+            <div
+              key={item}
+              className={`rounded px-1 py-1.5 text-center text-[10px] ${surface} ${active ? 'font-semibold text-txt ring-1 ring-inset ring-line-strong' : 'text-sub'}`}
+            >
+              {CYCLE_PHASE_LABEL[item]}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ChartMeta({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center justify-end gap-1.5">{children}</div>
+}
+
+export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResult }) {
+  const phase = phaseOf(result)
+  const cycle = result.cycle
+  const feedback = result.feedback
+  const funds = result.funds
+  const hasCycle = cycle.some((row) => row.sentiment != null)
+  const hasFeedback = feedback.some((row) => row.promoteRate != null || row.brokenRate != null || row.ztCount != null)
+  const hasFunds = funds.some((row) => row.temperature != null || row.mainNetYi != null)
+  const latestSentiment = result.latest.cycle?.sentiment == null ? '—' : n1(result.latest.cycle.sentiment)
+  const latestFundTemperature = result.latest.fund?.temperature == null ? '—' : n1(result.latest.fund.temperature)
+  const latestZtCount = result.latest.feedback?.ztCount == null ? '—' : `${Math.round(result.latest.feedback.ztCount)}`
+
+  return (
+    <Card
+      title="周期温度总览"
+      extra={
+        <div className="flex items-center gap-1.5">
+          {result.live?.date && <CardBadge tone="up">盘中 {bjTime(result.live.generatedTs)}</CardBadge>}
+          <HeatBadge signal={result.heat.sentiment} />
+          <CardBadge tone={phase.tone === 'mid' ? 'neutral' : phase.tone}>{phase.label}</CardBadge>
+        </div>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(270px,0.82fr)_minmax(0,2fr)]">
+        <section className={`rounded border p-3 ${PHASE_SURFACE[phase.tone]}`} aria-label="当前周期状态">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[11px] text-sub">当前周期状态</div>
+              <div className="mt-1 text-[25px] font-semibold leading-none text-txt">{phase.label}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-sub">情绪分</div>
+              <div className="num mt-1 text-[25px] font-semibold leading-none text-txt">{latestSentiment}<span className="ml-1 text-[11px] font-normal text-sub">/10</span></div>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-sub">情绪周期决定环境温度；下方各维度再看兑现、炸板、涨停和资金是否同步。</p>
+          <PhaseTrack phase={phase.phase} />
+        </section>
+
+        <section className="rounded border border-line bg-panel/50 p-3" aria-label="周期冷热维度">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-[12px] font-medium text-txt">数据维度冷热</div>
+              <div className="mt-0.5 text-[10px] text-sub">先看当前值，再看它在有效历史窗口中的相对位置。</div>
+            </div>
+            <span className="rounded border border-line px-1.5 py-0.5 text-[10px] text-sub">真实样本窗口</span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 2xl:grid-cols-3">
+            <HeatItem label="昨日涨停兑现" value={pct(result.latest.feedback?.promoteRate ?? null)} signal={result.heat.promoteRate} />
+            <HeatItem label="炸板率" value={pct(result.latest.feedback?.brokenRate ?? null)} signal={result.heat.brokenRate} risk />
+            <HeatItem label="涨停家数" value={latestZtCount} unit="只" signal={result.heat.ztCount} />
+            <HeatItem label="资金温度" value={latestFundTemperature} unit="/100" signal={result.heat.fundTemperature} />
+            <HeatItem label="主力净额" value={yi(result.latest.fund?.mainNetYi ?? null)} signal={result.heat.mainNetYi} />
+            <HeatItem label="情绪分" value={latestSentiment} unit="/10" signal={result.heat.sentiment} />
+          </div>
+          <HeatLegend />
+        </section>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+        <Card
+          title="投机情绪 · 周期相位"
+          extra={<ChartMeta><HeatBadge signal={result.heat.sentiment} /><CardBadge>{cycle.length}日</CardBadge></ChartMeta>}
+        >
+          {hasCycle ? (
+            <>
+              <PhaseBands rows={cycle} />
+              <LineChart
+                labels={cycle.map((row) => row.date.slice(5))}
+                series={[
+                  { name: '情绪分', values: cycle.map((row) => row.sentiment), tone: 'up', area: true },
+                  { name: 'MA3', values: cycle.map((row) => row.sentimentMa3), tone: 'sub', dashed: true },
+                ]}
+                height={190}
+                yMin={0}
+                yMax={10}
+                refLines={[
+                  { value: 2, label: '冰点', tone: 'down' },
+                  { value: 5, label: '中轴', tone: 'sub' },
+                  { value: 8, label: '高潮', tone: 'rec' },
+                ]}
+                format={(value) => n1(value)}
+              />
+            </>
+          ) : (
+            <EmptyState text="无情绪周期数据" />
+          )}
+        </Card>
+
+        <Card
+          title="昨日涨停反馈 · 涨停家数 · 炸板率"
+          extra={
+            <ChartMeta>
+              <HeatBadge signal={result.heat.promoteRate} />
+              <HeatBadge signal={result.heat.brokenRate} risk />
+              <CardBadge tone={result.heat.brokenRate.level === 'hot' ? 'warn' : 'neutral'}>{feedback.length}日</CardBadge>
+            </ChartMeta>
+          }
+        >
+          {hasFeedback ? (
+            <LineChart
+              labels={feedback.map((row) => row.date.slice(5))}
+              series={[
+                { name: '昨日涨停兑现', values: feedback.map((row) => row.promoteRate), tone: 'up', format: pct },
+                { name: '炸板率', values: feedback.map((row) => row.brokenRate), tone: 'down', axis: 'right', format: pct },
+                { name: '涨停家数', values: feedback.map((row) => row.ztCount), tone: 'lead', axis: 'right', format: (value) => `${Math.round(value)}只` },
+              ]}
+              height={190}
+              yMin={0}
+              yMax={100}
+              refLines={[{ value: 50, label: '50%', tone: 'sub' }]}
+              format={pct}
+            />
+          ) : (
+            <EmptyState text="无涨停反馈历史" />
+          )}
+        </Card>
+
+        <Card
+          className="xl:col-span-2"
+          title="资金温度 · 主力净额"
+          extra={
+            <ChartMeta>
+              <HeatBadge signal={result.heat.fundTemperature} />
+              <HeatBadge signal={result.heat.mainNetYi} />
+              <CardBadge>{funds.length}日</CardBadge>
+            </ChartMeta>
+          }
+        >
+          {hasFunds ? (
+            <div className="grid grid-cols-1 gap-3 2xl:grid-cols-2">
+              <div>
+                <div className="mb-1 text-[10px] text-sub">资金温度（当前窗口相对值）</div>
+                <LineChart
+                  labels={funds.map((row) => row.date.slice(5))}
+                  series={[{ name: '资金温度', values: funds.map((row) => row.temperature), tone: 'mid', area: true }]}
+                  height={180}
+                  yMin={0}
+                  yMax={100}
+                  refLines={[{ value: 50, label: '50', tone: 'sub' }]}
+                  format={(value) => n1(value)}
+                />
+              </div>
+              <div>
+                <div className="mb-1 text-[10px] text-sub">主力净额（亿）</div>
+                <BarChart
+                  bars={funds.map((row) => ({ label: row.date.slice(5), value: row.mainNetYi, tone: (row.mainNetYi ?? 0) >= 0 ? 'up' : 'down' }))}
+                  height={180}
+                  format={(value) => `${n1(value)}亿`}
+                  maxBarWidth={30}
+                />
+              </div>
+            </div>
+          ) : (
+            <EmptyState text="无资金温度历史" />
+          )}
+        </Card>
+      </div>
+    </Card>
+  )
+}
+
+function PhaseBands({ rows }: { rows: CycleTemperatureResult['cycle'] }) {
+  return (
+    <div className="mb-1 flex h-5 overflow-hidden rounded-sm border border-line-faint" aria-label="情绪周期阶段">
+      {rows.map((row) => {
+        const tone = row.phase ? CYCLE_PHASE_TONE[row.phase] : 'neutral'
+        const cls = tone === 'up' ? 'bg-up-soft' : tone === 'down' ? 'bg-down-soft' : tone === 'warn' ? 'bg-warn-soft' : tone === 'rec' ? 'bg-rec-soft' : 'bg-line-faint'
+        return <span key={row.date} className={cls} title={`${row.date} ${row.phase ? CYCLE_PHASE_LABEL[row.phase] : '待确认'}`} style={{ flex: 1 }} />
+      })}
+    </div>
+  )
+}

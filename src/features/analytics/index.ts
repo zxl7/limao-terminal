@@ -92,6 +92,22 @@ export {
   type ThemeRisk,
 } from './lib/theme-burst'
 
+// 情绪周期温度总览（历史事实整理：周期、涨停反馈、资金温度）
+export {
+  buildCycleTemperature,
+  CYCLE_PHASE_LABEL,
+  CYCLE_PHASE_TONE,
+  phaseOfScore,
+  HEAT_LABEL,
+  type CyclePhase,
+  type CycleTemperaturePoint,
+  type CycleTemperatureResult,
+  type FundTemperaturePoint,
+  type HeatLevel,
+  type HeatSignal,
+  type LiveCycleSnapshot,
+} from './lib/cycle-temperature'
+
 // 数值格式化（null 一律渲染为「—」；二元区间必须走 range，禁止直接渲染数组）
 export {
   n1,
@@ -149,6 +165,9 @@ export { TimelineDetailList } from './components/TimelineDetailList'
 
 // 盘中情绪走势（涨停 / 炸板率两条实时曲线 · 30s 轮询）
 export { IntradayMoodCard } from './components/IntradayMoodCard'
+
+// 情绪周期温度总览（周期相位、昨日涨停反馈、资金温度）
+export { CycleTemperaturePanel } from './components/CycleTemperaturePanel'
 
 // 事件原文分段（纯函数 · 无损：拼接恒等于原文 · 供卡片高亮题材/个股）
 export {

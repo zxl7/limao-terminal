@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { queryClient } from '@/shared/api'
+import { queryClient, ROUTES } from '@/shared/api'
 import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, RelayShadow } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
@@ -16,6 +16,8 @@ import { cn } from '@/shared/lib'
  *     这是决策链的单一产出物，也是事后复盘「判断依据」的唯一原件。
  *   · `market/candidates`——盘中候选池（`phase: intraday`，盘中滚动）
  *   · `market/auction`——竞价实时报价（`code → 竞价涨幅`）
+ *     ⚠️ 2026-10-14 审计：该链路已停更（无写入方），卡片按 `retired` 降级渲染。
+ *     真实竞价数据在 `/api/decision/auction-history`（`auction_quotes-<date>.json`）。
  *
  * ## ⚠️ 两套情绪读数必须并列（不可只留一套）
  *
@@ -93,6 +95,14 @@ export function Component() {
   }))
 
   const dg = d?.diagnostics as Record<string, unknown> | undefined
+
+  /**
+   * ⚠️ 2026-10-14 审计（A3）：`auction_live.json` **在产侧已无写入方**，
+   * 文件停在 2026-09-25 15:30（46 B）。它会一直「存在」，若照常渲染，
+   * 页面就会把 19 天前的报价当成今日竞价 —— 这是比「空卡」更危险的失真。
+   * 故按 `routes.ts` 的 `retired` 标记降级：明示停更 + 指向真实源。
+   */
+  const auctionRetired = ROUTES['/api/market/auction']?.retired === true
 
   return (
     <div className="flex flex-col gap-3">
@@ -313,16 +323,21 @@ export function Component() {
           </Card>
         </Zone>
 
-        <Zone label="竞价实时报价" dot="bg-warn" className="xl:w-[45%]">
+        <Zone label="竞价实时报价" dot={auctionRetired ? 'bg-down' : 'bg-warn'} className="xl:w-[45%]">
           <Card
             title="竞价报价"
             extra={
-              <CardBadge>
-                {au?.ts ?? '—'} · {quotes.length} 只
+              <CardBadge tone={auctionRetired ? 'down' : undefined}>
+                {auctionRetired ? '已停更 · 仅留档' : `${au?.ts ?? '—'} · ${quotes.length} 只`}
               </CardBadge>
             }
           >
-            {quotes.length ? (
+            {auctionRetired ? (
+              <EmptyState
+                text="该链路已停更"
+                hint="盘口竞价实时报价（auction_live.json）已无写入方 · 最后一份 2026-09-25。真实竞价数据请看「竞价报价存档」（/api/decision/auction-history · 每交易日 09:25 落盘）。"
+              />
+            ) : quotes.length ? (
               <ul className="space-y-1">
                 {quotes.map((q) => (
                   <li

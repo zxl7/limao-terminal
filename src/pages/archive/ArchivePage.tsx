@@ -370,7 +370,7 @@ export function Component() {
                   dense
                   empty="无报价"
                   columns={[
-                    { label: '标的', cell: (q) => <StockLink code={q.code}>{q.name ?? q.code}</StockLink> },
+                    { label: '标的', cell: (q) => <StockLink code={q.code}>{q.code}</StockLink> },
                     {
                       label: '竞价涨幅',
                       num: true,

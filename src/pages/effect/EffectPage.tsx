@@ -14,12 +14,13 @@ import {
   projectNextDay,
   DataTable,
   StatPair,
+  Tag,
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { APP_CONFIG } from '@/shared/config'
 import { inTrading } from '@/shared/lib'
 import { Card, CardBadge, StockLink } from '@/shared/ui'
-import type { FeedbackMatrix, MarketSnapshot } from '@/shared/api'
+import type { SelectionEffect } from '@/shared/api'
 
 const pctTone = (value: number | null | undefined) => value == null ? 'text-sub' : value > 0 ? 'text-up' : value < 0 ? 'text-down' : 'text-txt'
 
@@ -31,41 +32,47 @@ function ratio(num: number | null | undefined, den: number | null | undefined, d
   return num == null || den == null || den <= 0 ? '—' : `${num}/${den} · ${(num / den * 100).toFixed(digits)}%`
 }
 
-function SelectionLogicSection({ feedback, snapshot }: { feedback: FeedbackMatrix | null; snapshot?: MarketSnapshot }) {
+export function SelectionLogicSection({ selectionEffect }: { selectionEffect: SelectionEffect | null }) {
   // 选股文件是盘后产物，但页面继续轮询，保证脚本重算后能自动同步最新结果。
   const planQ = useQuery({ ...analyticsQueries.decisionLatest(), refetchInterval: () => inTrading() ? APP_CONFIG.pollIntradayMs : APP_CONFIG.pollOfflineMs })
   const plan = planQ.data
-  // 旧版反馈快照可能尚无逐票 quotes；缺字段按无可用样本处理，不调用 Object.entries(undefined)。
-  const quotes = feedback?.quotes ?? {}
-  const relayEntries = Object.entries(quotes).filter(([, quote]) => (quote.prev_boards ?? 0) >= 2)
-  const relay = relayEntries.map(([, quote]) => quote)
-  const promoted = new Set(feedback?.promote_codes ?? [])
-  const failedRelay = relayEntries.filter(([code]) => !promoted.has(code)).map(([, quote]) => quote)
-  // 失败后的形态只在同一批“昨连板”样本内统计：上涨视为修复，跌幅≤-5%视为核按钮，避免混入首板。
-  const repairCount = failedRelay.filter((quote) => quote.pct != null && quote.pct > 0).length
-  const nukeCount = failedRelay.filter((quote) => quote.pct != null && quote.pct <= -5).length
-  // 跌停只认 latest 的跌停名单；单靠 -10% 涨幅不能证明可靠跌停事实。
-  const limitDownNames = new Set(snapshot?.limit_down?.names ?? [])
-  const limitDownCount = failedRelay.filter((quote) => quote.name != null && limitDownNames.has(quote.name)).length
-  const failureRatio = (count: number) => feedback == null || failedRelay.length === 0 ? '—' : `${count}/${failedRelay.length}`
-  const limitDownRatio = feedback == null || snapshot == null || failedRelay.length === 0 ? '—' : `${limitDownCount}/${failedRelay.length}`
-  // 溢价直接取反馈矩阵的昨连板逐票涨幅；均值和中位数都只排除缺失行情，不补 0。
-  const relayPcts = relay.map((quote) => quote.pct).filter((value): value is number => value != null)
-  const relayAvg = relayPcts.length ? relayPcts.reduce((sum, value) => sum + value, 0) / relayPcts.length : null
-  const relayMedian = relayPcts.length ? [...relayPcts].sort((a, b) => a - b)[Math.floor(relayPcts.length / 2)] : null
+  const market = selectionEffect?.market
+  // 反馈快照的 prev_date 必须等于当前候选日期，避免把上一批标的的结果配到新候选上。
+  const feedbackMatchesPlan = selectionEffect?.prev_date != null && selectionEffect.prev_date === plan?.date
+  // 候选反馈由猎手 selection_effect 原样发布，终端不再从实时行情自行推算晋级或核按钮。
+  const outcomeByCode = useMemo(
+    () => new Map((feedbackMatchesPlan && selectionEffect ? selectionEffect.candidates : []).map((row) => [row.code, row])),
+    [feedbackMatchesPlan, selectionEffect],
+  )
   const rows = [...(plan?.relay ?? []), ...(plan?.watch ?? [])]
+  const rate = (value: number | null | undefined) => value == null ? '—' : `${value.toFixed(1)}%`
+  const failureRatio = market == null ? '—' : `${market.failed_nuke_count}/${market.failed_count}`
+  const repairRatio = market?.repair_count == null || market.repair_sample_count == null
+    ? '—'
+    : `${market.repair_count}/${market.repair_sample_count}`
+  const feedbackBadge = selectionEffect?.date == null
+    ? '等待次日反馈'
+    : feedbackMatchesPlan ? `${selectionEffect.date} 次日反馈` : `${selectionEffect.prev_date ?? '—'} 候选反馈`
 
-  return <Card title="选股逻辑同步｜晋级 · 溢价 · 失败反馈" extra={<CardBadge>{plan?.date ? `${plan.date} 选股结果` : '等待选股结果'}</CardBadge>}>
+  return <Card title="选股逻辑同步｜晋级 · 溢价 · 失败反馈" extra={<CardBadge>{feedbackBadge}</CardBadge>}>
     <div className="mt-3 flex flex-col gap-3">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
-        <StatPair label="连板晋级率" value={ratio(feedback?.lb_promote_count, feedback?.lb_prev_count)} tone="up" />
-        <StatPair label="昨连板今均涨" value={premium(relayAvg)} tone={relayAvg != null && relayAvg < 0 ? 'down' : 'up'} />
-        <StatPair label="昨连板今中位" value={premium(relayMedian)} tone={relayMedian != null && relayMedian < 0 ? 'down' : 'up'} />
-        <StatPair label="失败后修复" value={failureRatio(repairCount)} tone="up" />
-        <StatPair label="失败后核按钮" value={failureRatio(nukeCount)} tone="down" />
-        <StatPair label="确认跌停" value={limitDownRatio} tone="down" />
+        <StatPair label="连板样本" value={market?.sample_count ?? '—'} />
+        <StatPair label="实际晋级率" value={rate(market?.promote_rate)} tone="up" />
+        <StatPair label="竞价覆盖" value={ratio(market?.auction_quoted, market?.sample_count)} />
+        <StatPair label="连板竞价均值" value={premium(market?.auction_premium_avg)} tone={market?.auction_premium_avg != null && market.auction_premium_avg < 0 ? 'down' : 'up'} />
+        <StatPair label="失败核按钮" value={failureRatio} tone="down" />
+        <StatPair label="断板回补" value={repairRatio} tone="up" />
       </div>
-      <p className="text-[11px] text-sub">{feedback?.prev_date ?? '—'} → {feedback?.date ?? '—'} · 溢价按昨连板样本的当日涨幅计算；失败形态仅统计未进入 `promote_codes` 的昨连板。</p>
+      <p className="text-[11px] text-sub">{selectionEffect?.prev_date ?? '—'} → {selectionEffect?.date ?? '—'} · 竞价溢价按 09:25—09:30 有效报价计算；失败核按钮和断板回补均为猎手已发布事实。</p>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-sub">
+        <span>1进2 <b className="num text-txt">{rate(market?.stages?.one_to_two?.promote_rate)}</b></span>
+        <span>2进3 <b className="num text-txt">{rate(market?.stages?.two_to_three?.promote_rate)}</b></span>
+        <span>高位接力 <b className="num text-txt">{rate(market?.stages?.high_relay?.promote_rate)}</b></span>
+        <span>N+N回补 <b className="num text-txt">{rate(market?.stages?.n_plus_n?.repair_rate)}</b></span>
+        <span>压力收窄 <b className="text-txt">{market == null ? '—' : market.pressure ? '是' : '否'}</b></span>
+      </div>
 
       <div>
         <p className="mb-1 text-[12px] font-medium text-txt">当前选股结果 · 接力池优先，观察池待确认</p>
@@ -74,11 +81,20 @@ function SelectionLogicSection({ feedback, snapshot }: { feedback: FeedbackMatri
           { label: '板数', num: true, cell: (row) => row.boards == null ? '—' : `${row.boards}板` },
           { label: '同高度历史晋级', num: true, cell: (row) => <span>{row.history_relay_prob == null ? '—' : `${(row.history_relay_prob * 100).toFixed(1)}%`}<small className="block text-sub">样本 {row.history_relay_samples ?? '—'}</small></span> },
           { label: '预期开盘区间', num: true, cell: (row) => row.expectation?.expected_range?.length === 2 ? `${row.expectation.expected_range[0].toFixed(1)}% ~ ${row.expectation.expected_range[1].toFixed(1)}%` : '—' },
-          { label: '实时涨幅', num: true, cell: (row) => <span className={pctTone(quotes[row.code]?.pct)}>{premium(quotes[row.code]?.pct)}<small className="block text-sub">选股快照 {premium(row.pct)}</small></span> },
+          { label: '竞价 / 当前', num: true, cell: (row) => {
+            const outcome = outcomeByCode.get(row.code)
+            return <span className={pctTone(outcome?.current_pct)}>{premium(outcome?.auction_gap_pct)} / {premium(outcome?.current_pct)}<small className="block text-sub">猎手反馈</small></span>
+          } },
+          { label: '次日反馈', cell: (row) => {
+            const outcome = outcomeByCode.get(row.code)
+            if (outcome == null) return '—'
+            if (outcome.nuke) return <Tag tone="down">核按钮</Tag>
+            return <Tag tone={outcome.promoted ? 'up' : 'neutral'}>{outcome.promoted ? '已晋级' : '未晋级'}</Tag>
+          } },
           { label: '候选阶段 / 形态', cell: (row) => <span className="text-sub">{row.expectation?.phase ?? '—'} · {row.expectation?.seal_form ?? '—'}</span> },
         ]} />}
       </div>
-      <p className="text-[10.5px] text-sub">实时反馈 {feedback?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj} · 环境晋级率 ${plan.environment?.promote_rate == null ? '—' : `${plan.environment.promote_rate.toFixed(1)}%`} · 核按钮 ${plan.environment?.nuke_count ?? '—'}` : ''}。候选未被当前反馈矩阵覆盖时实时涨幅显示“—”；历史成功率与成功/失败组溢价见下方“下一交易日”基线，避免重复占位。</p>
+      <p className="text-[10.5px] text-sub">反馈快照 {selectionEffect?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj}` : ''}。{feedbackMatchesPlan ? '当前候选已与反馈日期对齐。' : '当前候选尚未有对应次日反馈。'} 未发布或缺失的候选反馈显示“—”，不以其他行情快照补算。</p>
     </div>
   </Card>
 }
@@ -122,6 +138,8 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.promotionSummary())
   // 选股结果文件盘后生成，先读入缓存，组件内继续按行情节拍发现重算结果。
   await queryClient.ensureQueryData(analyticsQueries.decisionLatest())
+  // 次日反馈由猎手与反馈矩阵同轮发布；缺失时页面保留候选原件并显示未知反馈。
+  await queryClient.ensureQueryData(marketQueries.selectionEffect())
   // 决策时点市场快照（只取 ladder 板数分布作为 T+1 推演输入）
   await queryClient.ensureQueryData(marketQueries.latest())
   return null
@@ -130,6 +148,8 @@ export async function loader() {
 export function Component() {
   /** 当日双轴主源 · 盘中 30s / 非交易 180s（节拍来自 `marketQueries` 的统一实现） */
   const fbQ = useQuery(marketQueries.feedback())
+  /** 猎手原子发布的候选次日反馈 · 盘中随反馈矩阵更新 */
+  const selectionQ = useQuery(marketQueries.selectionEffect())
   /** 日频：5 日/10 日序列与拐点信号（当日 17:19 才更新） */
   const sumQ = useQuery(analyticsQueries.emotionSummary5d())
   /** 日频：分阶段成功率与溢价（T+1 条件期望的基线） */
@@ -197,7 +217,7 @@ export function Component() {
         </p>
       </Card>
 
-      <SelectionLogicSection feedback={fb} snapshot={latestQ.data} />
+      <SelectionLogicSection selectionEffect={selectionQ.data ?? null} />
 
       {/* 第一步是今日事实，第二步用决策时点快照与历史基线形成条件期望。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">

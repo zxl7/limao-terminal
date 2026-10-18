@@ -332,8 +332,8 @@ export function Component() {
 
     const finalRows = [...judgeRows].sort(compareJudgeRows)
     const finalCounts = finalRows.reduce<Record<string, number>>((counts, row) => {
-      const view = finalViewOf(row)
-      counts[view] = (counts[view] ?? 0) + 1
+      const finalView = finalViewOf(row)
+      counts[finalView] = (counts[finalView] ?? 0) + 1
       return counts
     }, {})
     const changed = finalRows.filter((row) => {

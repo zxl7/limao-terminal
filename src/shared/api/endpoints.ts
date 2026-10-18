@@ -17,6 +17,7 @@ import type {
   AccountNavEntry,
   AmbushPullbackSettlementEntry,
   AmbushPullbackSignalEntry,
+  AmbushWeightedPnlEntry,
   AiDecisionEntry,
   AiNavEntry,
   AiViewFile,
@@ -31,6 +32,7 @@ import type {
   DatedFile,
   DecisionManifest,
   DecisionDossier,
+  EmotionDailySnapshot,
   EmotionSummary5D,
   ExecutionAudit,
   EngineStateFile,
@@ -69,6 +71,7 @@ import type {
   RelayShadow,
   RiskWatchFile,
   RotationData,
+  SelectionEffect,
   ShortSpiritSignals,
   StrategyMetricsFile,
   ThemeSequence,
@@ -95,6 +98,7 @@ export interface RouteTypeMap {
   // ── 二、反馈与题材 ──
   '/api/market/relay-effect': RelayEffect
   '/api/market/feedback': FeedbackMatrix
+  '/api/market/selection-effect': SelectionEffect
   '/api/market/candidates': CandidatesFile
   '/api/theme/rotation': RotationData
   '/api/theme/series': ThemeSeries
@@ -117,6 +121,7 @@ export interface RouteTypeMap {
 
   // ── 六、情绪周期 ──
   '/api/emotion/summary5d': EmotionSummary5D
+  '/api/emotion/daily': DatedFile<EmotionDailySnapshot>[]
   '/api/emotion/zt-history': DatedFile<ZtHistoryDay>[]
   '/api/emotion/memory': DatedFile<MarketMemory>[]
   '/api/zt/yesterday': ZtPoolSnapshot
@@ -145,6 +150,7 @@ export interface RouteTypeMap {
   // ── 九、尾盘潜伏研究账本 ──
   '/api/ambush/pullback/signals': AmbushPullbackSignalEntry[]
   '/api/ambush/pullback/settlements': AmbushPullbackSettlementEntry[]
+  '/api/ambush/pullback/weighted-pnl': AmbushWeightedPnlEntry[]
 
   // ── 十、净值与战绩（脚本轨）──
   '/api/account/nav': AccountNavEntry[]
@@ -244,6 +250,8 @@ export const api = {
   // ── 二、反馈与题材 ──
   /** 昨日涨停反馈矩阵 */
   feedback: () => fetchRoute('/api/market/feedback'),
+  /** 盘后候选的次日反馈（猎手原样发布） */
+  selectionEffect: () => fetchRoute('/api/market/selection-effect'),
   relayEffect: () => fetchRoute('/api/market/relay-effect'),
   /** 候选池 */
   candidates: () => fetchRoute('/api/market/candidates'),
@@ -280,6 +288,8 @@ export const api = {
   // ── 六、情绪周期 ──
   /** 5 日情绪摘要（含 3 日 MA 与转折信号） */
   emotionSummary5d: () => fetchRoute('/api/emotion/summary5d'),
+  /** 情绪日档历史（周期温度总览） */
+  emotionDaily: () => fetchRoute('/api/emotion/daily'),
   /** 盘中涨停时序 */
   emotionZtHistory: () => fetchRoute('/api/emotion/zt-history'),
   /** 情绪快照（情绪联动） */
@@ -344,6 +354,15 @@ export const api = {
   ambushPullbackSettlements: async () => {
     try {
       return await fetchRoute('/api/ambush/pullback/settlements')
+    } catch (error) {
+      if (error instanceof DataUnavailableError) return []
+      throw error
+    }
+  },
+  /** 尾盘潜伏「账户当日收益」（动态仓位加权后）；缺文件=空态，不阻断交易页。 */
+  ambushWeightedPnl: async () => {
+    try {
+      return await fetchRoute('/api/ambush/pullback/weighted-pnl')
     } catch (error) {
       if (error instanceof DataUnavailableError) return []
       throw error
@@ -467,5 +486,6 @@ export const INTRADAY_POLLERS = [
   ['latest', api.latest],
   ['signals', api.signals],
   ['feedback', api.feedback],
+  ['selectionEffect', api.selectionEffect],
   ['candidates', api.candidates],
 ] as const

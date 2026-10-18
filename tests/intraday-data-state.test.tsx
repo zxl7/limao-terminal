@@ -17,6 +17,19 @@ function mount(children: ReactNode, key: readonly string[], data?: unknown, fail
   return render(<QueryClientProvider client={client}>{children}</QueryClientProvider>)
 }
 
+/**
+ * 夹具入缓存 —— 与 `mount` 同口径：key 走宽松的 `readonly string[]`，
+ * 让 `setQueryData` 的数据参数退化为 `unknown`。
+ *
+ * 本文件所有夹具都**只提供被测字段**（如 极值卡只关心 limit_down/broken），
+ * 若直接用 `client.setQueryData(具体 queryKey, {...})`，TS 会按 queryKey 推导出
+ * 完整契约类型（`MarketSnapshot` 20+ 必填字段）而报缺字段 —— 那是**夹具写法**的问题，
+ * 不是被测组件的问题。故统一走此助手。
+ */
+function seed(client: QueryClient, key: readonly string[], data: unknown) {
+  client.setQueryData(key, data)
+}
+
 describe('首页数据状态不能伪装成无风险', () => {
   it('板块采集失败时区分上次完整快照与部分数据', () => {
     const stale = mount(<SectorFlowCard />, marketQueries.latest().queryKey, {
@@ -69,10 +82,10 @@ describe('首页数据状态不能伪装成无风险', () => {
 
   it('极值名单保留核按钮逐票价格、均线和破位信息，并区分总数与明细数', () => {
     const client = new QueryClient({ defaultOptions: { queries: { enabled: false, retry: false } } })
-    client.setQueryData(marketQueries.latest().queryKey, {
+    seed(client, marketQueries.latest().queryKey, {
       limit_down: { count: 1, names: ['跌停票'] }, broken: { count: 1, names: ['炸板票'] },
     })
-    client.setQueryData(marketQueries.feedback().queryKey, {
+    seed(client, marketQueries.feedback().queryKey, {
       generated_ts: '2026-09-28 10:30:00', nuke_count: 2, broken_rate: 20,
       nuke_list: [{ code: '000001', name: '核按钮票', pct: -7, price: 8.5, prev_boards: 3,
         tag: '昨连板', ma5: 9, ma10: 9.2, breakdown: true }],

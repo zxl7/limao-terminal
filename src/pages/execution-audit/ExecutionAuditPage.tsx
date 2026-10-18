@@ -36,7 +36,7 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title="🔎 真实执行审计" extra={<CardBadge tone="mid">只读证据链</CardBadge>}>
+      <Card title="🔎 真实执行审计" extra={<CardBadge tone="neutral">只读证据链</CardBadge>}>
         <p className="text-sub text-[12px] leading-relaxed mb-3">
           主口径只统计“盘后冻结候选 → 9:25 竞价 → 实际入场 → 当日收盘”。候选命中、连板晋级与题材回流留在各自研究页，不会混入账户收益。
         </p>

@@ -76,6 +76,15 @@ export const marketQueries = {
       staleTime: 20_000,
     }),
 
+  /** 盘后候选次日反馈：猎手由 feedback_matrix 同轮原子发布，盘中继续更新。 */
+  selectionEffect: () =>
+    queryOptions({
+      queryKey: ['market', 'selection-effect'] as const,
+      queryFn: api.selectionEffect,
+      refetchInterval: pollMs,
+      staleTime: 20_000,
+    }),
+
   /**
    * 昨日涨停池（唯一涨停权威）—— 连板天梯的**基线**。
    *

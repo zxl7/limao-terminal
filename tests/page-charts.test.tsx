@@ -114,6 +114,12 @@ describe('EmotionPage —— 情绪轨迹/接力质量/涨停家数', () => {
 
     // 卡片标题存在 = 未被降级为空态（空态时 Card 仍渲染标题，但正文是提示语，
     // 所以下面还要用「有没有 path/rect」做二次确认）
+    expect(screen.getByText(/周期温度总览/)).toBeInTheDocument()
+    expect(screen.getByText(/数据维度冷热/)).toBeInTheDocument()
+    expect(screen.getByText(/当前周期状态/)).toBeInTheDocument()
+    expect(screen.getAllByText(/盘中/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/资金温度 · 主力净额/)).toBeInTheDocument()
+    expect(screen.getByText(/周期冷热/)).toBeInTheDocument()
     expect(screen.getByText(/情绪轨迹/)).toBeInTheDocument()
     expect(screen.getByText(/收盘涨停家数/)).toBeInTheDocument()
 
@@ -156,14 +162,20 @@ describe('TradePage —— 全部交易走势 / 逐日收益', () => {
 })
 
 describe('AmbushPage —— AI尾盘潜伏研究结算', () => {
-  it('独立展示研究结算流水与待结算信号，缺账本时保持空态', async () => {
-    await renderPage(await import('@/pages/ambush/AmbushPage'))
+  it('独立展示研究结算流水、收益曲线与逐笔收益，缺账本时保持空态', async () => {
+    const container = await renderPage(await import('@/pages/ambush/AmbushPage'))
 
     expect(screen.getByText(/^🎯 AI尾盘潜伏战绩$/)).toBeInTheDocument()
     expect(screen.getByText(/研究结算流水/)).toBeInTheDocument()
-    expect(screen.getAllByText(/待结算信号/).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/暂无尾盘潜伏结算记录/)).toBeInTheDocument()
-    expect(screen.getByText(/暂无待结算信号/)).toBeInTheDocument()
+    // 收益曲线（净值折线）+ 逐笔收益（柱）已落 DOM
+    expect(screen.getByText(/收益曲线/)).toBeInTheDocument()
+    expect(screen.getByText(/逐笔收益/)).toBeInTheDocument()
+
+    const ds = pathDs(container)
+    const line = ds.find((d) => d.includes('M') && d.includes('L'))
+    expect(line, '收益曲线折线未生成 path').toBeTruthy()
+    expect(line).not.toContain('NaN')
+    expect(dataRects(container).length, '逐笔收益柱未生成 rect').toBeGreaterThan(0)
   })
 })
 

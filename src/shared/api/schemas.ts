@@ -199,7 +199,19 @@ export const MarketSnapshotSchema = z.object({
   broken: CountNames.optional(),
   weak_sectors: z
     .object({
-      focus_hits: z.array(s).optional(),
+      // ⚠️ 2026-10-14 修正：生产侧 `intraday_pulse.py:622` 写的是对象
+      //    {sector, ld[], broken[], total}，旧的 `z.array(s)` 与服务端形态漂移
+      //    （守卫长期打印 focus_hits.0: expected string, received object）。
+      focus_hits: z
+        .array(
+          z.object({
+            sector: s,
+            ld: z.array(s),
+            broken: z.array(s),
+            total: n,
+          }),
+        )
+        .optional(),
       ld_count: n.optional(),
       broken_count: n.optional(),
       ld_names: z.array(s).optional(),
@@ -382,6 +394,68 @@ export const FeedbackMatrixSchema = z.object({
     .optional(),
   /** 原系统异常态标记（存在时该文件不可用） */
   error: s.optional(),
+})
+
+// 猎手 selection_effect.py 的事实快照；字段缺失时由页面显示未知，不在守卫层补值。
+const SelectionEffectStageSchema = z.object({
+  sample_count: n.optional(),
+  promote_count: n.optional(),
+  promote_rate: nOrNull.optional(),
+  auction_quoted: n.optional(),
+  auction_premium_avg: nOrNull.optional(),
+  failed_count: n.optional(),
+  failed_nuke_count: n.optional(),
+  mood: s.optional(),
+})
+
+const SelectionEffectRepairStageSchema = z.object({
+  sample_count: nOrNull.optional(),
+  repair_count: nOrNull.optional(),
+  repair_rate: nOrNull.optional(),
+  mood: s.optional(),
+})
+
+export const SelectionEffectSchema = z.object({
+  date: s.optional(),
+  prev_date: s.optional(),
+  generated_ts: s.optional(),
+  market: z.object({
+    sample_count: n.optional(),
+    promote_count: n.optional(),
+    promote_rate: nOrNull.optional(),
+    auction_quoted: n.optional(),
+    auction_premium_avg: nOrNull.optional(),
+    auction_premium_median: nOrNull.optional(),
+    promoted_auction_premium_avg: nOrNull.optional(),
+    failed_auction_premium_avg: nOrNull.optional(),
+    failed_count: n.optional(),
+    failed_nuke_count: n.optional(),
+    failed_nuke_codes: z.array(s).optional(),
+    repair_sample_count: nOrNull.optional(),
+    repair_count: nOrNull.optional(),
+    repair_codes: z.array(s).nullable().optional(),
+    confirmed_limit_down_count: nOrNull.optional(),
+    stages: z.object({
+      one_to_two: SelectionEffectStageSchema.optional(),
+      two_to_three: SelectionEffectStageSchema.optional(),
+      high_relay: SelectionEffectStageSchema.optional(),
+      n_plus_n: SelectionEffectRepairStageSchema.optional(),
+    }).optional(),
+    pressure: b.optional(),
+  }).optional(),
+  candidates: z.array(z.object({
+    code: s.optional(),
+    name: s.optional(),
+    bucket: s.optional(),
+    rank: nOrNull.optional(),
+    boards: n.optional(),
+    raw_score: nOrNull.optional(),
+    auction_gap_pct: nOrNull.optional(),
+    current_pct: nOrNull.optional(),
+    quote_at: s.nullable().optional(),
+    promoted: b.optional(),
+    nuke: b.optional(),
+  })).optional(),
 })
 
 // ════════════════════════════════════════════════════════════════
@@ -824,6 +898,32 @@ export const ThemeSequenceSchema = z.object({
   updated: s.optional(),
 })
 
+export const EmotionDailySchema = z.array(
+  z.object({
+    file: s.optional(),
+    data: z
+      .object({
+        date: s.optional(),
+        prev_date: s.nullish(),
+        prev_zt_count: nOrNull.optional(),
+        zt_count: nOrNull.optional(),
+        promote_rate: nOrNull.optional(),
+        lb_promote_rate: nOrNull.optional(),
+        avg_pct: nOrNull.optional(),
+        up_rate: nOrNull.optional(),
+        nuke_count: nOrNull.optional(),
+        break_count: nOrNull.optional(),
+        max_boards: nOrNull.optional(),
+        prev_max_boards: nOrNull.optional(),
+        sentiment_score: nOrNull.optional(),
+        sentiment_label: s.nullish(),
+        generated_ts: s.optional(),
+      })
+      .nullable()
+      .optional(),
+  }),
+)
+
 export const FlowHistorySchema = z.array(
   z.object({ file: s.optional(), data: z.record(s, z.unknown()).nullable().optional() }),
 )
@@ -837,6 +937,7 @@ export const HealthPayloadSchema = z.object({
         route: s.optional(),
         file: s.optional(),
         desc: s.optional(),
+        retired: b.optional(),
         exists: b.optional(),
         mtime: s.nullable().optional(),
         age_sec: nOrNull.optional(),
@@ -865,8 +966,10 @@ const SCHEMA_MAP = {
   '/api/market/auction': AuctionLiveSchema,
   '/api/market/signals': ShortSpiritSignalsSchema,
   '/api/market/feedback': FeedbackMatrixSchema,
+  '/api/market/selection-effect': SelectionEffectSchema,
   '/api/market/relay-effect': RelayEffectSchema,
   '/api/market/candidates': CandidatesFileSchema,
+  '/api/emotion/daily': EmotionDailySchema,
   '/api/theme/rotation': RotationDataSchema,
   '/api/theme/series': ThemeSeriesSchema,
   '/api/theme/sequence': ThemeSequenceSchema,

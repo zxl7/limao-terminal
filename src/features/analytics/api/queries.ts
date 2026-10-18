@@ -95,6 +95,13 @@ export const analyticsQueries = {
       queryFn: api.emotionSummary5d,
       staleTime: DAILY_STALE,
     }),
+  /** 情绪日档历史（周期温度总览） */
+  emotionDaily: () =>
+    queryOptions({
+      queryKey: ['emotion', 'daily'] as const,
+      queryFn: api.emotionDaily,
+      staleTime: DAILY_STALE,
+    }),
   /** 盘中涨停时序（盘中会更新，给 5 分钟节拍） */
   emotionZtHistory: () =>
     queryOptions({
@@ -235,6 +242,12 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['ambush', 'pullback', 'settlements'] as const,
       queryFn: api.ambushPullbackSettlements,
+      staleTime: DAILY_STALE,
+    }),
+  ambushWeightedPnl: () =>
+    queryOptions({
+      queryKey: ['ambush', 'pullback', 'weighted-pnl'] as const,
+      queryFn: api.ambushWeightedPnl,
       staleTime: DAILY_STALE,
     }),
 

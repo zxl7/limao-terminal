@@ -2,12 +2,18 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type {
+  EmotionDailySnapshot,
   EmotionDay,
+  FlowHistoryDay,
+  FeedbackMatrix,
   ZtHistoryDay,
   ZtIntradayPoint,
+  SectorFundPool,
 } from '@/shared/api'
 import {
   analyticsQueries,
+  buildCycleTemperature,
+  CycleTemperaturePanel,
   DataTable,
   SegTabs,
   StatPair,
@@ -48,7 +54,11 @@ export async function loader() {
   // 实时反馈、盘中逐事件与日频归档独立产出；单一源暂缺时保留其他卡片。
   await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.emotionSummary5d()),
+    queryClient.ensureQueryData(analyticsQueries.emotionDaily()),
     queryClient.ensureQueryData(analyticsQueries.emotionZtHistory()),
+    queryClient.ensureQueryData(analyticsQueries.flowHistory()),
+    queryClient.ensureQueryData(analyticsQueries.flowLive()),
+    queryClient.ensureQueryData(marketQueries.latest()),
     queryClient.ensureQueryData(marketQueries.feedback()),
   ])
   return null
@@ -79,7 +89,11 @@ export function Component() {
     refetchInterval: APP_CONFIG.pollIntradayMs,
     staleTime: 15_000,
   })
+  const daily = useQuery(analyticsQueries.emotionDaily())
   const ztHist = useQuery(analyticsQueries.emotionZtHistory())
+  const flowHist = useQuery(analyticsQueries.flowHistory())
+  const flowLive = useQuery(analyticsQueries.flowLive())
+  const latest = useQuery(marketQueries.latest())
   const feedback = useQuery(marketQueries.feedback())
   const [tab, setTab] = useState<'days' | 'trajectory' | 'intraday'>('days')
 
@@ -113,6 +127,40 @@ export function Component() {
   const turnStyle = turn ? (TURN_TONE[turn.dir] ?? TURN_TONE.flat) : null
   /** 实时潮位严格按候选链路的 feedback_matrix 门控映射，不能拿日频摘要替代。 */
   const tide = useMemo(() => buildTideState(feedback.data), [feedback.data])
+  const temperature = useMemo(
+    () => {
+      const today = latest.data?.ts?.slice(0, 10) ?? feedback.data?.date ?? null
+      const dailyRows = (daily.data ?? []).flatMap((file) => (file.data ? [file.data] : [])) as EmotionDailySnapshot[]
+      const ztRows = [...(ztHist.data ?? [])]
+      const todayZt = ztRows.find((file) => file.data?.date === today)?.data
+      const liveZt = todayZt?.intraday_points?.at(-1)
+      const current = latest.data
+      if (today && current && current.ts.slice(0, 10) === today) {
+        const existingIndex = dailyRows.findIndex((row) => row.date === today)
+        const liveRow = {
+          ...(existingIndex >= 0 ? dailyRows[existingIndex] : { date: today }),
+          date: today,
+          sentiment_score: current.sentiment_detail?.score ?? null,
+          sentiment_label: current.sentiment_detail?.label ?? current.sentiment ?? null,
+          zt_count: liveZt?.total ?? current.total_zt ?? null,
+          nuke_count: current.broken?.count ?? null,
+          generated_ts: current.ts,
+        }
+        if (existingIndex >= 0) dailyRows[existingIndex] = liveRow
+        else dailyRows.push(liveRow)
+        if (!todayZt) ztRows.push({ file: `zt_${today}.json`, data: { date: today, intraday_points: liveZt ? [liveZt] : [] } as ZtHistoryDay })
+      }
+      return buildCycleTemperature(
+        dailyRows,
+        ztRows,
+        (feedback.data ?? null) as FeedbackMatrix | null,
+        (flowHist.data ?? []) as FlowHistoryDay[],
+        (flowLive.data ?? null) as SectorFundPool | null,
+        today,
+      )
+    },
+    [daily.data, feedback.data, flowHist.data, flowLive.data, latest.data, ztHist.data],
+  )
 
   /** 盘中时序按日期倒序，取最近 8 个交易日（仅保留确有逐窗口数据的归档日） */
   const intradayRows = useMemo<IntradayRow[]>(
@@ -253,6 +301,7 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
+      <CycleTemperaturePanel result={temperature} />
       {/* 周期页只展示多日样本；当日盘中过程由日内时间轴承接。 */}
       <Card
         title="🌊 情绪潮汐周期"

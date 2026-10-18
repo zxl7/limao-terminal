@@ -61,7 +61,15 @@ export function Component() {
 
   const files = health.data?.files ?? []
   const missing = files.filter((f) => !f.exists)
-  const stale = files.filter((f) => f.exists && (f.age_sec ?? 0) > 86_400)
+  /**
+   * ⚠️ 2026-10-14 审计：`retired` 路由（在产侧已无写入方）**不计入龄期告警** ——
+   * 它们的文件龄期必然无限增长，若算进来就会天天报「龄期 > 1 天」，
+   * 把真正的管道中断（本该 ≤1 天却变大的）淹掉。停更件单列一个计数。
+   */
+  const retiredFiles = files.filter((f) => f.retired)
+  const stale = files.filter(
+    (f) => !f.retired && f.exists && (f.age_sec ?? 0) > 86_400,
+  )
 
   return (
     <div className="flex flex-col gap-3">
@@ -77,6 +85,7 @@ export function Component() {
           <StatPair label="已登记数据源" value={files.length} />
           <StatPair label="缺失" value={missing.length} tone={missing.length ? 'down' : 'sub'} />
           <StatPair label="龄期 > 1 天" value={stale.length} tone={stale.length ? 'warn' : 'sub'} />
+          <StatPair label="已停更(留档)" value={retiredFiles.length} tone="sub" />
           <StatPair label="环比变化字段" value={`${changed} / ${diffRows.length}`} />
           <StatPair label="数据根" value={health.data?.data_root ?? '—'} />
         </div>
@@ -175,11 +184,25 @@ export function Component() {
             rows={files}
             rowKey={(f) => f.route}
             dense
-            rowClass={(f) => (!f.exists ? 'bg-down/5' : (f.age_sec ?? 0) > 86_400 ? 'bg-warn/5' : undefined)}
+            rowClass={(f) =>
+              !f.exists
+                ? 'bg-down/5'
+                : !f.retired && (f.age_sec ?? 0) > 86_400
+                  ? 'bg-warn/5'
+                  : undefined
+            }
             empty="无健康数据"
             columns={[
               { label: '路由', cell: (f) => <span className="num text-[11.5px]">{f.route}</span> },
-              { label: '说明', cell: (f) => <span className="text-sub text-[11.5px]">{f.desc || '—'}</span> },
+              {
+                label: '说明',
+                cell: (f) => (
+                  <span className="text-sub text-[11.5px]">
+                    {f.retired && <span className="badge bg-warn-soft text-warn mr-1">已停更</span>}
+                    {f.desc || '—'}
+                  </span>
+                ),
+              },
               {
                 label: '存在',
                 cell: (f) =>

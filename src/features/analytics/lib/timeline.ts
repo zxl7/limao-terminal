@@ -592,6 +592,7 @@ export function buildTimelineSlots(
   }
   // 所有有时刻的盘中事实独立建槽；个股已在相同分钟结构化展示时才避免重复。
   for (const e of intraday ?? []) {
+    if (e.kind === 'baseline') continue // 基线仅作诚实标记，不进入时间轴/曲线
     const t = clockMin(String(e.at ?? '').slice(11, 16))
     if (t == null || t < SESSION_OPEN || t > SESSION_CLOSE) continue
     if (e.kind === 'zt_total' && !verifiedZtChange(e)) continue
@@ -811,6 +812,7 @@ export function buildLimitSeries(
   type SeqItem = { wm: number; kind: 'zt_total' | 'limit_down_new' | 'broken_new'; total: number | null }
   const seq: SeqItem[] = []
   for (const e of events) {
+    if (e.kind === 'baseline') continue // 基线仅作诚实标记，不进入涨停/跌停/炸板曲线
     const wm = clockMin(String(e.at ?? '').slice(11, 16))
     if (wm == null || !inTradingWindow(wm)) continue
     if (e.kind === 'zt_total') {

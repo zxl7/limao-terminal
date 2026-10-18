@@ -29,7 +29,7 @@ import { feedbackTone, pctTone } from "../model/labels"
  */
 export function LadderCard() {
   const { data: yzt } = useQuery(marketQueries.yesterday())
-  const { data: fb, isPending: feedbackPending, isError: feedbackError } = useQuery(marketQueries.feedback())
+  const { data: fb, isError: feedbackError } = useQuery(marketQueries.feedback())
 
   /** 封单生效条件：反馈矩阵无异常且对照日与梯队基线日相同。 */
   const basisDate = yzt?.date ?? ""
