@@ -18,7 +18,7 @@ import {
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { APP_CONFIG } from '@/shared/config'
-import { inTrading } from '@/shared/lib'
+import { inTrading, tradableStocks } from '@/shared/lib'
 import { Card, CardBadge, StockLink } from '@/shared/ui'
 import type { SelectionEffect } from '@/shared/api'
 
@@ -76,7 +76,7 @@ export function SelectionLogicSection({ selectionEffect }: { selectionEffect: Se
 
       <div>
         <p className="mb-1 text-[12px] font-medium text-txt">当前选股结果 · 接力池优先，观察池待确认</p>
-        {!plan ? <p role="status" className="text-[12px] text-sub">{planQ.isPending ? '正在读取选股结果…' : '选股结果尚未发布。'}</p> : <DataTable dense rows={rows} rowKey={(row) => `${row.code}-${row.bucket ?? 'pool'}`} columns={[
+        {!plan ? <p role="status" className="text-[12px] text-sub">{planQ.isPending ? '正在读取选股结果…' : '选股结果尚未发布。'}</p> : <DataTable dense rows={tradableStocks(rows)} rowKey={(row) => `${row.code}-${row.bucket ?? 'pool'}`} columns={[
           { label: '池位 / 标的', cell: (row) => <span><StockLink code={row.code}>{row.name}</StockLink><span className="ml-1 text-sub">{row.bucket === 'relay' ? `接力 ${row.relay_rank ?? '—'}` : `观察 ${row.watch_rank ?? '—'}`}</span></span> },
           { label: '板数', num: true, cell: (row) => row.boards == null ? '—' : `${row.boards}板` },
           { label: '同高度历史晋级', num: true, cell: (row) => <span>{row.history_relay_prob == null ? '—' : `${(row.history_relay_prob * 100).toFixed(1)}%`}<small className="block text-sub">样本 {row.history_relay_samples ?? '—'}</small></span> },

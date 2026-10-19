@@ -14,7 +14,7 @@ import {
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, staleLabel } from '@/shared/lib'
 
 /**
  * 运维审计 —— 回答「系统今天到底跑了什么、推了什么」。
@@ -126,7 +126,7 @@ export function Component() {
         title="🛠️ 运维审计"
         extra={
           <CardBadge tone={totalPushed === 0 ? 'warn' : 'up'}>
-            当日推送 {totalPushed} 条
+            最新归档 {totalPushed} 条
           </CardBadge>
         }
       >
@@ -247,7 +247,12 @@ export function Component() {
                     ))}
                   </select>
                   <span className="text-sub text-[11.5px]">
-                    当日 {activeCards.length} 张卡 · 逐字节留存的成品，用于判断「当时那句话该不该说」
+                    该日 {activeCards.length} 张卡 · 逐字节留存的成品，用于判断「当时那句话该不该说」
+                    {activeDay && staleLabel(fileDate(activeDay.file), 7) && (
+                      <span className="badge bg-warn-soft text-warn ml-1.5">
+                        脉冲档 {staleLabel(fileDate(activeDay.file), 7)}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">

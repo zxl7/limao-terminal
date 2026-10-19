@@ -67,9 +67,38 @@ export function Component() {
    * 把真正的管道中断（本该 ≤1 天却变大的）淹掉。停更件单列一个计数。
    */
   const retiredFiles = files.filter((f) => f.retired)
-  const stale = files.filter(
-    (f) => !f.retired && f.exists && (f.age_sec ?? 0) > 86_400,
-  )
+  /**
+   * 龄期告警阈值按**节拍**分档（2026-10-18 修）。
+   *
+   * ⛔ 旧实现固定 `> 86400`：周末/节假日所有盘中源必然 >1 天 → 37 条里 33 条标黄，
+   *    告警彻底变成背景噪声，真断流反而看不出来。
+   * 现规则：
+   *   · `retired` / `manual` → 不告警（留档件与手动件龄期无意义）
+   *   · 周末（无交易）→ 不告警，只保留「文件缺失」
+   *   · 盘中源 → 4 小时（30s 节拍下，4h 未动即为真断流）
+   *   · 日频源 → 36 小时（当日 17:00 落盘，次日 09:30 前仍算新鲜）
+   */
+  // ⚠️ 不能用 `Date.now()`（React Compiler 判 impurity，会跳过整个页面组件的优化）。
+  // 体检时刻本身就是「现在」的最佳代理：它就是本轮 health 读盘的服务器时间。
+  const nowMs = health.data?.ts ? Date.parse(health.data.ts) : 0
+  const bjWeekday = nowMs ? new Date(nowMs + 8 * 3_600_000).getUTCDay() : -1
+  const isWeekend = bjWeekday === 0 || bjWeekday === 6
+  const staleLimit = (f: (typeof files)[number]): number | null => {
+    if (f.retired || f.cadence === 'manual') return null
+    if (isWeekend) return null
+    return f.cadence === 'intraday' ? 4 * 3600 : 36 * 3600
+  }
+  const stale = files.filter((f) => {
+    const limit = staleLimit(f)
+    return limit != null && f.exists && (f.age_sec ?? 0) > limit
+  })
+  /** 业务日期落后：有日期但早于「最近可接受业务日」的源（周末放宽到 4 天） */
+  const behind = files.filter((f) => {
+    if (!f.exists || f.retired || !f.asof) return false
+    if (!nowMs) return false
+    const ageDays = (nowMs - Date.parse(`${f.asof}T23:59:59+08:00`)) / 86_400_000
+    return ageDays > (isWeekend ? 4 : 2)
+  })
 
   return (
     <div className="flex flex-col gap-3">
@@ -84,7 +113,8 @@ export function Component() {
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
           <StatPair label="已登记数据源" value={files.length} />
           <StatPair label="缺失" value={missing.length} tone={missing.length ? 'down' : 'sub'} />
-          <StatPair label="龄期 > 1 天" value={stale.length} tone={stale.length ? 'warn' : 'sub'} />
+          <StatPair label="龄期超阈值" value={stale.length} tone={stale.length ? 'warn' : 'sub'} />
+          <StatPair label="业务日期落后" value={behind.length} tone={behind.length ? 'warn' : 'sub'} />
           <StatPair label="已停更(留档)" value={retiredFiles.length} tone="sub" />
           <StatPair label="环比变化字段" value={`${changed} / ${diffRows.length}`} />
           <StatPair label="数据根" value={health.data?.data_root ?? '—'} />
@@ -178,60 +208,83 @@ export function Component() {
         )}
       </Card>
 
-      <Card title={`文件新鲜度（${files.length} 个数据源）`} extra={<CardBadge>{health.data?.ts ?? '—'}</CardBadge>}>
-        <div className="max-h-[62vh] overflow-y-auto">
-          <DataTable
-            rows={files}
-            rowKey={(f) => f.route}
-            dense
-            rowClass={(f) =>
-              !f.exists
-                ? 'bg-down/5'
-                : !f.retired && (f.age_sec ?? 0) > 86_400
-                  ? 'bg-warn/5'
-                  : undefined
-            }
-            empty="无健康数据"
-            columns={[
-              { label: '路由', cell: (f) => <span className="num text-[11.5px]">{f.route}</span> },
-              {
-                label: '说明',
-                cell: (f) => (
-                  <span className="text-sub text-[11.5px]">
-                    {f.retired && <span className="badge bg-warn-soft text-warn mr-1">已停更</span>}
-                    {f.desc || '—'}
-                  </span>
-                ),
-              },
-              {
-                label: '存在',
-                cell: (f) =>
-                  f.exists ? (
-                    <span className="text-up">✓</span>
-                  ) : (
-                    <span className="text-down font-semibold">✗</span>
-                  ),
-              },
-              {
-                label: '龄期',
-                num: true,
-                cell: (f) => <span className="text-sub">{fmtAge(f.age_sec)}</span>,
-              },
-              {
-                label: '体积',
-                num: true,
-                cell: (f) => <span className="text-sub">{fmtSize(f.size)}</span>,
-              },
-              {
-                label: '更新时间',
-                cell: (f) => <span className="num text-sub text-[11px]">{f.mtime?.slice(5, 19).replace('T', ' ') ?? '—'}</span>,
-              },
-            ]}
-          />
-        </div>
-      </Card>
         </Zone>
       </ZoneRow>
+
+      {/* 健康总表通栏：76 条路由 × 7 列，双栏里会被横向挤压，必须占满整行 */}
+      <Card
+      title={`文件新鲜度（${files.length} 个数据源）`}
+      extra={
+        <CardBadge>
+          体检 {health.data?.ts ? new Date(health.data.ts).toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' }).slice(5) : '—'}
+        </CardBadge>
+      }
+      >
+        <DataTable
+          virtual
+          rows={files}
+          rowKey={(f) => f.route}
+          dense
+          rowClass={(f) => {
+            if (!f.exists) return 'bg-down/5'
+            if (f.retired) return undefined
+            const limit = staleLimit(f)
+            return limit != null && (f.age_sec ?? 0) > limit ? 'bg-warn/5' : undefined
+          }}
+          empty="无健康数据"
+          columns={[
+            { label: '路由', cell: (f) => <span className="num text-[11.5px]">{f.route}</span> },
+            {
+              label: '说明',
+              cell: (f) => (
+                <span className="text-sub text-[11.5px]">
+                  {f.retired && <span className="badge bg-warn-soft text-warn mr-1">已停更</span>}
+                  {!f.exists && <span className="badge bg-down-soft text-down mr-1">缺失</span>}
+                  {f.desc || '—'}
+                </span>
+              ),
+            },
+            {
+              label: '业务日期',
+              cell: (f) => (
+                <span className="num text-[11.5px] text-sub">{f.asof ?? '—'}</span>
+              ),
+            },
+            {
+              label: '节拍',
+              cell: (f) => (
+                <span className="text-[11.5px] text-sub">
+                  {f.cadence === 'intraday' ? '盘中' : f.cadence === 'manual' ? '手动' : '日频'}
+                  {f.kind === 'dir' && <span className="text-[10.5px] text-sub"> · 目录</span>}
+                </span>
+              ),
+            },
+            {
+              label: '存在',
+              cell: (f) =>
+                f.exists ? (
+                  <span className="text-up">✓</span>
+                ) : (
+                  <span className="text-down font-semibold">✗</span>
+                ),
+            },
+            {
+              label: '龄期',
+              num: true,
+              cell: (f) => <span className="text-sub">{fmtAge(f.age_sec)}</span>,
+            },
+            {
+              label: '体积',
+              num: true,
+              cell: (f) => <span className="text-sub">{fmtSize(f.size)}</span>,
+            },
+            {
+              label: '更新时间',
+              cell: (f) => <span className="num text-sub text-[11px]">{f.mtime?.slice(5, 19).replace('T', ' ') ?? '—'}</span>,
+            },
+          ]}
+        />
+      </Card>
     </div>
   )
 }

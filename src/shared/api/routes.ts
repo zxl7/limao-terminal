@@ -518,6 +518,18 @@ export const ROUTES: Record<string, RouteDef> = {
  */
 export const FILE_ROUTES = Object.entries(ROUTES).filter(([, d]) => d.file && !d.dirPattern)
 
+/**
+ * 健康检查路由（2026-10-18 扩充）。
+ *
+ * ⛔ 旧实现只喂 `FILE_ROUTES`（单文件型）→ 79 条路由里只有 37 条被体检，
+ *  risk / hithink / decision / card / board-core 这些**目录型主数据从不体检**，
+ *  于是「健康面板全绿」并不代表数据真的在。
+ *
+ * 现纳入「单文件 + 单层目录」两类；两层目录（`dirPattern`，其 `file` 是相对日期目录的
+ * 文件名）仍排除 —— 拼出来的路径必然不存在，会产生假红。
+ */
+export const HEALTH_ROUTES = Object.entries(ROUTES).filter(([, d]) => !d.dirPattern)
+
 /** 按刷新节拍分组（前端据此决定哪些源参与轮询） */
 export const ROUTES_BY_CADENCE = {
   intraday: Object.entries(ROUTES).filter(([, d]) => d.cadence === 'intraday').map(([r]) => r),

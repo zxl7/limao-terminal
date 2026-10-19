@@ -117,7 +117,7 @@ export function AppShell() {
 
         {/* 主内容区：≥3xl 与 RightRail 并排 */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <main className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 py-3">
+          <main className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 3xl:px-6 py-3">
             <TideAlgorithmLayer />
             <Outlet />
           </main>

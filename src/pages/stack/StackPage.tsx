@@ -4,7 +4,7 @@ import type { SeriesTableRow } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, HeatMatrix, Icon, LineChart, StockLink, Zone, ZoneRow, type HeatRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, staleLabel } from '@/shared/lib'
 
 /**
  * 数据堆叠 —— 数据源 `cache/theme_series.json`（题材 × N 日涨停数矩阵）。
@@ -108,7 +108,7 @@ export function Component() {
     }))
 
     const cellMax = Math.max(0, ...heatRows.flatMap((r) => r.values.map((v) => (v == null ? 0 : v))))
-    return { rows: heatRows, cols: dates.map((x) => x.slice(5)), cellMax }
+    return { rows: heatRows, cols: dates.map(dayLabel), cellMax }
   }, [d, dates])
 
   /**
@@ -121,7 +121,7 @@ export function Component() {
   const pulse = useMemo(() => {
     if (!dates.length) return null
     return {
-      labels: dates.map((x) => x.slice(5)),
+      labels: dates.map(dayLabel),
       totals: d?.daily_totals ?? [],
       maxBoards: d?.max_boards ?? [],
     }
@@ -247,7 +247,7 @@ export function Component() {
         )}
 
         {!!rows.length && (
-          <div className="overflow-x-auto max-h-[68vh] overflow-y-auto">
+          <div className="overflow-x-auto max-h-[var(--panel-max-h)] overflow-y-auto">
             <table className="border-collapse text-[12.5px]">
               <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-line text-sub">
@@ -256,7 +256,7 @@ export function Component() {
                   </th>
                   {dates.map((dt) => (
                     <th key={dt} className="font-normal py-1.5 px-2 text-right whitespace-nowrap num">
-                      {dt.slice(5)}
+                      {dayLabel(dt)}
                     </th>
                   ))}
                   <th className="font-normal py-1.5 px-2 text-right whitespace-nowrap">环比</th>
@@ -286,7 +286,20 @@ export function Component() {
             title="🗓 周涨停地图"
             extra={
               <CardBadge>
-                {wk ? `${wkView.days.length} 个交易日 · ${wkView.total} 只` : '—'}
+                {wk ? (
+                  <span className="flex items-center gap-1.5">
+                    <span>
+                      {weekRange(wkView.days)} · {wkView.days.length} 日 · {wkView.total} 只
+                    </span>
+                    {staleLabel(weekStart(wkView.days), 7) && (
+                      <span className="badge bg-warn-soft text-warn">
+                        {staleLabel(weekStart(wkView.days), 7)}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  '—'
+                )}
               </CardBadge>
             }
           >
@@ -316,7 +329,7 @@ export function Component() {
                   />
                 </div>
                 <div className="text-sub text-[11px]">
-                  按本周涨停天数降序取前 40 只 · 格子只表示「当日是否涨停」，
+                  按该周涨停天数降序取前 40 只 · 格子只表示「当日是否涨停」，
                   板数见行尾（原数据无逐日板数）
                 </div>
               </div>
@@ -327,9 +340,9 @@ export function Component() {
         <Zone label="持续性最强 · 涨停日 ≥3" dot="bg-rec" className="xl:w-[32%]">
           <Card title="🔥 持续涨停票" extra={<CardBadge>{wkView.persistent.length} 只</CardBadge>}>
             {wkView.persistent.length === 0 ? (
-              <EmptyState text="本周无涨停 ≥3 天的个股" />
+              <EmptyState text="该周无涨停 ≥3 天的个股" />
             ) : (
-              <div className="max-h-[560px] overflow-y-auto">
+              <div className="max-h-[var(--panel-max-h)] overflow-y-auto">
                 <DataTable
                   dense
                   rows={wkView.persistent}
@@ -460,4 +473,31 @@ function trendLabel(t: string): string {
     flat: '走平',
   }
   return m[t] ?? t ?? '—'
+}
+
+/**
+ * 日期标签（2026-10-18 修）。
+ *
+ * `theme_series.dates` **混着两种粒度**：日频是 `YYYY-MM-DD`，当日盘中追加的点是 `HH:MM`。
+ * 旧实现一律 `slice(5)` → 盘中点变成空字符串，表头出现一串空列、窗口显示「13:29 ~ 15:00」。
+ * 这里按长度分支：≥10 位取 `MM-DD`，否则原样保留（`13:29` 是可读的时点）。
+ */
+function dayLabel(d: string): string {
+  return d.length >= 10 ? d.slice(5, 10) : d
+}
+
+/** `20260907` 这类 8 位周内日期 → `YYYY-MM-DD`（取不到返回 null） */
+function weekStart(days: string[]): string | null {
+  const d = days[0]
+  if (!d || d.length !== 8) return null
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
+}
+
+/** 周区间：`2026-09-07 ~ 09-11`；只有 1 天时只显示一天 */
+function weekRange(days: string[]): string {
+  if (days.length === 0) return '—'
+  const first = weekStart(days)
+  const last = days.at(-1) ?? ''
+  const lastLabel = last.length === 8 ? `${last.slice(4, 6)}-${last.slice(6, 8)}` : last
+  return first ? `${first} ~ ${lastLabel}` : lastLabel
 }

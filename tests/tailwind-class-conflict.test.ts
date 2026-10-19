@@ -26,11 +26,14 @@ import path from 'node:path'
  * 2. 全仓 `className` 字面量里**不得**同时出现「裸 flex-row/flex-col」与「响应式 flex-col/flex-row」；
  * 3. `src/styles/theme.css` 必须仍定义断点令牌（`max-xl:` 依赖它）。
  *
- * ⚠️ **已知同类问题（未修 · 待用户拍板，⛔ 本守卫暂不覆盖）**：
- * `src/app/Sidebar.tsx` 的 `hidden lg:flex`、`src/app/RightRail.tsx` 的 `hidden 3xl:flex`
- * —— `hidden`（display）与 `lg:flex` 同为「裸排在响应式之后」的同一机制，
- * 实际表现是侧栏恒隐藏、窄屏兜底导航恒显示。修法同上：`max-lg:hidden lg:flex`。
- * 因为这会**改变整个外壳的可见布局**，需用户确认后再动，故未纳入本次守卫。
+ * ## 2026-10-18 补齐：`display` 是第二个重灾区（外壳级）
+ *
+ * 同一机制也适用于 `display`：构建产物里 `.flex`(65550) / `.hidden`(65588)
+ * **排在** `.lg\:flex`(55730) / `3xl:flex`(57661) **之后** ⇒ 裸类在所有宽度都赢。
+ * 真实后果（本轮修复前）：侧栏 `hidden lg:flex` 恒隐藏、右侧 rail `hidden 3xl:flex`
+ * 恒隐藏、顶栏 `hidden 2xl:flex` 的三个 KPI 永远不显示、窄屏兜底 tab 条恒显示
+ * —— 整个「左侧栏 + 顶栏 + 满宽主区」的 PC 三段外壳退化成顶部横条布局。
+ * 修法统一为**互斥媒体查询**：`max-lg:hidden lg:flex` / `max-3xl:hidden 3xl:flex`。
  */
 
 const SRC = path.resolve(import.meta.dirname, '../src')
@@ -48,6 +51,21 @@ function walk(dir: string, out: string[] = []): string[] {
 const BARE = new Set(['flex-row', 'flex-col'])
 /** 响应式变体（`sm:`…`4xl:` 前缀） */
 const VARIANT = /^(?:sm|md|lg|xl|2xl|3xl|4xl):flex-(?:row|col)$/
+
+/** display 类名 —— 同一属性组，裸类排在响应式之后，禁止同现 */
+const DISPLAY_BARE = new Set([
+  'hidden',
+  'flex',
+  'grid',
+  'block',
+  'inline',
+  'inline-flex',
+  'inline-block',
+  'flow-root',
+  'contents',
+])
+const DISPLAY_VARIANT =
+  /^(?:sm|md|lg|xl|2xl|3xl|4xl|max-sm|max-md|max-lg|max-xl|max-2xl|max-3xl|max-4xl):(?:hidden|flex|grid|block|inline|inline-flex|inline-block|flow-root|contents)$/
 
 /** 从 className 字面量里抽 token（够用的近似：按空白切开，去掉内嵌条件拼接） */
 function tokensOf(text: string): string[] {
@@ -95,5 +113,48 @@ describe('Tailwind 同属性竞争守卫（flex-direction）', () => {
     for (const token of ['--breakpoint-3xl', '--breakpoint-4xl']) {
       expect(css, `缺少 ${token} —— 对应前缀的类会静默失效`).toContain(token)
     }
+  })
+})
+
+describe('Tailwind 同属性竞争守卫（display · 外壳可见性）', () => {
+  it('全仓 className 字面量：裸 display 类与响应式 display 类不得同现', () => {
+    const bad: string[] = []
+    for (const file of walk(SRC)) {
+      const code = readFileSync(file, 'utf8')
+      for (const lit of code.match(/(?:'|"|`)([^'"`\n]*(?:hidden|flex|grid|block|inline)[^'"`\n]*)(?:'|"|`)/g) ?? []) {
+        const tokens = tokensOf(lit.slice(1, -1))
+        const hasBare = tokens.some((t) => DISPLAY_BARE.has(t))
+        const hasVariant = tokens.some((t) => DISPLAY_VARIANT.test(t))
+        if (hasBare && hasVariant) {
+          bad.push(`${path.relative(SRC, file)} → ${lit.trim()}`)
+        }
+      }
+    }
+    expect(
+      bad,
+      '同一 className 里同时出现裸 display 类与响应式 display 类：裸类在产物里排在后面，'
+        + '会在所有宽度生效 → 用 max-<bp>: 与 <bp>: 两个互斥媒体查询改写',
+    ).toEqual([])
+  })
+
+  it('外壳三段（侧栏 / 右 rail / 兜底 tab）必须用互斥媒体查询', () => {
+    const sidebar = readFileSync(path.join(SRC, 'app/Sidebar.tsx'), 'utf8')
+    const rail = readFileSync(path.join(SRC, 'app/RightRail.tsx'), 'utf8')
+    const topbar = readFileSync(path.join(SRC, 'app/TopBar.tsx'), 'utf8')
+
+    expect(sidebar, '侧栏：窄屏隐藏 / ≥lg 显示，必须写成 max-lg:hidden lg:flex').toContain(
+      'max-lg:hidden lg:flex',
+    )
+    expect(sidebar, '兜底 tab 条：<lg 显示 / ≥lg 隐藏，必须写成 max-lg:flex lg:hidden').toContain(
+      'max-lg:flex lg:hidden',
+    )
+    expect(rail, '右 rail：窄屏隐藏 / ≥3xl 显示，必须写成 max-3xl:hidden 3xl:flex').toContain(
+      'max-3xl:hidden 3xl:flex',
+    )
+    expect(topbar, '顶栏窄屏品牌：必须写成 max-lg:flex lg:hidden').toContain('max-lg:flex lg:hidden')
+    expect(
+      topbar,
+      '顶栏宽屏 KPI：必须写成 max-2xl:hidden 2xl:flex（三个 KPI 曾因此永远不显示）',
+    ).toContain('max-2xl:hidden 2xl:flex')
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildThemeBursts,
+  firstBurstByKey,
   normName,
   normTheme,
   parseThemeEvents,
@@ -368,5 +369,29 @@ describe('题材观测时刻序列（替代无意义的区间）', () => {
     })
     expect(r.themes[0].points).toHaveLength(1)
     expect(r.themes[0].points[0].kind).toBe('rise')
+  })
+})
+
+/**
+ * 首爆判定（2026-10-18 用户：「低空经济首次爆发变大红，后续继续走强保持红色」）。
+ *
+ * ⛔ 关键不变式：**同一题材只在第一次出现的块上算首爆**，之后的块即使 `burst` 仍为真，
+ *    也只能算续强。这条一旦写错，用户会看到「低空经济一天首爆三次」。
+ */
+describe('firstBurstByKey · 当日首爆只算第一次', () => {
+  it('同题材跨块重复出现 → 只有第一块算首爆', () => {
+    const map = firstBurstByKey([
+      { key: 'a', burst: [{ theme: '低空经济' }, { theme: '军工' }] },
+      { key: 'b', burst: [{ theme: '低空经济' }] },
+      { key: 'c', burst: [{ theme: '低空经济' }, { theme: '机器人' }] },
+    ])
+    expect(map.get('a')).toEqual(['低空经济', '军工'])
+    expect(map.has('b')).toBe(false)
+    expect(map.get('c')).toEqual(['机器人'])
+  })
+
+  it('无爆发的块不产出条目', () => {
+    const map = firstBurstByKey([{ key: 'x', burst: [] }])
+    expect(map.size).toBe(0)
   })
 })

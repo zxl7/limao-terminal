@@ -540,6 +540,8 @@ export interface FeedbackMatrix {
   trend: FeedbackTrend
   /** 原系统异常态标记（存在时该文件不可用） */
   error?: string
+  /** 异常态的中文说明（后端 `msg` 字段，如「9:26 竞价定价后首轮生效」） */
+  msg?: string
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1254,8 +1256,14 @@ export interface HealthFile {
   route: string
   file: string | undefined
   desc: string
+  /** 路由形态：单文件 / 目录（取目录内 mtime 最新一份做探针） */
+  kind?: 'file' | 'dir'
+  /** 刷新节拍（透传 routes.ts）—— 龄期告警阈值按它分档 */
+  cadence?: 'intraday' | 'daily' | 'manual'
   /** ⚠️ 该链路在产侧已无写入方（`routes.ts` 的 `retired` 标记透传），文件仅留档 */
   retired?: boolean
+  /** 业务日期（文件内容 date/generated_ts/ts 优先，取不到退回文件名日期） */
+  asof?: string | null
   exists: boolean
   mtime: string | null
   age_sec: number | null

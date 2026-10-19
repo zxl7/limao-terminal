@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib'
+import { useMeasuredHeight, useVirtualRows } from '@/shared/ui'
 
 /**
  * 通用数据表 —— 分析域全部「榜单 / 明细」类视图的唯一样式来源。
@@ -42,6 +43,16 @@ export interface DataTableProps<T> {
   dense?: boolean
   /** 整行高亮判定（如最高板、命中项） */
   rowClass?: (row: T, index: number) => string | undefined
+  /**
+   * 虚拟滚动（2026-10-18）。
+   *
+   * 只渲染视口内的行 + 上下占位，长表（200+ 行）不再把几千个 DOM 节点塞进页面。
+   * ⛔ 前置条件：**行高必须固定**（列内容不得 `whitespace-normal` 换行），
+   *    否则占位高度与真实行高不一致，会出现空白缝或跳行。
+   */
+  virtual?: boolean
+  /** 虚拟滚动容器的高度上限（默认「视口 − 顶栏」，保证不超屏） */
+  heightClass?: string
 }
 
 export function DataTable<T>({
@@ -51,15 +62,35 @@ export function DataTable<T>({
   empty = '暂无数据',
   dense,
   rowClass,
+  virtual = false,
+  heightClass = 'max-h-[var(--panel-max-h)]',
 }: DataTableProps<T>) {
+  /**
+   * 行高常量必须与真实渲染一致：实测 dense 行为 32px（py-1 + 12.5px 正文 + border）。
+   * 虚拟化时会给每行**强制** `height: ROW_H`，保证占位高度与内容严格对齐。
+   */
+  const ROW_H = 32
+  const [scrollRef, viewportH] = useMeasuredHeight<HTMLDivElement>()
+  const win = useVirtualRows({
+    count: rows.length,
+    rowHeight: ROW_H,
+    viewportHeight: viewportH,
+  })
+
   if (!rows.length) {
     return <div className="text-center text-sub text-xs py-4">{empty}</div>
   }
 
+  const bodyRows = virtual ? rows.slice(win.start, win.end) : rows
+
   return (
-    <div className="overflow-x-auto">
+    <div
+      ref={virtual ? scrollRef : undefined}
+      onScroll={virtual ? win.onScroll : undefined}
+      className={virtual ? cn('overflow-auto overscroll-contain', heightClass) : 'overflow-x-auto'}
+    >
       <table className="w-full border-collapse text-[12.5px]">
-        <thead>
+        <thead className={virtual ? 'sticky top-0 z-10' : undefined}>
           <tr className="border-b border-line bg-line-faint">
             {columns.map((c) => (
               <th
@@ -78,9 +109,18 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {/* 上占位：模拟已滚过的高度，aria-hidden 且不参与行样式 */}
+          {virtual && win.padTop > 0 && (
+            <tr aria-hidden>
+              <td colSpan={columns.length} style={{ height: win.padTop, padding: 0, border: 0 }} />
+            </tr>
+          )}
+          {bodyRows.map((row, idx) => {
+            const i = virtual ? win.start + idx : idx
+            return (
             <tr
               key={rowKey?.(row, i) ?? i}
+              style={virtual ? { height: ROW_H } : undefined}
               className={cn(
                 // hover 高亮：多列宽表横向扫读时，行背景是最便宜的「防串行」手段
                 'border-b border-line-faint transition-colors hover:bg-line-faint',
@@ -101,7 +141,13 @@ export function DataTable<T>({
                 </td>
               ))}
             </tr>
-          ))}
+            )
+          })}
+          {virtual && win.padBottom > 0 && (
+            <tr aria-hidden>
+              <td colSpan={columns.length} style={{ height: win.padBottom, padding: 0, border: 0 }} />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>

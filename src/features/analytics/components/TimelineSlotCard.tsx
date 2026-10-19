@@ -258,7 +258,7 @@ function ThemeSlotGroup({
 }: {
   theme: string
   stocks: ZtPoolStock[]
-  /** 本槽这一刻该题材是否为「新主线崛起」→ 题材名用紫 + 🚀 */
+  /** 本槽这一刻该题材是否为「新主线崛起」→ 题材名用**大红** + 放大 + 🚀 */
   burst: boolean
   topBoard: number
   tags: Map<string, StockThemeTag>
@@ -274,8 +274,9 @@ function ThemeSlotGroup({
         {burst && <span className="text-[11px] flex-none">🚀</span>}
         <span
           className={cn(
-            'text-[12.5px] font-semibold break-all min-w-0',
-            burst ? 'text-rec' : 'text-txt',
+            'font-semibold break-all min-w-0',
+            // 爆发 = 大红 + 放大一号（用户 2026-10-18：「字体稍微大一点，突出这个题材牛逼」）
+            burst ? 'text-[13.5px] font-bold text-up' : 'text-[12.5px] text-txt',
           )}
         >
           {theme}
@@ -598,12 +599,13 @@ export function SlotBody({
           {marks.burst.length > 0 && (
             <div className="flex flex-col gap-0.5 min-w-0">
               <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-                {/* 题材爆发 = **紫色**（全站语义：紫=题材/机会）—— 与时间轴节点竖条同色，
-                    否则同一件事在轴上是紫的、在卡里是红的，读起来像两种信号。 */}
-                <span className="text-[10.5px] font-semibold text-rec flex-none">🚀 首爆</span>
+                {/* 题材爆发 = **大红**（2026-10-18 用户定调：与「题材轮动紫」分家）——
+                    原为紫色，与「轮动/回流」同色，看不出「新爆发」还是「又轮动一下」。
+                    轴上竖条已同步为红：首爆实心大红、后续续强半档红。 */}
+                <span className="text-[11.5px] font-bold text-up flex-none">🚀 首爆</span>
                 {bursts.map(({ key, item: b }) => (
                   <span key={key} className="flex items-baseline gap-1 flex-none">
-                    <span className="text-[11.5px] font-medium text-rec break-all">{b.theme}</span>
+                    <span className="text-[12px] font-semibold text-up break-all">{b.theme}</span>
                     {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
                     {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
                   </span>

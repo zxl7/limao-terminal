@@ -217,11 +217,23 @@ describe('/timeline 页 · 盘中默认跟随最新交易日', () => {
   /** 北京时间构造（本机时区无关）：BJ = UTC+8 */
   const bjAt = (h: number, mi: number) => new Date(Date.UTC(2026, 8, 21, h - 8, mi))
 
-  /** 真实 `zt_history` 里最新的一天 = 页面日期列表的第一项 */
-  function latestHistoryDate(): string {
+  /**
+   * 真实 `zt_history` 里、**且不晚于用例伪造的「今天」**的最新一天。
+   *
+   * ⚠️ 2026-10-18 修：旧实现直接取全局最新归档，而本用例把系统时间伪造成
+   *    2026-09-21 —— 于是「09-21 那天能看到的最近归档」与「10 月的真实最新归档」
+   *    必然不等，周末/换月跑必然红。默认日应取 **≤ 伪造今天** 的最新一份。
+   */
+  function latestHistoryDate(notAfter = '2026-09-21'): string {
     const def = (ROUTES as Record<string, RouteDefLike>)['/api/emotion/zt-history']
     const rows = readRoute(DATA_ROOT, def) as { file?: string }[]
-    const files = rows.map((r) => r.file ?? '').sort((a, b) => b.localeCompare(a))
+    const files = rows
+      .map((r) => r.file ?? '')
+      .filter((f) => {
+        const d = /zt_(\d{4}-\d{2}-\d{2})\.json/.exec(f)?.[1]
+        return !!d && d <= notAfter
+      })
+      .sort((a, b) => b.localeCompare(a))
     return /zt_(\d{4}-\d{2}-\d{2})\.json/.exec(files[0] ?? '')?.[1] ?? ''
   }
 

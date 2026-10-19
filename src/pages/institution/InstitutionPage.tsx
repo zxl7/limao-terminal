@@ -12,6 +12,7 @@ import {
   type ArchiveCard,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
+import { tradableStocks } from '@/shared/lib'
 
 /**
  * 机构投研 —— 数据源三类，视角完全不同：
@@ -159,11 +160,11 @@ export function Component() {
               {filteredGroups.map((g) => (
                 <div key={g.theme} className="border border-line rounded-sm px-2.5 py-2">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <Tag tone="up">{g.items.length} 家</Tag>
+                    <Tag tone="up">{tradableStocks(g.items).length} 家</Tag>
                     <span className="text-[13px] font-semibold text-txt">{g.theme}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {g.items.map((it) => (
+                    {tradableStocks(g.items).map((it) => (
                       <span
                         key={it.code}
                         className="badge border border-line text-sub"

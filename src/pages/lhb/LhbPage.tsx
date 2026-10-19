@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { HithinkLhbFile, LhbTencentFile } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n2 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, tradableStocks } from '@/shared/lib'
 
 /**
  * 龙虎榜 —— 数据源 `cache/lhb_*.json`（腾讯源）与 `cache/hithink_lhb_*.json`（同花顺源）。
@@ -73,9 +73,14 @@ export function Component() {
           <Card
             title="🏦 龙虎榜"
         extra={
-          <CardBadge tone={instNetSum >= 0 ? 'up' : 'down'}>
-            机构合计净买 {n2(instNetSum)} 亿
-          </CardBadge>
+          txLatest ? (
+            <CardBadge tone={instNetSum >= 0 ? 'up' : 'down'}>
+              机构合计净买 {instNetSum >= 0 ? '+' : ''}{n2(instNetSum)} 亿
+            </CardBadge>
+          ) : (
+            // ⛔ 无数据时不能显示「净买 0.00 亿」—— 那是把「不知道」说成「零」
+            <CardBadge tone="neutral">无当日榜单</CardBadge>
+          )
         }
       >
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
@@ -109,7 +114,7 @@ export function Component() {
       >
         {tab === 'inst' && (
           <DataTable
-            rows={txLatest?.institution ?? []}
+            rows={tradableStocks(txLatest?.institution)}
             // ⚠️ 同一只票可能因多个上榜原因重复出现（实测 688835 出现两次），仅用 code 会 key 冲突
             rowKey={(r, i) => `${r.code}-${i}`}
             empty="该日无机构上榜（或文件未生成）"
@@ -165,10 +170,10 @@ export function Component() {
                 label: '涉及个股',
                 className: 'whitespace-normal min-w-[280px]',
                 cell: (r) =>
-                  r.stocks.length ? (
+                  tradableStocks(r.stocks).length ? (
                     <span className="flex flex-wrap gap-1">
                       {/* ⚠️ stocks 是对象数组 {code, name}，不是字符串数组 */}
-                      {r.stocks.map((s) => (
+                      {tradableStocks(r.stocks).map((s) => (
                         <Tag key={s.code} title={s.code}>
                           <StockLink code={s.code}>{s.name || s.code}</StockLink>
                         </Tag>
@@ -259,7 +264,7 @@ export function Component() {
                       r.stocks?.length ? (
                         <span className="flex flex-wrap gap-1">
                           {/* ⚠️ stocks 是对象数组 {code, name} */}
-                          {r.stocks.map((s) => (
+                          {tradableStocks(r.stocks).map((s) => (
                             <Tag key={s.code} title={s.code}>
                               <StockLink code={s.code}>{s.name || s.code}</StockLink>
                             </Tag>

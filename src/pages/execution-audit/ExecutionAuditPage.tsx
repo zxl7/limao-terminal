@@ -4,6 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { ExecutionAudit } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, StockLink } from '@/shared/ui'
+import { bucketText, caliberText, staleLabel } from '@/shared/lib'
 
 /** 真实执行审计：候选预测、题材/连板研究与账户收益不在此页混算。 */
 export async function loader() {
@@ -36,7 +37,22 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title="🔎 真实执行审计" extra={<CardBadge tone="neutral">只读证据链</CardBadge>}>
+      <Card
+        title="🔎 真实执行审计"
+        extra={
+          <span className="flex items-center gap-1.5">
+            <CardBadge tone="neutral">只读证据链</CardBadge>
+            {data?.generated_at_bj && (
+              <span className="text-[11px] text-sub">生成 {data.generated_at_bj.slice(0, 16)}</span>
+            )}
+            {staleLabel(data?.generated_at_bj?.slice(0, 10), 2) && (
+              <span className="badge bg-warn-soft text-warn">
+                审计 {staleLabel(data?.generated_at_bj?.slice(0, 10), 2)}
+              </span>
+            )}
+          </span>
+        }
+      >
         <p className="text-sub text-[12px] leading-relaxed mb-3">
           主口径只统计“盘后冻结候选 → 9:25 竞价 → 实际入场 → 当日收盘”。候选命中、连板晋级与题材回流留在各自研究页，不会混入账户收益。
         </p>
@@ -64,8 +80,8 @@ export function Component() {
             { label: '推荐日', cell: (row) => row.recommendation_date },
             { label: '执行日', cell: (row) => row.trade_date },
             { label: '标的', cell: (row) => <StockLink code={row.code}>{row.name || row.code}</StockLink> },
-            { label: '候选池', cell: (row) => row.bucket },
-            { label: '裁决口径', cell: (row) => <Tag tone={row.caliber === 'ai' ? 'up' : 'warn'}>{row.caliber}</Tag> },
+            { label: '候选池', cell: (row) => bucketText(row.bucket) },
+            { label: '裁决口径', cell: (row) => <Tag tone={row.caliber === 'ai' ? 'up' : 'warn'}>{caliberText(row.caliber)}</Tag> },
             { label: '竞价至收盘', num: true, cell: (row) => row.gross_return_pct == null ? '—' : `${row.gross_return_pct >= 0 ? '+' : ''}${row.gross_return_pct.toFixed(2)}%` },
             { label: '证据完整性', cell: (row) => row.evidence },
           ]}

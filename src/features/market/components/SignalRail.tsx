@@ -3,7 +3,7 @@ import { cn, fmtPct, isStarMarket } from '@/shared/lib'
 import { pctTone } from '../model/labels'
 import { marketQueries } from '../api/queries'
 import type { ShortSpiritDeposit } from '@/shared/api'
-import { StockLink } from '@/shared/ui'
+import { StockLink, VirtualList, useViewportFill } from '@/shared/ui'
 
 /**
  * 信号 rail —— 盘中实时页最右侧的**固定窄列（占宽 10%）**。
@@ -47,6 +47,8 @@ function signalTypeStyle(type?: string): { text: string; dot: string } {
 
 export function SignalRail({ className }: { className?: string }) {
   const { data: sig, isPending, isError } = useQuery(marketQueries.signals())
+  /** 高度 = 视口剩余空间（实测 top），保证任何屏高/任何横幅组合下都不超屏 */
+  const [railRef, railH] = useViewportFill<HTMLElement>(10)
 
   // —— 短线精灵紧凑列表（与 SignalsCard 同口径）——
   const deposited = sig?.signals_today ?? []
@@ -57,7 +59,16 @@ export function SignalRail({ className }: { className?: string }) {
   const hasRows = isHistory || sig?.signals != null
 
   return (
-    <section className={cn('signal-rail flex flex-col gap-2 min-w-0', className)}>
+    <section
+      ref={railRef}
+      style={railH ? { height: railH } : undefined}
+      className={cn(
+        'signal-rail flex flex-col gap-2 min-w-0 min-h-0',
+        // 兜底：挂载首帧还没量到高度时，先给「视口 − 顶栏」上限，避免闪一下超长
+        railH ? 'overflow-hidden' : 'h-[var(--panel-max-h)]',
+        className,
+      )}
+    >
       {/* 栏头：色条 + 标题 + 延伸线 */}
       <div className="flex items-center gap-2 px-0.5 pt-0.5">
         <span className="w-[3px] h-3.5 rounded-[2px] bg-rec flex-none" aria-hidden />
@@ -80,14 +91,27 @@ export function SignalRail({ className }: { className?: string }) {
       </div>
       {isError && <p role="status" className="m-0 text-[11px] text-warn">{sig ? '信号更新失败，保留上次数据' : '信号加载失败'}</p>}
 
+      {/*
+        ⛔ 2026-10-18 用户硬要求：短线精灵**固定高度 + 内部滚动，不得超屏**。
+        行高必须与 `rowH` 完全一致（否则虚拟列表会出现空白缝隙）：
+          · 当日沉淀行含「首/末」两行 → 46px
+          · 实时行只有两行 → 34px
+        列表容器 `flex-1 min-h-0`：高度由上面的固定 section 决定，绝不反向撑高页面。
+      */}
       {visible.length > 0 ? (
-        <div className="flex flex-col max-h-[60vh] overflow-auto">
-          {visible.map((s) => {
+        <VirtualList
+          items={visible}
+          itemHeight={isHistory ? 46 : 34}
+          heightClass="flex-1 min-h-0"
+          className="-mx-0.5 pr-0.5"
+          empty={null}
+          render={(s) => {
             const st = signalTypeStyle(s.type)
             return (
               <div
                 key={s.code ?? s.name}
-                className="py-[4px] border-b border-line last:border-b-0 min-w-0"
+                style={{ height: isHistory ? 46 : 34 }}
+                className="py-[4px] border-b border-line last:border-b-0 min-w-0 overflow-hidden"
               >
                 <div className="flex items-baseline gap-1.5">
                   <StockLink code={s.code} className="text-[12px] font-semibold truncate min-w-0">{s.name ?? s.code}</StockLink>
@@ -116,8 +140,8 @@ export function SignalRail({ className }: { className?: string }) {
                 </div>
               </div>
             )
-          })}
-        </div>
+          }}
+        />
       ) : (
         <p className="text-[12px] text-sub px-0.5 py-1">{isPending ? '正在加载短线信号…' : isError ? '暂无法确认信号状态' : !hasRows ? '信号列表未提供' : '暂无短线信号'}</p>
       )}

@@ -5,7 +5,7 @@ import type { PromoDaily, PromoEvent, PromoSummaryRow } from '@/shared/api'
 import { analyticsQueries, SegTabs, n1, pct, tone } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, LineChart, StockLink, Zone, ZoneRow, maLine } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, stageText } from '@/shared/lib'
 
 /**
  * 连板晋级量化 —— 数据源 `cache/promo/`（`scripts/promo_quant.py` 产出）。
@@ -105,7 +105,7 @@ export function Component() {
       .map((e) => ({
         label: e.name,
         value: e.prem_close1,
-        sub: e.stage,
+        sub: stageText(e.stage),
         note: e.ok ? `晋级 ${e.prev_boards}→${e.boards}` : '断板',
         tone: e.ok ? undefined : ('sub' as const),
       }))
@@ -250,7 +250,7 @@ function SummaryView({
         </div>
         <BarList
           items={rows.map((r) => ({
-            label: r.stage,
+            label: stageText(r.stage),
             value: r.succ_rate,
             note: r.prem_close_avg == null ? '溢价 —' : `溢价 ${pct(r.prem_close_avg)}`,
             sub: `n=${r.n}`,
@@ -273,7 +273,7 @@ function SummaryView({
         </div>
         <BarChart
           bars={rows.map((r) => ({
-            label: r.stage,
+            label: stageText(r.stage),
             value: r.prem_close_avg,
             compare: r.fail_open_avg,
             compareLabel: '失败组开盘均值',
@@ -308,7 +308,7 @@ function SummaryView({
           <tbody>
             {rows.map((r) => (
               <tr key={r.stage} className="border-b border-line-faint">
-                <td className="py-1.5 px-2 whitespace-nowrap font-semibold text-txt">{r.stage}</td>
+                <td className="py-1.5 px-2 whitespace-nowrap font-semibold text-txt">{stageText(r.stage)}</td>
                 <td className="py-1.5 px-2 text-right num">{r.n}</td>
                 <td className="py-1.5 px-2 text-right num text-up">{r.ok}</td>
                 <td className="py-1.5 px-2 text-right num text-down">{r.fail}</td>
@@ -461,7 +461,7 @@ function DailyView({
                   <td className="py-1.5 px-2 whitespace-nowrap text-rec">
                   <StockLink code={e.code}>{e.name}</StockLink>
                   </td>
-                  <td className="py-1.5 px-2 whitespace-nowrap text-sub">{e.stage}</td>
+                  <td className="py-1.5 px-2 whitespace-nowrap text-sub">{stageText(e.stage)}</td>
                   <td className="py-1.5 px-2 text-right num">
                     {e.prev_boards}
                     <span className="text-sub mx-0.5">→</span>

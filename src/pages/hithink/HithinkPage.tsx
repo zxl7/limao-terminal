@@ -11,7 +11,7 @@ import type {
 } from '@/shared/api'
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, staleLabel } from '@/shared/lib'
 
 /**
  * 同花顺专业数据 —— 盘前/盘后**第二权威** + 数据质量证据。
@@ -255,7 +255,21 @@ export function Component() {
             )}
           </Card>
 
-          <Card title="估值" extra={<CardBadge>{valData ? `${valData.got} 只` : '—'}</CardBadge>}>
+          <Card
+            title="估值"
+            extra={
+              valData ? (
+                <span className="flex items-center gap-1.5">
+                  <CardBadge>{valData.date} · {valData.got} 只</CardBadge>
+                  {staleLabel(valData.date, 3) && (
+                    <span className="badge bg-warn-soft text-warn">{staleLabel(valData.date, 3)}</span>
+                  )}
+                </span>
+              ) : (
+                <CardBadge>—</CardBadge>
+              )
+            }
+          >
             {valData && Object.keys(valData.values ?? {}).length ? (
               <DataTable
                 rows={Object.entries(valData.values).map(([code, v]) => ({ code, ...v }))}

@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { BacktestMetricBlock, BacktestReport, PromoBacktest } from '@/shared/api'
 import { analyticsQueries, DataTable, SegTabs, StatPair, Tag, n1 } from '@/features/analytics'
 import { BarChart, Card, CardBadge, EmptyState, LineChart, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, backtestFieldText } from '@/shared/lib'
 
 /**
  * 推测回测 —— 数据源 `cache/backtest/backtest_*.json`（`scripts/backtest_engine.py` 产出）。
@@ -430,7 +430,9 @@ export function Component() {
  */
 function pickColumns(sample: Record<string, unknown>) {
   return Object.keys(sample).map((k) => ({
-    label: k,
+    // ⛔ 表头不得直接打印原始 key（`candidate_hit` / `range_hit` 这类英文内部字段名）。
+    // 未登记字段也不静默直出，而是标成「未登记字段(xxx)」，逼后续补进词表。
+    label: backtestFieldText(k),
     num: typeof sample[k] === 'number',
     className: typeof sample[k] === 'string' && String(sample[k]).length > 30 ? 'whitespace-normal min-w-[240px]' : undefined,
     cell: (r: Record<string, unknown>) => {

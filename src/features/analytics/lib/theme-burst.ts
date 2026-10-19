@@ -542,6 +542,34 @@ export function isLowStrengthSlot(s: {
 }
 
 /**
+ * 当日「首次爆发」判定（2026-10-18 用户：「低空经济首次爆发……跟紫色区分成大红」）。
+ *
+ * 输入按**时间顺序**排列的块（`{ key, burst }`），输出 `blockKey → 该块首次出现的题材名[]`。
+ *
+ * ⛔ 必须跨块累积：`summarizeBlock` 只回答「这一块有没有爆发」，同一题材一天爆发 3 次时
+ *    三次都返回 burst，单块看根本分不出「第一次」和「第三次」。
+ * ⛔ 纯函数、无副作用：时间轴（`TimelineSnake`）与未来的卡片流共用同一份判定，
+ *    避免两处各写一遍导致「轴上红色、浮层里还是紫色」。
+ */
+export function firstBurstByKey(
+  blocks: ReadonlyArray<{ key: string; burst: ReadonlyArray<{ theme: string }> }>,
+): Map<string, string[]> {
+  const seen = new Set<string>()
+  const out = new Map<string, string[]>()
+  for (const b of blocks) {
+    const fresh: string[] = []
+    for (const item of b.burst) {
+      if (!seen.has(item.theme)) {
+        seen.add(item.theme)
+        fresh.push(item.theme)
+      }
+    }
+    if (fresh.length > 0) out.set(b.key, fresh)
+  }
+  return out
+}
+
+/**
  * ⛔ 口径边界（**写在这里供维护者判断，⛔ 不要写到界面上**）
  *
  * 「题材爆发榜」的题材名与家数**来自原系统 `event_log`**（系统自己算好的结论），

@@ -4,6 +4,7 @@ import { queryClient } from '@/shared/api'
 import type { GeneHistory, GenePoolFile, GeneProfile, GeneSummary } from '@/shared/api'
 import { analyticsQueries, DataTable, n1, pct, rate, tone } from '@/features/analytics'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
+import { useMeasuredHeight, useVirtualRows } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 /**
@@ -82,6 +83,14 @@ export function Component() {
         r.profile.industry?.includes(k),
     )
   }, [rows, q])
+
+  /**
+   * 主表虚拟滚动（205 行 × 12 列 = 2460 个单元格，全量渲染会让这页的重排开销翻几倍）。
+   * 行高固定 32px（与本表 `py-1.5 + 12.5px` 实测一致）；表格内容全部 `whitespace-nowrap`，
+   * 不会换行 → 满足虚拟化的前提。
+   */
+  const [scrollRef, viewportH] = useMeasuredHeight<HTMLDivElement>()
+  const win = useVirtualRows({ count: filtered.length, rowHeight: 32, viewportHeight: viewportH })
 
   const withHist = rows.filter((r) => r.hist).length
 
@@ -245,7 +254,11 @@ export function Component() {
       )}
 
       {filtered.length > 0 && (
-        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
+        <div
+          ref={scrollRef}
+          onScroll={win.onScroll}
+          className="overflow-x-auto max-h-[var(--panel-max-h)] overflow-y-auto"
+        >
           <table className="w-full border-collapse text-[12.5px]">
             <thead className="sticky top-0 bg-card">
               <tr className="border-b border-line text-sub">
@@ -264,8 +277,14 @@ export function Component() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(({ profile: p, hist: h }) => (
-                <tr key={p.code} className="border-b border-line-faint">
+              {/* 上下占位：模拟未渲染行的高度（虚拟列表） */}
+              {win.padTop > 0 && (
+                <tr aria-hidden>
+                  <td colSpan={12} style={{ height: win.padTop, padding: 0, border: 0 }} />
+                </tr>
+              )}
+              {filtered.slice(win.start, win.end).map(({ profile: p, hist: h }) => (
+                <tr key={p.code} style={{ height: 32 }} className="border-b border-line-faint">
                   <td className="py-1.5 px-2 whitespace-nowrap text-rec">
                     <StockLink code={p.code}>{p.name}</StockLink>
                   </td>
@@ -292,6 +311,11 @@ export function Component() {
                   <td className="py-1.5 px-2 text-right num text-sub">{h?.max_boards_hist ?? '—'}</td>
                 </tr>
               ))}
+              {win.padBottom > 0 && (
+                <tr aria-hidden>
+                  <td colSpan={12} style={{ height: win.padBottom, padding: 0, border: 0 }} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -314,7 +338,7 @@ export function Component() {
             {!gs || gs.top.length === 0 ? (
               <EmptyState text="股性榜未落盘（scripts/zt_genes.py 未运行）" />
             ) : (
-              <div className="max-h-[480px] overflow-y-auto">
+              <div className="max-h-[var(--panel-max-h)] overflow-y-auto">
                 <DataTable
                   dense
                   rows={gs.top}
@@ -383,7 +407,7 @@ export function Component() {
             {!pool || pool.pool.length === 0 ? (
               <EmptyState text="涨停基因池未落盘（pool_<日期>.json 缺失）" />
             ) : (
-              <div className="max-h-[480px] overflow-y-auto">
+              <div className="max-h-[var(--panel-max-h)] overflow-y-auto">
                 <DataTable
                   dense
                   rows={pool.pool}

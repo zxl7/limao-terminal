@@ -4,7 +4,7 @@ import { queryClient } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarChart, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, tradableStocks } from '@/shared/lib'
 
 /** 环比 = 当日涨停数 − 昨日涨停数（⚠️ 不能用 `delta`，它是状态枚举） */
 /**
@@ -213,19 +213,7 @@ export function Component() {
       {expanded && (
         <Card
           title={`${expanded.name} · 题材详情`}
-          extra={
-            <div className="flex items-center gap-2">
-              {deltaTone(expanded.zt_count, expanded.zt_prev) === 'up' && (
-                <CardBadge tone="up">环比 {deltaText(expanded.zt_count, expanded.zt_prev)}</CardBadge>
-              )}
-              {deltaTone(expanded.zt_count, expanded.zt_prev) === 'down' && (
-                <CardBadge tone="down">环比 {deltaText(expanded.zt_count, expanded.zt_prev)}</CardBadge>
-              )}
-              {deltaTone(expanded.zt_count, expanded.zt_prev) === 'sub' && (
-                <CardBadge>环比持平（{expanded.zt_prev} 家）</CardBadge>
-              )}
-            </div>
-          }
+          extra={<DeltaBadge cur={expanded.zt_count} prev={expanded.zt_prev} />}
         >
           {/* 龙头逻辑为实时快照原文；题材催化已随左侧每张强度卡展示。 */}
           {expanded.leader?.desc && (
@@ -280,7 +268,7 @@ export function Component() {
             <div>
               <div className="text-[12px] text-sub mb-1">当日涨停股（{expanded.zt_stocks?.length ?? 0}）</div>
               <DataTable
-                rows={expanded.zt_stocks ?? []}
+                rows={tradableStocks(expanded.zt_stocks)}
                 rowKey={(r) => r.code}
                 dense
                 empty="无涨停股明细"
@@ -344,4 +332,17 @@ export function Component() {
       </ZoneRow>
     </div>
   )
+}
+
+/**
+ * 环比徽标 —— `prev == null` 时**不能**说「持平」（2026-10-18 修）。
+ *
+ * 旧实现把 `prev == null` 与 `cur - prev === 0` 都归到 `sub` 分支，
+ * 于是详情卡出现「环比持平（null 家）」—— 把「昨日没有这条线」说成了「家数没变」。
+ */
+function DeltaBadge({ cur, prev }: { cur: number | null | undefined; prev: number | null | undefined }) {
+  if (prev == null) return <CardBadge tone="neutral">昨日无此题材</CardBadge>
+  const tone = deltaTone(cur, prev)
+  if (tone === 'sub') return <CardBadge tone="neutral">环比持平（{prev} 家）</CardBadge>
+  return <CardBadge tone={tone}>环比 {deltaText(cur, prev)}</CardBadge>
 }

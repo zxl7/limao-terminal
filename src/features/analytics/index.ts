@@ -90,6 +90,7 @@ export {
   type ThemeEvent,
   type ThemeEventKind,
   type ThemeRisk,
+  firstBurstByKey,
 } from './lib/theme-burst'
 
 // 情绪周期温度总览（历史事实整理：周期、涨停反馈、资金温度）
@@ -145,6 +146,13 @@ export {
   SNAKE_PAD_X,
   SNAKE_PAD_Y,
   SNAKE_ROW_HEIGHT,
+  shapeBox,
+  SHAPE_ICON_SIZE,
+  SIGNAL_SHAPE,
+  SHAPE_LEGEND_ORDER,
+  type SignalKind,
+  type SignalShape,
+  type SignalShapeSpec,
   type SnakeLane,
   type SnakeLayout,
   type SnakePoint,
@@ -154,7 +162,7 @@ export {
 export { summarizeBlock, SUMMARY_CAP, type BlockSummary } from './lib/block-summary'
 
 // 蛇形时间轴（一条线横走→弯→反向 · hover 浮层 + 点击详情）
-export { TimelineSnake } from './components/TimelineSnake'
+export { ShapeLegend, TimelineSnake } from './components/TimelineSnake'
 
 // 单个时间轴分块的**完整详情**（右侧 hover 浮层 + 左栏详情列表共用同一实现·
 // 2026-09-22 起详情走**题材主轴**：题材 → 该题材当刻个股 → 该题材当日全部涨停成员）

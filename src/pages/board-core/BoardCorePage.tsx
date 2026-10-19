@@ -308,7 +308,7 @@ export function Component() {
                         {/* 行内细条：本表内部相对比较（与自身列的 max 归一），不跨表不可跨日 */}
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span
-                            className="hidden md:inline-block h-[3px] w-[52px] rounded-sm overflow-hidden align-middle"
+                            className="max-md:hidden md:inline-block h-[3px] w-[52px] rounded-sm overflow-hidden align-middle"
                             style={{ background: 'var(--color-line-faint)' }}
                           >
                             <span

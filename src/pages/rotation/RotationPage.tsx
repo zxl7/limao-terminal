@@ -5,7 +5,7 @@ import type { PoolStock, RotationCandidate, SectorFlowFull } from '@/shared/api'
 import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarList, Card, CardBadge, EmptyState, Icon, Sparkline, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn, capitalText, klineText, phaseText, ztDirText } from '@/shared/lib'
+import { cn, capitalText, klineText, phaseText, ztDirText, tradableStocks } from '@/shared/lib'
 
 /**
  * 题材轮动 —— 数据源 `cache/rotation.json`（`scripts/theme_rotation.py` 产出）。
@@ -630,7 +630,7 @@ function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
         {title}（{rows.length}）
       </div>
       <DataTable
-        rows={rows}
+        rows={tradableStocks(rows)}
         rowKey={(r) => r.code}
         dense
         empty="空"

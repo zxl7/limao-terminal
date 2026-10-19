@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/shared/lib'
+import { useViewportFill } from '@/shared/ui'
 import { BlockDetail } from './BlockDetail'
 import { timelineAnchorId, type TimelineBlock } from '../lib/timeline'
 import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
@@ -68,6 +69,15 @@ export function TimelineDetailList({
 }) {
   /** 倒序（`at` 降序）—— 见文件头注 */
   const ordered = [...blocks].sort((a, b) => b.at - a.at)
+  /**
+   * 面板高度 = 视口剩余空间（2026-10-18 用户：「现在的滚动把高度顶开了」）。
+   *
+   * ⛔ 之前视口容器只写了 `min-w-0`（没有高度上限）→ 内容有多高它就长多高，
+   *    整页被顶出屏幕，滚动条落在**页面**而不是这块面板上。
+   *    现在高度由 `useViewportFill` 实测 top 算出来（同 `SignalRail`），
+   *    面板内部滚动，页面不再被撑高。
+   */
+  const [sectionRef, sectionH] = useViewportFill<HTMLElement>(10)
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(FALLBACK_VIEWPORT_H)
@@ -125,7 +135,15 @@ export function TimelineDetailList({
   for (let i = winStart; i < winEnd; i++) rows.push({ i, top: offsets[i], block: ordered[i] })
 
   return (
-    <section className={cn('timeline-detail-list flex flex-col gap-1.5 min-w-0', className)}>
+    <section
+      ref={sectionRef}
+      style={sectionH ? { height: sectionH } : undefined}
+      className={cn(
+        'timeline-detail-list flex flex-col gap-1.5 min-w-0 min-h-0',
+        sectionH ? 'overflow-hidden' : 'max-h-[var(--panel-max-h)]',
+        className,
+      )}
+    >
       {/* 栏头：色条 + 标题 + 延伸线 + 节点数 */}
       <div className="flex items-center gap-2 px-0.5 pt-0.5">
         <span className="w-[3px] h-3.5 rounded-[2px] bg-rec flex-none" aria-hidden />
@@ -140,7 +158,7 @@ export function TimelineDetailList({
       <div
         ref={viewportRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
-        className="overflow-auto overscroll-contain max-h-[calc(100vh-190px)] min-w-0"
+        className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain"
       >
         {ordered.length === 0 ? (
           <div className="text-sub text-[11px] px-1.5 py-2">当日无可定位到分钟的记录</div>

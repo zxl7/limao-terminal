@@ -348,8 +348,8 @@ export function Component() {
                   />
                 </div>
 
-                <div className="max-h-[62vh] overflow-y-auto">
-                  <DataTable<FlowBoardRow>
+                <DataTable<FlowBoardRow>
+                    virtual
                     rows={activeDay?.rows ?? []}
                     rowKey={(r) => r.name}
                     dense
@@ -409,7 +409,6 @@ export function Component() {
                       },
                     ]}
                   />
-                </div>
                 <p className="text-sub text-[11px] mt-1.5">
                   「同花顺」「滚动 5/10 日」为可选字段 —— 早于该口径上线日期的归档没有，渲染为「—」而非 0。
                 </p>

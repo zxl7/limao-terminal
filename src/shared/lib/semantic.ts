@@ -106,3 +106,21 @@ export function isStarMarket(code: string | null | undefined): boolean {
 export function sortLadderDesc<T extends { boards: number }>(groups: T[]): T[] {
   return [...groups].sort((a, b) => b.boards - a.boards)
 }
+
+/**
+ * 可交易标的过滤 —— **所有个股清单渲染前必须过这一道**。
+ *
+ * 用户无科创板（688/689）权限，页面上出现这类票等于给了「看得见买不着」的错误信息。
+ * 实测 2026-10-16 的 `/api/decision/zt-pool` 含 `688592 司南导航`，
+ * `/api/lhb/tencent` 含 `688835` —— 上游并未统一剔除，所以过滤必须在消费端做一次。
+ *
+ * ⛔ 不要在每张表里各写一遍 `filter(r => !r.code.startsWith('688'))`：
+ *    · `startsWith('688')` 会误杀 `600688`（上海石化）以外的写法各写各的，
+ *    · `includes('688')` 更会误杀 `600688` / `000688`（详见 `isStarMarket` 注释）。
+ *    统一走本函数，口径只有一份。
+ */
+export function tradableStocks<T extends { code?: string | null }>(
+  rows: readonly T[] | null | undefined,
+): T[] {
+  return (rows ?? []).filter((r) => !isStarMarket(r.code))
+}

@@ -16,6 +16,11 @@ import {
   snakePos,
   SUMMARY_CAP,
   summarizeBlock,
+  shapeBox,
+  SIGNAL_SHAPE,
+  SHAPE_LEGEND_ORDER,
+  SNAKE_BAR_W,
+  SHAPE_ICON_SIZE,
 } from '@/features/analytics'
 import type { ZtPoolStock } from '@/shared/api'
 
@@ -522,5 +527,48 @@ describe('盘外 / 夹位记录的标注与堆叠', () => {
       expect(p.stack).toBe(0)
       expect(p.y).toBe(L.lanes[p.row].y)
     }
+  })
+})
+
+/**
+ * 形状编码（2026-10-18 用户：「不用全部用椭圆柱体，用三角形、圆形标示不同信号」）。
+ *
+ * 锁三件事：
+ *  ① 每种信号都有**唯一**形状（不能两个信号共用一个形状）；
+ *  ② 三角/菱形/圆近似等宽高（宽度随高度走，不会被拉成细条）；
+ *  ③ 普通事实仍是**窄条**（宽度 = SNAKE_BAR_W），不随高度变粗 —— 否则满屏粗条淹没信号。
+ */
+describe('shapeBox · 节点形状规格', () => {
+  it('每种信号形状唯一', () => {
+    const shapes = SHAPE_LEGEND_ORDER.map((k) => SIGNAL_SHAPE[k].shape)
+    expect(new Set(shapes).size).toBe(shapes.length)
+  })
+
+  it('图标（三角/菱形/圆/方块）等大：不随活跃度缩放', () => {
+    // 用户 2026-10-18：「三角符号还是一样大吧，不要忽大忽小……就不要控制 icon 的大小了」
+    for (const shape of ['triangle-up', 'triangle-down', 'diamond', 'circle', 'ring', 'square'] as const) {
+      const small = shapeBox(shape, 8)
+      const big = shapeBox(shape, 46)
+      expect(big.width, `${shape} 宽度应恒定`).toBe(small.width)
+      expect(big.height, `${shape} 高度应恒定`).toBe(small.height)
+      expect(big.height).toBeLessThanOrEqual(SHAPE_ICON_SIZE)
+    }
+    // 正/反三角必须同一尺寸（只有方向不同），否则「爆发」和「风险」看起来强弱不同
+    const up = shapeBox('triangle-up', 8)
+    const down = shapeBox('triangle-down', 46)
+    expect([up.width, up.height]).toEqual([down.width, down.height])
+  })
+
+  it('三角形给 clip-path，圆形给圆角，空心圆额外给描边宽度', () => {
+    expect(shapeBox('triangle-up', 20).clipPath).toContain('polygon')
+    expect(shapeBox('triangle-down', 20).clipPath).toContain('polygon(0 0')
+    expect(shapeBox('circle', 20).borderRadius).toBe(9999)
+    expect(shapeBox('ring', 20).borderWidth).toBe(1.5)
+    expect(shapeBox('ring', 20).clipPath).toBeUndefined()
+  })
+
+  it('普通事实保持窄条（宽度 = 基准宽，不随高度变粗）', () => {
+    expect(shapeBox('bar', 8).width).toBe(SNAKE_BAR_W)
+    expect(shapeBox('bar', 46).width).toBe(SNAKE_BAR_W)
   })
 })

@@ -140,6 +140,102 @@ export const KLINE_PLAIN: Readonly<Record<string, string>> = {
   no_data: '无K线数据',
 }
 
+/**
+ * 晋级档 `promotion.stage`。取值源：`cache/promo/promo_summary.json` 实测
+ * `1to2 / 2to3 / 3to4 / 4to5+`，另有字符串 `"None"`（无样本）。
+ */
+export const STAGE_PLAIN: Readonly<Record<string, string>> = {
+  '1to2': '1进2',
+  '2to3': '2进3',
+  '3to4': '3进4',
+  '4to5+': '4进5及以上',
+  None: '—',
+  null: '—',
+}
+
+/**
+ * 市场环境 `decision.regime`。取值源：`wealth_code/cache/candidates*.json` 实测 `ice`，
+ * 同族还有 ebb / repair / boom 与风险偏好三档。
+ */
+export const REGIME_PLAIN: Readonly<Record<string, string>> = {
+  ice: '冰点',
+  ebb: '退潮',
+  repair: '修复',
+  boom: '亢奋',
+  risk_on: '进攻',
+  neutral: '中性',
+  risk_off: '防守',
+  hibernate: '空仓',
+}
+
+/**
+ * 决策存档件角色 `manifest.role`。取值源：`cache/decision_log/<日期>/manifest.json` 实测
+ * `card / candidates / ai_view / zt_pool_data`。
+ */
+export const ROLE_PLAIN: Readonly<Record<string, string>> = {
+  card: '卡片原文',
+  candidates: '候选原件',
+  ai_view: 'AI 观点',
+  zt_pool_data: '涨停池',
+  auction: '竞价原件',
+  manifest: '清单',
+}
+
+/**
+ * 账户账本口径 `account_nav.caliber`。取值源：`wealth_code/cache/execution_audit.json` 实测
+ * `ai` 与空串（空 = 未标注，⛔ 不要回落成「机械」—— 那是把新口径误标成旧口径）。
+ */
+export const CALIBER_PLAIN: Readonly<Record<string, string>> = {
+  ai: 'AI 口径',
+  mechanical: '机械口径',
+  manual: '手工口径',
+}
+
+/** 名额归属 `execution_audit.bucket`。取值源：同上实测 `relay / watch` */
+export const BUCKET_PLAIN: Readonly<Record<string, string>> = {
+  relay: '接力位',
+  watch: '观察位',
+}
+
+/**
+ * 回测明细的动态列名 → 中文。⛔ 表头不得直接打印 `Object.keys()`。
+ * 取值源：`cache/backtest_report_*.json` 的 `metrics` / `summary` 实测字段。
+ */
+export const BACKTEST_FIELD_PLAIN: Readonly<Record<string, string>> = {
+  date: '日期',
+  settle_date: '结算日',
+  rec_date: '推荐日',
+  candidates: '候选数',
+  candidate_hit: '候选命中',
+  candidate_hit_rate: '候选命中率',
+  range_hit: '区间命中',
+  range_hit_rate: '区间命中率',
+  sentiment_gap: '情绪差',
+  sentiment: '情绪分',
+  nav: '净值',
+  return_pct: '收益率',
+  avg_return: '平均收益',
+  win_rate: '胜率',
+  samples: '样本数',
+  stage: '晋级档',
+  success_rate: '成功率',
+  promote_rate: '晋级率',
+  count: '数量',
+  skipped: '跳过',
+  reason: '说明',
+}
+
+export const stageText = makeMapper(STAGE_PLAIN)
+export const regimeText = makeMapper(REGIME_PLAIN)
+export const roleText = makeMapper(ROLE_PLAIN)
+export const caliberText = makeMapper(CALIBER_PLAIN)
+export const bucketText = makeMapper(BUCKET_PLAIN)
+
+/** 回测动态列名 → 中文；未登记字段保留原 key 但加「未知字段」标记，⛔ 不静默直出 */
+export function backtestFieldText(key: string): string {
+  return BACKTEST_FIELD_PLAIN[key] ?? `未登记字段(${key})`
+}
+
 export const capitalText = makeMapper(CAPITAL_PLAIN)
 export const phaseText = makeMapper(PHASE_PLAIN)
 export const ztDirText = makeMapper(ZT_DIR_PLAIN)

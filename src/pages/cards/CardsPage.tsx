@@ -10,7 +10,7 @@ import {
   type ArchiveCard,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, staleLabel } from '@/shared/lib'
 
 /**
  * 卡片原文存档 —— 决策过程的可追溯原件。
@@ -148,6 +148,11 @@ export function Component() {
                 </div>
                 <div className="text-[11px] text-sub mt-0.5 truncate">
                   {latest ? `最新 ${fileDate(latest.file)}` : '—'}
+                  {latest && staleLabel(fileDate(latest.file), 7) && (
+                    <span className="badge bg-warn-soft text-warn ml-1">
+                      {staleLabel(fileDate(latest.file), 7)}
+                    </span>
+                  )}
                 </div>
               </button>
             )

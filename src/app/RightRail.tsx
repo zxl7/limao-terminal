@@ -16,7 +16,7 @@ export function RightRail() {
 
   return (
     <aside
-      className="hidden 3xl:flex flex-col w-[var(--rail-width)] 4xl:w-[var(--rail-width-4xl)] flex-none border-l border-line bg-card overflow-y-auto"
+      className="max-3xl:hidden 3xl:flex flex-col w-[var(--rail-width)] 4xl:w-[var(--rail-width-4xl)] flex-none border-l border-line bg-card overflow-y-auto"
       aria-label="辅助信息"
     >
       <div className="flex-none h-[var(--header-height)] flex items-center px-3 border-b border-line bg-head-bg 3xl:bg-card">

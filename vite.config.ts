@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ROUTES, FILE_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from './src/shared/api/routes.ts'
+import { ROUTES, HEALTH_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from './src/shared/api/routes.ts'
 import { readRoute, healthPayload, resolveDataRoot } from './scripts/lib/read-route.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -39,7 +39,7 @@ function dataApiPlugin(): Plugin {
         const url = (req.url ?? '').split('?')[0]
 
         if (url === '/api/health') {
-          sendJson(res, 200, healthPayload(DATA_ROOT, FILE_ROUTES))
+          sendJson(res, 200, healthPayload(DATA_ROOT, HEALTH_ROUTES))
           return
         }
 

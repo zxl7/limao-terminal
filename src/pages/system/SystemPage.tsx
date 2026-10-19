@@ -19,7 +19,7 @@ import {
   parseTaskLedger,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, staleLabel } from '@/shared/lib'
 
 /**
  * 系统台账 —— 把这个量化系统**自身**的运行配置与状态摊开。
@@ -344,7 +344,7 @@ export function Component() {
           </Card>
         </Zone>
 
-        <Zone label="盘中引擎状态 · 60s 刷新" dot="bg-warn" className="xl:w-[44%]">
+        <Zone label="盘中引擎状态件（含历史留档）" dot="bg-warn" className="xl:w-[44%]">
           <Card
             title="⚙️ 盘中引擎状态"
             extra={<CardBadge>{engineFiles.length} 件</CardBadge>}
@@ -362,10 +362,17 @@ export function Component() {
                         <span className="num text-[12px] font-semibold text-txt">
                           {f.file.replace(/[.]json$/, '')}
                         </span>
-                        <span className="num text-[11px] text-sub">
-                          {typeof d.ts === 'number'
-                            ? new Date(d.ts * 1000).toLocaleString('zh-CN', { hour12: false })
-                            : d.date || '—'}
+                        <span className="flex items-center gap-1.5">
+                          <span className="num text-[11px] text-sub">
+                            {typeof d.ts === 'number'
+                              ? new Date(d.ts * 1000).toLocaleString('zh-CN', { hour12: false })
+                              : d.date || '—'}
+                          </span>
+                          {staleLabel(typeof d.date === 'string' ? d.date : null, 3) && (
+                            <span className="badge bg-warn-soft text-warn">
+                              {staleLabel(typeof d.date === 'string' ? d.date : null, 3)}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <div className="mt-1">

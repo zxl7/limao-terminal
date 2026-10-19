@@ -61,7 +61,26 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title="⚡ 盘中承接" extra={<CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>}>
+      {/*
+        ⚠️ 2026-10-18 修：`feedback_matrix.json` 在非交易日/盘前会写 `error`，
+        但 `generated_ts` 仍是**刚刚生成**的时间 —— 旧版直接显示 HH:MM:SS，
+        看起来像「盘中刚更新过」，实际四个指标全是空。现在按 error 分支显示原因。
+      */}
+      <Card
+        title="⚡ 盘中承接"
+        extra={
+          feedback.data?.error ? (
+            <CardBadge tone="neutral">非交易时段 · 未计算</CardBadge>
+          ) : (
+            <CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>
+          )
+        }
+      >
+        {feedback.data?.error && (
+          <p className="text-[11.5px] text-sub mb-1.5">
+            {feedback.data.msg || '反馈矩阵当前不计算（盘前或非交易日）'}
+          </p>
+        )}
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
           <StatPair label="晋级数" value={feedback.data?.promote_count ?? '—'} tone="up" />
           <StatPair label="连板晋级" value={feedback.data?.lb_promote_count ?? '—'} tone="up" />

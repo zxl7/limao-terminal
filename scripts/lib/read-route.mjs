@@ -168,13 +168,24 @@ export function healthPayload(dataRoot, fileRoutes) {
     data_root: dataRoot,
     ts: new Date().toISOString(),
     files: fileRoutes.map(([route, def]) => {
-      // 目录型路由：新鲜度取「目录内最新文件」的 mtime
+      // 目录型路由：新鲜度取「目录内**mtime 最新**文件」的 mtime。
+      // ⛔ 不能按文件名字典序取 at(-1)：历史日期命名不保证单调，会取到旧文件。
       const target = def.file ?? def.dir
       const abs = path.join(dataRoot, target)
       let probe = abs
       if (!def.file && def.dir) {
         const names = safeReaddir(abs) ?? []
-        if (names.length) probe = path.join(abs, names.sort().at(-1))
+        const candidates = names
+          .map((name) => {
+            try {
+              return { name, mtimeMs: fs.statSync(path.join(abs, name)).mtimeMs }
+            } catch {
+              return null
+            }
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.mtimeMs - b.mtimeMs)
+        if (candidates.length) probe = path.join(abs, candidates.at(-1).name)
       }
       try {
         const st = fs.statSync(probe)
@@ -182,6 +193,10 @@ export function healthPayload(dataRoot, fileRoutes) {
           route,
           file: target,
           desc: def.desc,
+          kind: def.file ? 'file' : 'dir',
+          cadence: def.cadence ?? 'daily',
+          retired: !!def.retired,
+          asof: asofOf(probe),
           exists: true,
           mtime: st.mtime.toISOString(),
           age_sec: Math.round((now - st.mtimeMs) / 1000),
@@ -189,10 +204,37 @@ export function healthPayload(dataRoot, fileRoutes) {
         }
       } catch {
         // 文件未生成是**可预期状态**（盘前），不是异常
-        return { route, file: target, desc: def.desc, exists: false, mtime: null, age_sec: null, size: 0 }
+        return {
+          route, file: target, desc: def.desc,
+          kind: def.file ? 'file' : 'dir',
+          cadence: def.cadence ?? 'daily',
+          retired: !!def.retired,
+          asof: null,
+          exists: false, mtime: null, age_sec: null, size: 0,
+        }
       }
     }),
   }
+}
+
+/**
+ * 业务日期探测：从文件内容头部取 `date/asof/generated_ts/ts`，取不到再退回文件名里的日期。
+ * 只读前 8KB —— 健康检查不能把 800KB 的决策文件整个读进内存。
+ */
+function asofOf(probe) {
+  try {
+    const fd = fs.openSync(probe, 'r')
+    const buf = Buffer.alloc(8192)
+    const n = fs.readSync(fd, buf, 0, 8192, 0)
+    fs.closeSync(fd)
+    const head = buf.subarray(0, n).toString('utf8')
+    const m = /"(?:date|asof|as_of|generated_ts|generated_at|updated_at|ts)"\s*:\s*"(\d{4}-\d{2}-\d{2})/.exec(head)
+    if (m) return m[1]
+  } catch {
+    /* 读不到就走文件名兜底 */
+  }
+  const fname = /(\d{4})-?(\d{2})-?(\d{2})/.exec(path.basename(probe))
+  return fname ? `${fname[1]}-${fname[2]}-${fname[3]}` : null
 }
 
 /**

@@ -27,6 +27,7 @@ import {
   TimelineLinkageCard,
   TimelineMergedCard,
   TimelineSlotCard,
+  ShapeLegend,
   TimelineSnake,
   type SectorNode,
   type StockThemeTag,
@@ -475,7 +476,7 @@ export function Component() {
       </Card>
 
       {/* 🚀 题材爆发 —— 2026-09-20 用户定调：**这张独立大卡已删除**。
-          题材信息一律挂到时间轴节点上：轴内节点标题材名（紫）+ hover 明细展开
+          题材信息一律挂到时间轴节点上：轴内节点标题材名（首爆=大红加粗 / 续强=红半档 / 轮动=紫）+ hover 明细展开
           「催化原文 / 当日涨停成员 / 观测时刻」（数据经 `themeInfo` 注入）。
           ⛔ 不要在页面里重新长出一张题材清单卡。 */}
 
@@ -520,14 +521,18 @@ export function Component() {
             }
           >
             {view === 'snake' ? (
-              <TimelineSnake
+              <>
+                {/* 图例：形状=性质、高度=活跃度（2026-10-18 用户要求「顶部解释每个图形」） */}
+                <ShapeLegend className="mb-2.5" />
+                <TimelineSnake
                 blocks={blocks}
                 topBoard={topBoard}
                 tags={themeTags}
                 reasonByCode={reasonByCode}
                 themeInfo={themeInfo}
                 focusKey={activeKey}
-              />
+                />
+              </>
             ) : (
               <>
                 {/* 🃏 卡片流：左→右铺开、满了自动换行（⛔ 不用 grid —— 会拉成等高留空白）

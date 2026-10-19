@@ -14,7 +14,7 @@ import {
   pct,
 } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, roleText, tradableStocks } from '@/shared/lib'
 
 /**
  * 决策存档（黑匣子）—— 数据源 `cache/decision_log/<日期>/` + `wealth_code/cache/candidates-<日期>.json`。
@@ -109,6 +109,8 @@ export function Component() {
     () => [...(pool?.zt_list ?? [])].sort((a, b) => b.boards - a.boards || (a.fbt || '').localeCompare(b.fbt || '')),
     [pool],
   )
+  /** 涨停池里的科创板（688/689）家数 —— 用户无权限，展示时剔除但把数量说清楚 */
+  const starCount = useMemo(() => ztList.length - tradableStocks(ztList).length, [ztList])
 
   const gaps = m?.gaps ?? []
 
@@ -179,7 +181,7 @@ export function Component() {
             dense
             empty="无来源清单"
             columns={[
-              { label: '角色', cell: (s) => <Tag tone="up">{s.role || '—'}</Tag> },
+              { label: '角色', cell: (s) => <Tag tone="up">{roleText(s.role)}</Tag> },
               { label: '源路径', cell: (s) => <span className="num text-[11.5px]">{s.src || '—'}</span> },
               { label: '存档路径', cell: (s) => <span className="num text-[11.5px] text-sub">{s.dst || '—'}</span> },
               {
@@ -270,12 +272,15 @@ export function Component() {
               <StatPair label="最高板" value={pool?.max_boards ?? '—'} />
               <StatPair label="天梯层数" value={pool?.ladder ? Object.keys(pool.ladder).length : '—'} />
               <StatPair label="明细条数" value={ztList.length} tone={ztList.length ? 'up' : 'sub'} />
+              {starCount > 0 && (
+                <StatPair label="已剔除科创" value={`${starCount} 只`} tone="sub" />
+              )}
             </div>
 
             {ztList.length > 0 ? (
-              <div className="max-h-[62vh] overflow-y-auto">
                 <DataTable
-                  rows={ztList}
+                  virtual
+                  rows={tradableStocks(ztList)}
                   rowKey={(s) => s.code}
                   dense
                   empty="无明细"
@@ -309,7 +314,6 @@ export function Component() {
                     },
                   ]}
                 />
-              </div>
             ) : (
               <EmptyState
                 text="决策时点涨停池无全量明细"

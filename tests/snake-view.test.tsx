@@ -10,6 +10,7 @@ import {
   SNAKE_MIN_GAP,
   SNAKE_MIN_ROWS,
   SNAKE_NODE_W,
+  ShapeLegend,
   TimelineSnake,
   type ThemeBurst,
   type TimelineBlock,
@@ -363,10 +364,13 @@ describe('TimelineSnake · 盘外与夹位记录', () => {
  * 故节点 = 细竖条（高度编码活跃度、颜色编码性质），文字交给 hover。
  */
 describe('TimelineSnake · 节点标记形态', () => {
+  /**
+   * 节点标记（竖条/三角/圆…）。
+   * ⛔ 2026-10-18 起不能再按「宽度 = SNAKE_BAR_W」筛 —— 形状化后三角/圆的宽度随高度变化，
+   *    用宽度选择器会漏掉一半节点（表现为「bars 数量对不上」，而不是形状断言失败）。
+   */
   const barsOf = (c: HTMLElement) =>
-    Array.from(c.querySelectorAll('span')).filter(
-      (s) => (s as HTMLElement).style.width === `${SNAKE_BAR_W}px`,
-    ) as HTMLElement[]
+    Array.from(c.querySelectorAll('span[data-node-kind]')) as HTMLElement[]
 
   it('① 节点命中区宽 = SNAKE_NODE_W（26px），不是卡片宽度', () => {
     const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} />)
@@ -388,17 +392,18 @@ describe('TimelineSnake · 节点标记形态', () => {
     expect(Number.parseFloat(b.style.width)).toBeLessThanOrEqual(gap)
   })
 
-  it('② 竖条高度编码活跃度：活跃的更高，且封顶 SNAKE_BAR_MAX_H', () => {
-    const busy = normalBlock(10 * 60, slot(10 * 60, { sectors: [sec('电力', 9), sec('半导体', 8)] }))
+  it('② 只有细竖线编码活跃度（图标等大，不随活跃度缩放）', () => {
+    const busy = normalBlock(
+      10 * 60,
+      slot(10 * 60, { singles: [mk('a', '100000', '甲'), mk('b', '100001', '乙'), mk('c', '100002', '丙')] }),
+    )
     const quiet = normalBlock(14 * 60, slot(14 * 60, { singles: [mk('x', '140000', '黄酒')] }))
     const { container } = render(<TimelineSnake blocks={[busy, quiet]} {...props} width={W} {...instant} />)
-    const hOf = (clock: string) => {
-      const bar = nodeAt(container, clock).querySelector(
-        `span[style*="width: ${SNAKE_BAR_W}px"]`,
-      ) as HTMLElement
+    const barH = (clock: string) => {
+      const bar = nodeAt(container, clock).querySelector('[data-node-shape="bar"]') as HTMLElement
       return Number.parseFloat(bar.style.height)
     }
-    expect(hOf('10:00')).toBeGreaterThan(hOf('14:00'))
+    expect(barH('10:00')).toBeGreaterThan(barH('14:00'))
     for (const b of barsOf(container)) {
       const h = Number.parseFloat(b.style.height)
       expect(h).toBeGreaterThanOrEqual(8)
@@ -503,15 +508,20 @@ describe('TimelineSnake · 悬停明细必须全量（不折叠）', () => {
  *
  *   ① 「将题材爆发的时间节点，按照**板块和时间节点**添加到时间轴上」→ 轴上直接标板块名；
  *   ② 「hover 详情…**板块、个股、催化**都可以显示」→ 详情里展开催化 / 成员 / 观测时刻；
- *   ③ 「这种题材爆发的节点，可以标**紫色**显示」→ 竖条 `bg-rec`（原来是红 `bg-up/70`）。
+ *   ③ 「这种题材爆发的节点，可以标**紫色**显示」→ 2026-10-18 **用户改口**：
+ *      「低空经济首次爆发……跟紫色区分，变**大红色**……后面继续走强也保持红色，字体大一点」
+ *      ⇒ 首爆 = 实心大红 `bg-up` + 竖条加宽；同题材再次爆发 = 续强 `bg-up/80`；轮动仍是紫。
  *
  * ⛔ 为什么必须钉住：颜色错了、名字漏了、催化没渲染，**页面都照常工作、不报错** ——
  * 典型的静默退化，只有渲染断言能发现。
  */
-describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含催化）', () => {
-  /** 竖条（宽度 = SNAKE_BAR_W 的那个 span） */
+describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详情含催化）', () => {
+  /**
+   * 竖条 —— 按 `data-node-kind` 定位（⛔ 不再按宽度找：首爆竖条比常态宽 3px，
+   * 用固定宽度选择器会在改造后直接选不到，表现为「test 崩了而不是断言失败」）。
+   */
   const barAt = (c: HTMLElement, clock: string) =>
-    nodeAt(c, clock).querySelector(`span[style*="width: ${SNAKE_BAR_W}px"]`) as HTMLElement
+    nodeAt(c, clock).querySelector('span[data-node-kind]') as HTMLElement
 
   const themeInfo = new Map<string, ThemeBurst>([
     [
@@ -549,13 +559,20 @@ describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含�
    */
   const burstBlock = () => normalBlock(11 * 60, slot(11 * 60, { events: [RISE] }))
 
-  it('① 题材爆发节点竖条为**紫色**（紫=题材），且不泛化到普通节点', () => {
+  it('① 题材**首爆**竖条为实心大红（与「轮动紫」分家），且不泛化到普通节点', () => {
     const { container } = render(<TimelineSnake blocks={[burstBlock()]} {...props} {...instant} width={W} />)
     const burstBar = barAt(container, '11:00')
-    expect(burstBar.className, '题材爆发节点应为紫色').toContain('bg-rec')
-    expect(burstBar.className, '⛔ 不得再退化成红色 bg-up/70').not.toContain('bg-up')
+    expect(burstBar.className, '题材首爆应为大红').toContain('bg-up')
+    expect(burstBar.className, '⛔ 不得再用紫色（紫=轮动/回流）').not.toContain('bg-rec')
+    expect(burstBar.className, '首爆是实心红，不是续强那档半透明').not.toContain('bg-up/80')
+    // 轴上标签：带「首爆·」，且文字放大（用户「字体稍微大一点，突出这个题材牛逼」）
+    const node = nodeAt(container, '11:00')
+    expect(node.textContent).toContain('首爆·光通信')
+    const tag = node.querySelector('[data-burst="first"]') as HTMLElement
+    expect(tag, '首爆标签应带 data-burst=first（供样式与测试定位）').toBeTruthy()
+    expect(tag.className).toContain('text-[11.5px]')
 
-    // 反例：普通节点仍是灰 —— 紫色是题材专用色，不能处处紫
+    // 反例：普通节点仍是灰 —— 红色是爆发专用色，不能处处红
     const { container: c2 } = render(
       <TimelineSnake
         blocks={[normalBlock(14 * 60, slot(14 * 60, { singles: [mk('z', '140000', '黄酒')] }))]}
@@ -565,6 +582,25 @@ describe('TimelineSnake · 题材爆发节点（紫色 + 板块名 + 详情含�
       />,
     )
     expect(barAt(c2, '14:00').className).toContain('bg-sub')
+  })
+
+  it('② 同一题材再次爆发 = 续强（仍是红，弱半档，文案「续强·」）', () => {
+    const { container } = render(
+      <TimelineSnake
+        blocks={[
+          normalBlock(11 * 60, slot(11 * 60, { events: [RISE] })),
+          normalBlock(13 * 60, slot(13 * 60, { events: [{ ...RISE, time: '13:00' }] })),
+        ]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    expect(barAt(container, '11:00').className, '首爆：实心大红').toContain('bg-up')
+    expect(barAt(container, '13:00').className, '续强：红但弱半档').toContain('bg-up/80')
+    expect(nodeAt(container, '13:00').textContent, '第二次爆发应写「续强」而不是「首爆」').toContain(
+      '续强·光通信',
+    )
   })
 
   it('② 同一分钟既有题材爆发又有杀跌板块 → **风险优先**（绿），这是刻意的优先级', () => {
@@ -673,5 +709,74 @@ describe('TimelineSnake · 外部聚焦（左栏节点列表点击联动 · 2026
     expect(dialogOf(container)?.getAttribute('aria-label')).toContain('10:00')
     fireEvent.mouseEnter(nodeAt(container, '11:00'))
     expect(dialogOf(container)?.getAttribute('aria-label')).toContain('11:00')
+  })
+})
+
+/**
+ * 形状编码渲染（2026-10-18 用户：「用三角形、圆形标示不同信号，顶部加图例」）。
+ *
+ * ⛔ 为什么必须锁形状：形状全错时页面照常渲染、不报错，只有截图或断言能发现；
+ *    而形状恰恰是用户区分「爆发 / 风险 / 轮动」的第一编码（颜色是第二编码）。
+ */
+describe('TimelineSnake · 形状编码与图例', () => {
+  /** 本块自带最小夹具：上一个 describe 里的 RISE/burstBlock 是块级常量，这里取不到 */
+  const RISE = {
+    time: '11:00',
+    event: '新主线崛起：光通信 涨停7只，龙头 华脉科技',
+    severity: 'high',
+    topic: '光通信',
+  }
+  const burstBlock = () => normalBlock(11 * 60, slot(11 * 60, { events: [RISE] }))
+
+  const shapeOf = (c: HTMLElement, clock: string) =>
+    nodeAt(c, clock).querySelector('span[data-node-shape]') as HTMLElement
+
+  it('题材爆发 = 向上三角；普通事实 = 细竖线', () => {
+    const { container } = render(
+      <TimelineSnake blocks={[burstBlock()]} {...props} {...instant} width={W} />,
+    )
+    const burst = shapeOf(container, '11:00')
+    expect(burst.getAttribute('data-node-shape')).toBe('triangle-up')
+    expect(burst.style.clipPath).toContain('polygon(50% 0')
+
+    const { container: c2 } = render(
+      <TimelineSnake
+        blocks={[normalBlock(14 * 60, slot(14 * 60, { singles: [mk('z', '140000', '黄酒')] }))]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    const plain = shapeOf(c2, '14:00')
+    expect(plain.getAttribute('data-node-shape')).toBe('bar')
+    expect(plain.style.width).toBe(`${SNAKE_BAR_W}px`)
+  })
+
+  it('风险节点 = 向下三角（与爆发同为三角但方向相反，色盲也能分辨）', () => {
+    const mixed = normalBlock(
+      11 * 60,
+      slot(11 * 60, { events: [RISE], intradayDown: [ie('sector_down', '白银', { pct: -6.49 })] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[mixed]} {...props} {...instant} width={W} />)
+    const risk = shapeOf(container, '11:00')
+    expect(risk.getAttribute('data-node-shape')).toBe('triangle-down')
+    expect(risk.style.clipPath).toContain('polygon(0 0')
+  })
+
+  it('图例把 7 种形状全部解释清楚（每个都有名字）', () => {
+    const { container } = render(<ShapeLegend />)
+    const items = Array.from(container.querySelectorAll('[data-legend-kind]'))
+    expect(items).toHaveLength(7)
+    expect(items.map((el) => el.textContent?.trim())).toEqual([
+      '首爆',
+      '风险',
+      '联动',
+      '走强',
+      '轮动',
+      '记录',
+      '事实',
+    ])
+    // 每个图例项都带解释（title），不是只有个图形
+    for (const el of items) expect(el.getAttribute('title')).toBeTruthy()
   })
 })

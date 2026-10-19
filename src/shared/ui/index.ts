@@ -15,3 +15,4 @@ export * from './charts'
 /** 图标集（零依赖内联 SVG） */
 export { Icon, type IconName } from './Icon'
 export { StockLink, xueqiuStockUrl } from './StockLink'
+export { VirtualList, useMeasuredHeight, useViewportFill, useVirtualRows, windowRange } from './VirtualList'

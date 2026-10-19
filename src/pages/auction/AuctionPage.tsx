@@ -4,7 +4,7 @@ import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, RelaySha
 import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, fmtPct, regimeText, tradableStocks } from '@/shared/lib'
 
 /**
  * 竞价 · 候选 · 决策档案 —— 财富密码链的**当日原件**。
@@ -112,7 +112,7 @@ export function Component() {
         extra={
           <span className="flex items-center gap-2">
             <CardBadge tone={d?.regime === 'risk_on' ? 'up' : d?.regime === 'ice' ? 'down' : 'neutral'}>
-              {d?.regime ?? '—'}
+              {regimeText(d?.regime)}
             </CardBadge>
             <span className="text-[11px] text-sub">
               {d?.date ?? '—'} · {d?.generated_at_bj ?? '—'}
@@ -180,7 +180,7 @@ export function Component() {
           >
             {d?.relay?.length ? (
               <DataTable
-                rows={relayRows}
+                rows={tradableStocks(relayRows)}
                 rowKey={(r) => r.code}
                 dense
                 empty="无接力标的"
@@ -253,8 +253,13 @@ export function Component() {
                       <div className="text-[12.5px] mt-0.5">
                         <span className="text-sub">关注 </span>
                         <StockLink code={e.buy.code} className="text-rec font-medium">{e.buy.name}</StockLink>
-                        <span className="num text-[12px] text-up ml-1.5">
-                          +{num(e.buy.pct)}%
+                        <span
+                          className={cn(
+                            'num text-[12px] ml-1.5',
+                            e.buy.pct > 0 ? 'text-up' : e.buy.pct < 0 ? 'text-down' : 'text-sub',
+                          )}
+                        >
+                          {fmtPct(e.buy.pct)}
                         </span>
                         {e.buy.is_20cm && <span className="badge bg-rec-soft text-rec ml-1">20cm</span>}
                       </div>
@@ -284,7 +289,7 @@ export function Component() {
           >
             {cf?.candidates?.length ? (
               <DataTable
-                rows={cf.candidates}
+                rows={tradableStocks(cf.candidates)}
                 rowKey={(r) => r.code}
                 dense
                 empty="无候选"
@@ -370,7 +375,7 @@ export function Component() {
           >
             {d?.watch?.length ? (
               <DataTable
-                rows={watchRows}
+                rows={tradableStocks(watchRows)}
                 rowKey={(r) => r.code}
                 dense
                 empty="无观察标的"

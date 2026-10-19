@@ -13,6 +13,103 @@ export const SNAKE_MIN_GAP = 22
 export const SNAKE_NODE_W = 26
 export const SNAKE_BAR_W = 10
 export const SNAKE_BAR_MAX_H = 46
+/**
+ * 节点**形状**语义（2026-10-18 用户定调）。
+ *
+ * 原实现所有节点都是同一根 10 × 高 的**椭圆柱体**（`rounded-full`），只用颜色区分性质 ——
+ * 用户原话：「不用全部用椭圆柱体，可以用一些三角形、圆形等来标示不同的信号」。
+ *
+ * 形状比颜色更抗干扰：色盲、强光屏、缩放后色相都会失真，但「三角朝上 / 朝下」不会看错。
+ * 故这里把**形状当第一编码、颜色当第二编码**：
+ *
+ * | 形状 | 信号 | 含义 |
+ * |---|---|---|
+ * | ▲ 上三角 | 首爆 / 续强 | 资金一次性打进来（最强信号） |
+ * | ▼ 下三角 | 风险 / 杀跌 | 炸板、负反馈、板块杀跌 |
+ * | ◆ 菱形   | 多板块联动 | 同刻多条线共振 |
+ * | ● 实心圆 | 盘中走强 | 有走强，但未构成爆发 |
+ * | ○ 空心圆 | 题材轮动 | 旧线回流 / 龙头切换，**不是**新爆发 |
+ * | ■ 方块   | 系统记录 | 低频系统观测合并 |
+ * | │ 细竖线 | 普通事实 | 单个封板 / 推送点 |
+ *
+ * ⛔ 尺寸仍表示**活跃度**（高度），形状只表示**性质** —— 两者正交，不要互相替代。
+ */
+export type SignalKind = 'linkage' | 'risk' | 'burst' | 'rotation' | 'up' | 'system' | 'normal'
+
+export type SignalShape = 'triangle-up' | 'triangle-down' | 'diamond' | 'circle' | 'ring' | 'square' | 'bar'
+
+/**
+ * 图标边长（2026-10-18 用户：「三角符号还是一样大吧，不要忽大忽小……就不要控制 icon 的大小了」）。
+ *
+ * ⛔ 形状图标**尺寸恒定**，不再随活跃度缩放：同一根轴上出现 9px 和 20px 两种三角，
+ *    看起来像两种不同的信号，实际只是活跃度不同 —— 这是纯噪声。
+ *    活跃度改由**细竖线（普通事实）的高度**表达，其它形状只表达「是什么」。
+ */
+export const SHAPE_ICON_SIZE = 14
+
+export interface SignalShapeSpec {
+  shape: SignalShape
+  /** 图例上的名字（≤4 字） */
+  label: string
+  /** 悬停解释 */
+  desc: string
+}
+
+export const SIGNAL_SHAPE: Record<SignalKind, SignalShapeSpec> = {
+  burst: { shape: 'triangle-up', label: '首爆', desc: '题材首次爆发或续强：大红三角朝上' },
+  risk: { shape: 'triangle-down', label: '风险', desc: '炸板 / 负反馈 / 板块杀跌：绿色倒三角' },
+  linkage: { shape: 'diamond', label: '联动', desc: '同刻多个板块共振：菱形' },
+  up: { shape: 'circle', label: '走强', desc: '板块或个股走强，但未构成爆发：实心圆' },
+  rotation: { shape: 'ring', label: '轮动', desc: '旧题材回流或龙头切换，不是新爆发：紫色空心圆' },
+  system: { shape: 'square', label: '记录', desc: '低频系统观测合并：灰色小方块' },
+  normal: { shape: 'bar', label: '事实', desc: '单个封板 / 推送事实点：灰色细竖线' },
+}
+
+/** 图例顺序 = 重要度降序（用户要求「时间轴顶部给每个图形做解释」） */
+export const SHAPE_LEGEND_ORDER: readonly SignalKind[] = [
+  'burst',
+  'risk',
+  'linkage',
+  'up',
+  'rotation',
+  'system',
+  'normal',
+] as const
+
+/**
+ * 形状 → 盒子尺寸 + CSS 形状声明（纯函数，便于单测）。
+ *
+ * `height` 仍由活跃度决定；这里只负责「这个高度下，三角形的底边应该多宽」——
+ * 三角/菱形/圆必须是**近似等宽高**才不失真，而细竖线（普通事实）保持窄条，
+ * 否则满屏粗条会把真正的信号淹没。
+ */
+export function shapeBox(
+  shape: SignalShape,
+  height: number,
+  baseWidth = SNAKE_BAR_W,
+): { width: number; height: number; clipPath?: string; borderRadius?: number; borderWidth?: number } {
+  // 细竖线（普通事实）保留活跃度编码：它是「线」，高度本身就是信息。
+  if (shape === 'bar') {
+    return { width: baseWidth, height: Math.max(6, Math.round(height)), borderRadius: 9999 }
+  }
+  // 其余是「图标」：尺寸恒定，只表示性质，不表示强度（见 SHAPE_ICON_SIZE 注释）。
+  const S = SHAPE_ICON_SIZE
+  switch (shape) {
+    case 'triangle-up':
+      return { width: S, height: S, clipPath: 'polygon(50% 0, 100% 100%, 0 100%)' }
+    case 'triangle-down':
+      return { width: S, height: S, clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }
+    case 'diamond':
+      return { width: S - 2, height: S, clipPath: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' }
+    case 'circle':
+      return { width: S - 2, height: S - 2, borderRadius: 9999 }
+    case 'ring':
+      return { width: S - 3, height: S - 3, borderRadius: 9999, borderWidth: 1.5 }
+    case 'square':
+      return { width: S - 5, height: S - 5, borderRadius: 2 }
+  }
+}
+
 /** 版式固定为四根时间轴，不再随节点密度改变行数。 */
 export const SNAKE_MIN_ROWS = 4
 export const SNAKE_MAX_ROWS = 4

@@ -84,7 +84,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className="hidden lg:flex flex-col w-[220px] flex-none text-head-txt border-r border-white/10 select-none"
+      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none text-head-txt border-r border-white/10 select-none"
       style={{ background: 'linear-gradient(180deg, #1c2130, #232c41)' }}
       aria-label="主导航"
     >
@@ -136,13 +136,26 @@ export function Sidebar() {
                         'flex items-center gap-2 px-2.5 py-[7px] rounded-md text-[13px] no-underline transition-colors',
                         isActive
                           ? 'bg-white/10 text-white shadow-[inset_2px_0_0_var(--color-up)]'
-                          : t.priority
-                            ? 'bg-white/[0.07] text-white font-medium shadow-[inset_2px_0_0_var(--color-head-up)] hover:bg-white/10'
-                            : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
+                          : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
                       )
                     }
                   >
                     <span className="truncate">{t.label}</span>
+                    {/*
+                      重点入口标记（2026-10-18 用户改：**不要整行加底色**，改成右侧一颗五角星）。
+                      原来的做法是 `bg-white/[0.07]` + 左侧红条，多条重点同时高亮时侧栏出现
+                      一片深浅不一的色块，反而看不出重点；一颗星既不抢版式又一眼可辨。
+                      ⛔ 星标只做「标识」，不改变点击行为与 `data-priority`（导航测试与埋点依赖它）。
+                    */}
+                    {t.priority && (
+                      <span
+                        className="ml-auto flex-none text-[11px] leading-none text-head-up"
+                        aria-label="重点盯盘"
+                        title="重点盯盘"
+                      >
+                        ★
+                      </span>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -166,7 +179,7 @@ export function TopNavFallback() {
 
   return (
     <nav
-      className="lg:hidden flex items-stretch gap-1 px-3 pt-2 bg-bg flex-none overflow-x-auto border-b border-line"
+      className="max-lg:flex lg:hidden items-stretch gap-1 px-3 pt-2 bg-bg flex-none overflow-x-auto border-b border-line"
       aria-label="顶部导航"
     >
       {TABS.map((t, i) => {

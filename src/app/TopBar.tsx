@@ -57,7 +57,7 @@ export function TopBar() {
       style={{ background: 'linear-gradient(90deg, #1c2130, #283049)' }}
     >
       {/* 品牌 —— 仅窄屏显示（≥lg 时品牌在左侧栏，避免重复） */}
-      <div className="lg:hidden flex items-center gap-2 font-bold text-[15px] tracking-[0.02em]">
+      <div className="max-lg:flex lg:hidden items-center gap-2 font-bold text-[15px] tracking-[0.02em]">
         <span
           className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white text-[13px] font-extrabold"
           style={{ background: 'linear-gradient(135deg, #ee2500, #ff7a3d)' }}
@@ -118,21 +118,21 @@ export function TopBar() {
           value={maxBoards ?? DASH}
           unit="板"
           tone={headFromTone('up')}
-          className="hidden 2xl:flex"
+          className="max-2xl:hidden 2xl:flex"
         />
         <HeadKpi
           label="上涨家数"
           value={breadth.up ?? DASH}
           unit="家"
           tone={headFromTone('up')}
-          className="hidden 2xl:flex"
+          className="max-2xl:hidden 2xl:flex"
         />
         <HeadKpi
           label="成交额"
           value={data?.market != null ? data.market.toFixed(0) : DASH}
           unit="亿"
           tone="text-head-txt"
-          className="hidden 2xl:flex"
+          className="max-2xl:hidden 2xl:flex"
         />
       </div>
 

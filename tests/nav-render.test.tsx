@@ -105,11 +105,29 @@ describe('AppShell 导航渲染', () => {
     expect(actual).toEqual(realtimeTo)
   })
 
-  it('交易优先入口在未激活时仍保持高亮', () => {
+  it('交易优先入口用**右侧五角星**标记（2026-10-18 用户改：不再整行加底色）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    const labels = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[data-priority="true"]')).map((a) => a.textContent?.trim())
-    expect(labels).toEqual(['盘中实时', '主线题材', '情绪周期', 'AI竞价', 'AI尾盘潜伏'])
+    const priority = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[data-priority="true"]'))
+    // 名称集合不变（去掉星标后对比），顺序即优先级
+    expect(priority.map((a) => a.textContent?.replace('★', '').trim())).toEqual([
+      '盘中实时',
+      '主线题材',
+      '情绪周期',
+      'AI竞价',
+      'AI尾盘潜伏',
+    ])
+    // 每个重点入口都必须带星标
+    for (const a of priority) {
+      expect(a.textContent, `${a.getAttribute('href')} 缺星标`).toContain('★')
+    }
+    // ⛔ 非重点入口不得出现星标（否则「重点」这个语义就失效了）
+    const others = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a:not([data-priority="true"])'))
+    expect(others.some((a) => (a.textContent ?? '').includes('★'))).toBe(false)
+    // ⛔ 也不得再靠整行底色强调（底色只表示「当前页」）
+    for (const a of priority) {
+      expect(a.className).not.toContain('bg-white/[0.07]')
+    }
   })
 
   it('顶部导航的数据子 Tab 默认收起，点击“数据”后展开', () => {

@@ -7,12 +7,76 @@ import { summarizeBlock, type BlockSummary } from '../lib/block-summary'
 import { minToClock, SLOT_VISIBLE_SECTORS, type TimelineBlock } from '../lib/timeline'
 import {
   layoutSnake,
+  shapeBox,
+  SHAPE_LEGEND_ORDER,
+  SIGNAL_SHAPE,
   snakePos,
   SNAKE_BAR_MAX_H,
   SNAKE_BAR_W,
   SNAKE_NODE_W,
+  type SignalKind,
 } from '../lib/snake'
-import type { StockThemeTag, ThemeBurst } from '../lib/theme-burst'
+import { firstBurstByKey, type StockThemeTag, type ThemeBurst } from '../lib/theme-burst'
+
+/**
+ * 图例：轴上每种图形代表什么（2026-10-18 用户要求「时间轴顶部给每个图形做解释」）。
+ *
+ * ⛔ 图例与节点渲染**共用** `SIGNAL_SHAPE` + `shapeBox` —— 各写一套的话，
+ * 改形状时必然出现「图例是三角、轴上是圆」的静默漂移。
+ */
+const LEGEND_TONE: Record<SignalKind, string> = {
+  burst: 'bg-up',
+  risk: 'bg-down',
+  linkage: 'bg-up',
+  up: 'bg-up/70',
+  rotation: 'border border-rec bg-transparent',
+  system: 'bg-line-strong',
+  normal: 'bg-sub',
+}
+
+const LEGEND_SIZE = 15
+
+export function ShapeLegend({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-sm border border-line-faint bg-line-faint/40 px-2.5 py-1.5',
+        className,
+      )}
+      aria-label="时间轴图形说明"
+    >
+      <span className="text-[10.5px] font-semibold tracking-[0.1em] text-sub">图形说明</span>
+      {SHAPE_LEGEND_ORDER.map((kind) => {
+        const spec = SIGNAL_SHAPE[kind]
+        const box = shapeBox(spec.shape, LEGEND_SIZE)
+        return (
+          <span
+            key={kind}
+            className="flex items-center gap-1 text-[11px] text-sub"
+            title={spec.desc}
+            data-legend-kind={kind}
+          >
+            <span className="flex h-[16px] w-[16px] flex-none items-center justify-center">
+              <span
+                className={cn('inline-block', LEGEND_TONE[kind])}
+                style={{
+                  width: box.width,
+                  height: box.height,
+                  clipPath: box.clipPath,
+                  borderRadius: box.borderRadius,
+                  borderWidth: box.borderWidth,
+                  borderStyle: box.borderWidth ? 'solid' : undefined,
+                }}
+              />
+            </span>
+            {spec.label}
+          </span>
+        )
+      })}
+      <span className="text-[10.5px] text-sub">图标等大 · 竖线高度 = 活跃度</span>
+    </div>
+  )
+}
 
 /**
  * **蛇形时间轴**（boustrophedon）—— 固定四段从 09:25 横走、经半圆弯道反向连接。
@@ -66,24 +130,38 @@ const AI_TRADER_QUOTES = [
 ] as const
 
 /**
- * 竖条颜色 = 该刻**性质**（与 A 股语义一致：涨红 / 跌绿 / **题材紫** / 普通灰）。
+ * 竖条颜色 = 该刻**性质**（涨红 / 跌绿 / 题材紫 / 普通灰）。
  * ⛔ 与卡片流的判断顺序同源（联动 > 杀跌 > 题材 > 合并 > 普通），免得同一时刻两种视图颜色不一致。
  *
- * ⚠️ 2026-09-20 修：题材爆发原为 `bg-up/70`（**红**）—— 与「紫=题材」的全站语义相悖，
- *    也与本函数注释自述不符（用户抓包「这种题材爆发的节点，可以标紫色显示」）。
- *    现统一为 `bg-rec`（紫），并同步卡片题材区的 🚀 首爆 标签色。
+ * ## ⚡ 2026-10-18 用户定调：题材爆发改「大红」，与题材紫分家
+ *
+ * 原实现把「题材新爆发」也画成 `bg-rec`（紫），与「轮动/回流」同色，用户看不出
+ * 「这条线是今天第一次炸」还是「只是又轮动了一下」——原话：
+ * 「低空经济首次爆发……可以跟这个紫色再做一个区分，变为大红色……后面继续走强也保持红色，
+ *   字体稍微大一点，突出这个题材牛逼」。
+ *
+ * 现规则（两档，都红）：
+ *   · **首爆**（该题材当日第一次爆发）→ 实心大红 `bg-up` + 竖条加宽 3px + 标签加粗放大，文案带「首爆」；
+ *   · **续爆**（同一题材后续再爆发/走强）→ `bg-up/80`（仍是红，弱半档），文案带「续强」；
+ *   · **轮动/回流** 保持紫色空心 —— 紫色从此只表示「不是新爆发」。
  */
-function barVisual(s: BlockSummary, block: TimelineBlock): {
-  kind: 'linkage' | 'risk' | 'burst' | 'rotation' | 'up' | 'system' | 'normal'
+function barVisual(s: BlockSummary, block: TimelineBlock, firstBurst = false): {
+  kind: SignalKind
   className: string
   width: number
   title: string
 } {
   // 颜色表示方向与题材，宽度/空心表示事件类型；不能只靠色相区分。
-  if (block.kind === 'linkage') return { kind: 'linkage', className: 'bg-up ring-1 ring-up', width: 14, title: '多板块联动' }
+  // 联动 = 菱形（原 `ring-1` 在裁剪成菱形后会变成一圈怪边，故只用实心底色）
+  if (block.kind === 'linkage') return { kind: 'linkage', className: 'bg-up', width: 14, title: '多板块联动' }
   if (s.fade.length > 0 || s.downSectorCount > 0 || s.otherDownCount > 0) return { kind: 'risk', className: 'bg-down', width: SNAKE_BAR_W, title: '风险或负反馈' }
-  if (s.burst.length > 0) return { kind: 'burst', className: 'bg-rec', width: SNAKE_BAR_W, title: '题材新爆发' }
-  if (s.rotated.length > 0) return { kind: 'rotation', className: 'border border-rec bg-card', width: SNAKE_BAR_W, title: '题材轮动或回流' }
+  if (s.burst.length > 0) {
+    return firstBurst
+      ? { kind: 'burst', className: 'bg-up', width: SNAKE_BAR_W + 3, title: '题材首次爆发' }
+      : { kind: 'burst', className: 'bg-up/80', width: SNAKE_BAR_W, title: '题材继续走强' }
+  }
+  // 轮动 = 空心圆（描边紫，内部透明 → 一眼区分「不是新爆发」）
+  if (s.rotated.length > 0) return { kind: 'rotation', className: 'border border-rec bg-transparent', width: SNAKE_BAR_W, title: '题材轮动或回流' }
   if (s.upSectorCount > 0 || s.otherUpCount > 0) return { kind: 'up', className: 'bg-up/70', width: SNAKE_BAR_W, title: '盘中走强' }
   if (block.kind === 'merged') return { kind: 'system', className: 'bg-line-strong', width: SNAKE_BAR_W, title: '低频系统记录' }
   return { kind: 'normal', className: 'bg-sub', width: SNAKE_BAR_W, title: '盘中事实' }
@@ -317,6 +395,18 @@ export function TimelineSnake({
       )
   }, [blocks, layout])
 
+  /**
+   * 首爆判定（2026-10-18 用户要求）：按**时间顺序**扫一遍，题材名第一次出现在
+   * `burst` 里的那个节点 = 首爆；之后再爆发 = 续强。
+   *
+   * ⛔ 必须跨节点累积，不能只看单节点 —— `summarizeBlock` 只回答「这一块有没有爆发」，
+   *    同一个题材一天爆发 3 次时它三次都返回 burst，无法区分「第一次」。
+   */
+  const firstBursts = useMemo(
+    () => firstBurstByKey(nodes.map((n) => ({ key: n.block.key, burst: n.summary.burst }))),
+    [nodes],
+  )
+
   const openNode = nodes.find((n) => n.block.key === openKey) ?? null
 
   /**
@@ -446,7 +536,11 @@ export function TimelineSnake({
         {/* ── 节点（小标记：细竖条，高度编码活跃度；明细走 hover）── */}
         {nodes.map(({ block, point, summary }) => {
           const isOpen = block.key === openKey
-          const visual = barVisual(summary, block)
+          const firstBurstThemes = firstBursts.get(block.key)
+          const isFirstBurst = !!firstBurstThemes?.length
+          const visual = barVisual(summary, block, isFirstBurst)
+          const shape = SIGNAL_SHAPE[visual.kind].shape
+          const box = shapeBox(shape, barHeight(summary), visual.width)
           const hitWidth = hitWidthByKey.get(block.key) ?? SNAKE_NODE_W
           const outsideTag =
             point.outside === 'post' ? '（盘后）' : point.outside === 'pre' ? '（盘前）' : ''
@@ -456,21 +550,29 @@ export function TimelineSnake({
            *   · 仅龙头轮动 → `题材名`（淡紫 = 弱一档，⛔ 不带 🚀）
            * 多题材只列第一个 + `+N` 防叠字；完整名单在 hover 明细里。
            */
+          /**
+           * 轴上题材名（用户 2026-10-18：首爆要「大红 + 字号大一点」突出）：
+           *   首爆 → `首爆·低空经济`（大红加粗 11.5px）
+           *   续强 → `续强·低空经济`（红 11px，弱半档）
+           *   轮动 → `题材名`（紫 9.5px，保持原样）
+           */
+          const burstLead = isFirstBurst ? firstBurstThemes![0] : summary.burst[0]?.theme
+          const extraBurst = summary.burst.length > 1 ? `+${summary.burst.length - 1}` : ''
           const themeTag =
-            summary.burst.length > 0
+            summary.burst.length > 0 && burstLead
               ? {
-                  strong: true,
-                  text: `🚀${summary.burst[0].theme}${summary.burst.length > 1 ? `+${summary.burst.length - 1}` : ''}`,
+                  kind: (isFirstBurst ? 'first' : 'follow') as 'first' | 'follow',
+                  text: `${isFirstBurst ? '首爆' : '续强'}·${burstLead}${extraBurst}`,
                 }
               : summary.rotated.length > 0
                 ? {
-                    strong: false,
+                    kind: 'rotation' as const,
                     text: `${summary.rotated[0].theme}${summary.rotated.length > 1 ? `+${summary.rotated.length - 1}` : ''}`,
                   }
                 : summary.upSectors.length > 0
-                  ? { strong: false, text: `${summary.upSectors[0].name}走强` }
+                  ? { kind: 'plain' as const, text: `${summary.upSectors[0].name}走强` }
                   : summary.downSectors.length > 0
-                    ? { strong: false, text: `${summary.downSectors[0].name}走弱` }
+                    ? { kind: 'plain' as const, text: `${summary.downSectors[0].name}走弱` }
                     : null
           return (
             <button
@@ -511,14 +613,28 @@ export function TimelineSnake({
                 />
               )}
               {/* 竖条：高度 = 活跃度，颜色 = 性质 */}
+              {/*
+                形状 = 信号性质（2026-10-18 用户：不再全部用椭圆柱体）：
+                ▲首爆 ▼风险 ◆联动 ●走强 ○轮动 ■记录 │普通。
+                图标**等大**（不随活跃度缩放，2026-10-18 用户：「不要忽大忽小」）；
+                活跃度只由细竖线的高度表达 —— 见 `lib/snake.ts` 的 SHAPE_ICON_SIZE。
+              */}
               <span
                 className={cn(
-                  'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none',
+                  'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
                   visual.className,
                   isOpen && 'ring-2 ring-line-strong',
                 )}
-                style={{ width: visual.width, height: barHeight(summary) }}
+                style={{
+                  width: box.width,
+                  height: box.height,
+                  clipPath: box.clipPath,
+                  borderRadius: box.borderRadius,
+                  borderWidth: box.borderWidth,
+                  borderStyle: box.borderWidth ? 'solid' : undefined,
+                }}
                 data-node-kind={visual.kind}
+                data-node-shape={shape}
                 title={visual.title}
               />
               {/* 时刻标签：只给显著节点 / 盘外记录，且同层不挤才显示 */}
@@ -529,7 +645,16 @@ export function TimelineSnake({
                     <span className="text-warn">{point.outside === 'post' ? '盘后' : '盘前'}</span>
                   )}
                   {themeTag && (
-                    <span className={cn('ml-1', themeTag.strong ? 'text-rec' : 'text-rec/60')}>
+                    <span
+                      className={cn(
+                        'ml-1',
+                        themeTag.kind === 'first' && 'text-[11.5px] font-bold text-up',
+                        themeTag.kind === 'follow' && 'text-[11px] font-semibold text-up/90',
+                        themeTag.kind === 'rotation' && 'text-rec',
+                        themeTag.kind === 'plain' && 'text-rec/60',
+                      )}
+                      data-burst={themeTag.kind === 'first' ? 'first' : themeTag.kind === 'follow' ? 'follow' : undefined}
+                    >
                       {themeTag.text}
                     </span>
                   )}
