@@ -23,7 +23,6 @@ import {
   SegTabs,
   SHAPE_META,
   StatPair,
-  TimelineDetailList,
   TimelineLinkageCard,
   TimelineMergedCard,
   TimelineSlotCard,
@@ -91,12 +90,15 @@ export function Component() {
   const hzQ = useQuery(analyticsQueries.hithinkZt())
   /** 📡 盘中情绪时间轴（当日逐事件 · 双向 · 实时轮询） */
   const itQ = useQuery(analyticsQueries.intradayTimeline())
+  /** ⚡ 短线精灵（消息面 · `signals_today` 带 first_seen，落进时间轴的下区） */
+  const sigQ = useQuery(analyticsQueries.signals())
   const [dayFile, setDayFile] = useState('')
   /**
-   * 左栏「时间轴」节点组件当前选中的节点（2026-09-22 用户定：左节点列表 / 右蛇形时间线）。
-   * 点击左栏节点 → 右侧蛇形轴上对应节点**弹出明细**（`focusKey` 透传给 `TimelineSnake`）。
+   * ⛔ 2026-10-20 用户：「取消左侧的节点详情纵向列表，保证让时间轴显示完整」。
+   *    左栏（`TimelineDetailList`）已移除 —— 它固定吃掉 15% 宽度，行高加到 196 之后
+   *    时间轴横向明显不够用（标签挤、折线压缩）。轴的交互本来就是 hover 出明细，
+   *    左栏那份「同源详情」属于重复呈现，删掉不损失信息。
    */
-  const [activeKey, setActiveKey] = useState('')
   /**
    * 右侧时间轴排版：`snake` = 蛇形折线（默认 · 一条线横走→弯→反向）；`cards` = 卡片流。
    * ⛔ 两视图共用同一批分块与排序内核，切视图不改结论。
@@ -300,13 +302,51 @@ export function Component() {
   )
 
   /**
+   * 短线精灵信号 → 时间轴事件（2026-10-20 用户：「消息面呢？这边是否介入快讯
+   * 【短线精灵 + 终端！！】」）。
+   *
+   * - 只取 `signals_today`（当日沉淀，带 `first_seen`）—— ⛔ 不用 `signals`（本轮触发，
+   *   没有首次时刻，反复触发会把同一条信号重复投到多个分钟上）。
+   * - 只取与选中日期同一天：历史日不串线。
+   * - kind 用 `signal_new`：时间轴按「非下跌即上涨」归入上区，但 `summarizeBlock`
+   *   会把它**从 `otherUpCount` 里单列**，⛔ 不能让它把节点染成「个股走强」红圆。
+   */
+  const signalEvents = useMemo<IntradayTimelineEvent[]>(() => {
+    const s = sigQ.data
+    if (!s?.date || !day?.date || s.date !== day.date) return []
+    return (s.signals_today ?? [])
+      .filter((r) => r.name && r.first_seen)
+      .map((r) => {
+        const hhmmss = String(r.first_seen).length === 5 ? `${r.first_seen}:00` : String(r.first_seen)
+        return {
+          at: `${s.date} ${hhmmss}`,
+          kind: 'signal_new',
+          name: r.name,
+          code: r.code,
+          sector: r.sector ?? null,
+          pct: r.pct ?? null,
+          strength: r.strength ?? null,
+          type: r.type ?? null,
+          tags: r.tags ?? [],
+        } as unknown as IntradayTimelineEvent
+      })
+  }, [sigQ.data, day])
+
+  /** 时间轴本体的事件流 = 盘中逐事件 + 短线精灵（按时刻升序，槽位生成不依赖顺序但仍排序） */
+  const timelineEvents = useMemo(
+    () =>
+      [...itEvents, ...signalEvents].sort((a, b) => String(a.at).localeCompare(String(b.at))),
+    [itEvents, signalEvents],
+  )
+
+  /**
    * 展示投影：把「整个行业全天」的聚类**重投到分钟槽**——
    * 每只票按自己的首封分钟落点，纠正「后封的票被提前到最早时刻」的串线。
    * 不改 `buildTimeline` 的任何业务口径。
    */
   const slots: TimelineSlot[] = useMemo(
-    () => buildTimelineSlots(nodes, itEvents),
-    [nodes, itEvents],
+    () => buildTimelineSlots(nodes, timelineEvents),
+    [nodes, timelineEvents],
   )
 
   /**
@@ -405,7 +445,6 @@ export function Component() {
     .reduce<number | null>((m, v) => (m == null || v < m ? v : m), null)
 
   /** 点击左栏节点：置为选中 —— 透传给 `TimelineSnake` 的 `focusKey` → 右侧轴上对应节点弹明细。 */
-  const pickNode = (key: string) => setActiveKey(key)
 
   return (
     <div className="flex flex-col gap-3">
@@ -480,28 +519,10 @@ export function Component() {
           「催化原文 / 当日涨停成员 / 观测时刻」（数据经 `themeInfo` 注入）。
           ⛔ 不要在页面里重新长出一张题材清单卡。 */}
 
-      {/* ── 主体：**左＝节点完整详情（15%·虚拟列表） / 右＝完整蛇形时间线**（2026-09-22 用户定稿）
-          · 左（15%）：`TimelineDetailList` —— **每个节点一条完整详情**（倒序 · 虚拟列表窗口化渲染 ·
-            自身滚动 · sticky）；内容与右侧 hover 浮层**同源**（都走 `BlockDetail`，全量不截断）；
-          · 右（其余）：**完整「时间轴」卡**（🐍 蛇形轴默认 / 🃏 卡片流可切）+ 行业级集群 + 无时间坐标；
-          · 点击左栏条目 → `activeKey` 透传 `TimelineSnake` 的 `focusKey` → 右侧轴上对应节点**弹出明细**。
-          ⛔ 左栏是「详情」，⛔ 不是时间轴导航、也不是卡片墙。── */}
-      <div className="flex gap-3 items-start max-xl:flex-col">
-        {/* ── 左 15%：**每个节点的完整详情**（虚拟列表 · 倒序 · 点击联动右侧轴）── */}
-        <div className="xl:w-[15%] xl:flex-none xl:sticky xl:top-3 max-xl:w-full min-w-0">
-          <TimelineDetailList
-            blocks={blocks}
-            topBoard={topBoard}
-            tags={themeTags}
-            reasonByCode={reasonByCode}
-            themeInfo={themeInfo}
-            activeKey={activeKey}
-            onPick={pickNode}
-          />
-        </div>
-
-        {/* ── 右：完整蛇形时间线 + 行业集群 + 无时间坐标 ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
+      {/* ── 主体：**整条蛇形时间线通栏**（2026-10-20 用户：取消左侧节点详情，让轴显示完整）
+          ⛔ 不要再把左栏加回来：15% 的固定宽度在行高 196（上下各三层标签）之后会直接
+             压缩横向容量，密集日整条轴都会挤成一团。── */}
+      <div className="flex flex-col gap-3 min-w-0">
           <Card
             title="时间轴"
             extra={
@@ -530,7 +551,6 @@ export function Component() {
                 tags={themeTags}
                 reasonByCode={reasonByCode}
                 themeInfo={themeInfo}
-                focusKey={activeKey}
                 />
               </>
             ) : (
@@ -626,7 +646,6 @@ export function Component() {
               </div>
             </Card>
           )}
-        </div>
       </div>
     </div>
   )

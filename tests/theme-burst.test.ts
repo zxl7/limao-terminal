@@ -395,3 +395,34 @@ describe('firstBurstByKey · 当日首爆只算第一次', () => {
     expect(map.size).toBe(0)
   })
 })
+
+/**
+ * 时间戳合法性（2026-10-20 实测踩坑）。
+ *
+ * 10-16 的 `market_memory.event_log` 里有 4 条 `time: "00:18"` 的「新主线崛起」
+ * （大消费 / PCB板 / 医药 / 短剧·互动影游）—— 盘后补写导致时间退化成午夜。
+ * 若照单全收，前端会把它们定位到 00:18 → 被布局夹到开盘前最左端，
+ * 左边缘堆 4 个「首爆」，看起来像「首爆时间全错」。
+ *
+ * ⛔ 题材崛起最早只可能发生在集合竞价（09:15）之后，08:30 之前一律判无效。
+ */
+describe('parseThemeEvents · 无效时间戳过滤', () => {
+  it('00:18 这类午夜假时间被丢弃，真实盘中时间保留', () => {
+    const events = [
+      { time: '00:18', event: '新主线崛起：大消费 涨停6只，龙头 阳光乳业', severity: 'high', topic: '大消费' },
+      { time: '00:18', event: '新主线崛起：PCB板 涨停5只，龙头 崇达技术', severity: 'high', topic: 'PCB板' },
+      { time: '09:50', event: '新主线崛起：国产芯片 涨停5只，龙头 东方嘉盛', severity: 'high', topic: '国产芯片' },
+    ] as MarketMemory['event_log']
+
+    const out = parseThemeEvents(events)
+    expect(out).toHaveLength(1)
+    expect(out[0].theme).toBe('国产芯片')
+    expect(out[0].at).toBe(9 * 60 + 50)
+  })
+
+  it('边界：08:29 丢弃、08:30 保留（阈值是 < 08:30，不是 ≤）', () => {
+    const mk = (time: string) => ({ time, event: '新主线崛起：测试 涨停3只，龙头 X', severity: 'high', topic: '测试' })
+    expect(parseThemeEvents([mk('08:29')] as MarketMemory['event_log'])).toHaveLength(0)
+    expect(parseThemeEvents([mk('08:30')] as MarketMemory['event_log'])).toHaveLength(1)
+  })
+})

@@ -308,7 +308,11 @@ describe('常量面', () => {
   it('导出常量齐备且自洽', () => {
     expect(SEAM_AXIS).toBe(125)
     expect(SESSION_TOTAL_MIN).toBe(245)
-    expect(SNAKE_ROW_HEIGHT).toBe(128)
+    /**
+     * ⛔ 196 = 6 排标签（上三层 + 下三层）的硬需求 180 + 呼吸 16。
+     *    改小会让第 2 层标签顶到上一行的图标上（页面不报错，只是看着乱）。
+     */
+    expect(SNAKE_ROW_HEIGHT).toBe(196)
   })
 })
 
@@ -428,7 +432,12 @@ describe('summarizeBlock · 摘要不撒谎', () => {
     expect(s.downSectorCount).toBe(2)
     // 非板块事件单列，⛔ 不混进板块计数
     expect(s.otherUpCount).toBe(1)
-    expect(s.otherDownCount).toBe(1)
+    /**
+     * ⛔ 2026-10-20：炸板从 `otherDownCount` 里**拆出去**（`brokenCount` 单独计）。
+     *    混在一起时「个股走弱」的绿叉总会先命中，黄环永远出不来 —— 降权等于删除。
+     */
+    expect(s.otherDownCount).toBe(0)
+    expect(s.brokenCount).toBe(1)
   })
 
   it('题材标记：跨槽合并去重、题材家数取最大、各自截断', () => {
@@ -531,12 +540,14 @@ describe('盘外 / 夹位记录的标注与堆叠', () => {
 })
 
 /**
- * 形状编码（2026-10-18 用户：「不用全部用椭圆柱体，用三角形、圆形标示不同信号」）。
+ * 形状编码（2026-10-18 用户：「不用全部用椭圆柱体，用三角形、圆形标示不同信号」；
+ * 2026-10-20 用户：「首爆和风险换一个 icon，这个红绿三角不好看」→ 星/叉）。
  *
- * 锁三件事：
+ * 锁四件事：
  *  ① 每种信号都有**唯一**形状（不能两个信号共用一个形状）；
- *  ② 三角/菱形/圆近似等宽高（宽度随高度走，不会被拉成细条）；
- *  ③ 普通事实仍是**窄条**（宽度 = SNAKE_BAR_W），不随高度变粗 —— 否则满屏粗条淹没信号。
+ *  ② 图标等大（不随活跃度缩放）；
+ *  ③ 尖角形状走 SVG（`glyph`），几何形状走 CSS（`clipPath` / `borderRadius`）；
+ *  ④ 普通事实仍是**窄条**（宽度 = SNAKE_BAR_W），不随高度变粗 —— 否则满屏粗条淹没信号。
  */
 describe('shapeBox · 节点形状规格', () => {
   it('每种信号形状唯一', () => {
@@ -544,24 +555,39 @@ describe('shapeBox · 节点形状规格', () => {
     expect(new Set(shapes).size).toBe(shapes.length)
   })
 
-  it('图标（三角/菱形/圆/方块）等大：不随活跃度缩放', () => {
+  it('首爆/风险不再是三角，而是星形与叉（用户 2026-10-20 嫌三角难看）', () => {
+    expect(SIGNAL_SHAPE.burst.shape).toBe('sparkle')
+    expect(SIGNAL_SHAPE.risk.shape).toBe('cross')
+    // ⛔ 三角不得回流（包括以别名形式）：14px 的 ▲▼ 远看几乎同形，方向这个唯一区分维度会失效
+    const all = SHAPE_LEGEND_ORDER.map((k) => SIGNAL_SHAPE[k].shape as string)
+    expect(all.some((s) => s.includes('triangle'))).toBe(false)
+  })
+
+  it('图标（星/叉/菱形/圆/方块）等大：不随活跃度缩放', () => {
     // 用户 2026-10-18：「三角符号还是一样大吧，不要忽大忽小……就不要控制 icon 的大小了」
-    for (const shape of ['triangle-up', 'triangle-down', 'diamond', 'circle', 'ring', 'square'] as const) {
+    for (const shape of ['sparkle', 'cross', 'diamond', 'circle', 'ring', 'square'] as const) {
       const small = shapeBox(shape, 8)
       const big = shapeBox(shape, 46)
       expect(big.width, `${shape} 宽度应恒定`).toBe(small.width)
       expect(big.height, `${shape} 高度应恒定`).toBe(small.height)
       expect(big.height).toBeLessThanOrEqual(SHAPE_ICON_SIZE)
     }
-    // 正/反三角必须同一尺寸（只有方向不同），否则「爆发」和「风险」看起来强弱不同
-    const up = shapeBox('triangle-up', 8)
-    const down = shapeBox('triangle-down', 46)
-    expect([up.width, up.height]).toEqual([down.width, down.height])
+    // 层级：叉必须比星小 —— 普跌日风险节点一天 90+，与星等大时会把首爆完全压住
+    const sparkle = shapeBox('sparkle', 8)
+    const cross = shapeBox('cross', 46)
+    expect(cross.height, '风险（高频背景）必须比首爆（最高优先级）小').toBeLessThan(sparkle.height)
+    expect(cross.height).toBeGreaterThanOrEqual(9)  // 再小就看不见了
   })
 
-  it('三角形给 clip-path，圆形给圆角，空心圆额外给描边宽度', () => {
-    expect(shapeBox('triangle-up', 20).clipPath).toContain('polygon')
-    expect(shapeBox('triangle-down', 20).clipPath).toContain('polygon(0 0')
+  it('尖角形状标记为 glyph（走 SVG），几何形状走 CSS', () => {
+    expect(shapeBox('sparkle', 20).glyph).toBe('sparkle')
+    expect(shapeBox('cross', 20).glyph).toBe('cross')
+    // ⛔ glyph 与 clipPath 互斥：两个都给会让渲染分支争抢，出现「星形被裁成方块」这类怪相
+    expect(shapeBox('sparkle', 20).clipPath).toBeUndefined()
+    expect(shapeBox('sparkle', 20).borderRadius).toBeUndefined()
+
+    expect(shapeBox('diamond', 20).glyph).toBeUndefined()
+    expect(shapeBox('diamond', 20).clipPath).toContain('polygon')
     expect(shapeBox('circle', 20).borderRadius).toBe(9999)
     expect(shapeBox('ring', 20).borderWidth).toBe(1.5)
     expect(shapeBox('ring', 20).clipPath).toBeUndefined()

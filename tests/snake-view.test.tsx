@@ -137,6 +137,7 @@ describe('TimelineSnake · 蛇形骨架', () => {
     const { container } = render(<TimelineSnake blocks={blocks} {...props} width={W} {...instant} />)
     const path = container.querySelector('svg path') as SVGPathElement
     const layout = layoutSnake({ marks: blocks.map((b) => b.at), width: W })
+    // ⛔ 行高固定为 3+3 预留（2026-10-20 用户：「还是把高度预留出来吧」）——path 必须逐字相等
     expect(path.getAttribute('d')).toBe(layout.path)
     expect(layout.path.includes('NaN')).toBe(false)
     expect(layout.path.match(/A /g)?.length).toBe(layout.rows - 1)
@@ -365,12 +366,13 @@ describe('TimelineSnake · 盘外与夹位记录', () => {
  */
 describe('TimelineSnake · 节点标记形态', () => {
   /**
-   * 节点标记（竖条/三角/圆…）。
-   * ⛔ 2026-10-18 起不能再按「宽度 = SNAKE_BAR_W」筛 —— 形状化后三角/圆的宽度随高度变化，
-   *    用宽度选择器会漏掉一半节点（表现为「bars 数量对不上」，而不是形状断言失败）。
+   * 节点标记（细竖线 / 圆 / 菱形 / 四角星 / 叉…）。
+   * ⛔ 两处不能省：
+   *    ① 不能按「宽度 = SNAKE_BAR_W」筛 —— 形状化后宽度不再统一，用宽度选择器会漏掉一半节点；
+   *    ② 不能写 `span[data-node-kind]` —— 首爆/风险是 `<svg>`（尖角形状走 SVG 才不糊）。
    */
   const barsOf = (c: HTMLElement) =>
-    Array.from(c.querySelectorAll('span[data-node-kind]')) as HTMLElement[]
+    Array.from(c.querySelectorAll('[data-node-kind]')) as HTMLElement[]
 
   it('① 节点命中区宽 = SNAKE_NODE_W（26px），不是卡片宽度', () => {
     const { container } = render(<TimelineSnake blocks={threeBlocks()} {...props} width={W} {...instant} />)
@@ -422,7 +424,7 @@ describe('TimelineSnake · 节点标记形态', () => {
     expect(nodeAt(container, '15:00').textContent).toBe('')
   })
 
-  it('④ 同层相邻时刻标签互不挤（间距 ≥ MIN_LABEL_GAP）', () => {
+  it('④ 同层相邻时刻标签互不挤（间距 ≥ MIN_LABEL_GAP），挤不下就升一层', () => {
     const blocks = Array.from({ length: 10 }, (_, i) =>
       normalBlock(
         10 * 60 + i,
@@ -430,19 +432,58 @@ describe('TimelineSnake · 节点标记形态', () => {
       ),
     )
     const { container } = render(<TimelineSnake blocks={blocks} {...props} width={800} {...instant} />)
-    const labeledNodes = nodesOf(container).filter((n) => (n.textContent ?? '').trim() !== '')
-    expect(labeledNodes.length).toBeGreaterThan(0)
-    expect(labeledNodes.length).toBeLessThan(blocks.length)
-    const byLane = new Map<string, number[]>()
-    for (const n of labeledNodes) {
-      const list = byLane.get(n.style.top) ?? []
-      list.push(Number.parseFloat(n.style.left))
-      byLane.set(n.style.top, list)
+    // ⛔ 2026-10-20 起标签分三层（data-label-tier），必须**按层**比间距，不能全局比
+    const labels = Array.from(container.querySelectorAll('[data-label-tier]')) as HTMLElement[]
+    expect(labels.length).toBeGreaterThan(0)
+    const byTier = new Map<string, number[]>()
+    for (const el of labels) {
+      const tier = el.getAttribute('data-label-tier') ?? '0'
+      const btn = el.closest('button') as HTMLElement | null
+      const x = Number.parseFloat(btn?.style.left ?? '0')
+      const list = byTier.get(tier) ?? []
+      list.push(x)
+      byTier.set(tier, list)
     }
-    for (const xs of byLane.values()) {
+    for (const xs of byTier.values()) {
       xs.sort((a, b) => a - b)
       for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(48)
     }
+    // 分层确实被用上了（否则这条测试等于没测到错位机制）
+    expect(byTier.size, '密集段落应自动错开到多层').toBeGreaterThan(1)
+  })
+
+  it('④-b 两个长题材标签放不下时**错开到不同层**，都保留（不再二选一）', () => {
+    /**
+     * 两个题材爆发相隔 3 分钟（≈75px）：两个字号 11.5 的「首爆·XXX」各约 118px，
+     * 半宽之和 122px > 75px —— 同层必然压字，旧实现只能丢掉一个。
+     * 现在应该一个留层 0、一个升到层 1，**两个都看得见**。
+     */
+    const burstAt = (m: number, topic: string) =>
+      normalBlock(
+        m,
+        slot(m, {
+          events: [
+            {
+              time: `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`,
+              event: `新主线崛起：${topic} 涨停8只，龙头 某某股份`,
+              severity: 'high',
+              topic,
+            },
+          ],
+        }),
+      )
+    const { container } = render(
+      <TimelineSnake
+        blocks={[burstAt(10 * 60, '低空经济'), burstAt(10 * 60 + 3, '国产芯片')]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    const labels = Array.from(container.querySelectorAll('[data-label-tier]')) as HTMLElement[]
+    const tiers = labels.map((el) => el.getAttribute('data-label-tier'))
+    expect(labels.length, '两个长标签都应保留').toBe(2)
+    expect(new Set(tiers).size, '必须错开到不同层，否则就是压字').toBe(2)
   })
 
   it('⑤ **整段**分钟级密集保持固定四段，并如实标记拥挤', () => {
@@ -510,18 +551,24 @@ describe('TimelineSnake · 悬停明细必须全量（不折叠）', () => {
  *   ② 「hover 详情…**板块、个股、催化**都可以显示」→ 详情里展开催化 / 成员 / 观测时刻；
  *   ③ 「这种题材爆发的节点，可以标**紫色**显示」→ 2026-10-18 **用户改口**：
  *      「低空经济首次爆发……跟紫色区分，变**大红色**……后面继续走强也保持红色，字体大一点」
- *      ⇒ 首爆 = 实心大红 `bg-up` + 竖条加宽；同题材再次爆发 = 续强 `bg-up/80`；轮动仍是紫。
+ *      ⇒ 首爆 = 满色红四角星；同题材再次爆发 = 续强（红 60%）；轮动仍是紫。
+ *
+ * ⚠️ 2026-10-20 用户：「首爆和风险换一个 icon，这个红绿三角不好看」→ 三角改星/叉。
+ *    首爆与续强的区分从「加宽 3px」改为**颜色浓度**（图标已强制等大）。
  *
  * ⛔ 为什么必须钉住：颜色错了、名字漏了、催化没渲染，**页面都照常工作、不报错** ——
  * 典型的静默退化，只有渲染断言能发现。
  */
-describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详情含催化）', () => {
+describe('TimelineSnake · 题材爆发节点（紫四角星首爆 + 光晕 + 板块名 + 详情含催化）', () => {
   /**
-   * 竖条 —— 按 `data-node-kind` 定位（⛔ 不再按宽度找：首爆竖条比常态宽 3px，
-   * 用固定宽度选择器会在改造后直接选不到，表现为「test 崩了而不是断言失败」）。
+   * 节点标记 —— 按 `data-node-kind` 定位。
+   * ⛔ 不能用 `span[data-node-kind]`：首爆/风险现在是 `<svg>`（尖角形状走 SVG 才不糊）。
    */
-  const barAt = (c: HTMLElement, clock: string) =>
-    nodeAt(c, clock).querySelector('span[data-node-kind]') as HTMLElement
+  const markAt = (c: HTMLElement, clock: string) =>
+    nodeAt(c, clock).querySelector('[data-node-kind]') as Element
+
+  /** 标记的 class 文本 —— ⛔ SVG 的 `.className` 是 `SVGAnimatedString`，直接 toContain 会永远失败 */
+  const clsAt = (c: HTMLElement, clock: string) => markAt(c, clock).getAttribute('class') ?? ''
 
   const themeInfo = new Map<string, ThemeBurst>([
     [
@@ -559,12 +606,16 @@ describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详�
    */
   const burstBlock = () => normalBlock(11 * 60, slot(11 * 60, { events: [RISE] }))
 
-  it('① 题材**首爆**竖条为实心大红（与「轮动紫」分家），且不泛化到普通节点', () => {
+  it('① 题材**首爆**是满色紫四角星 + 同色光晕（2026-10-20 用户：「首爆改为紫色，加一圈很淡的同色光晕」）', () => {
     const { container } = render(<TimelineSnake blocks={[burstBlock()]} {...props} {...instant} width={W} />)
-    const burstBar = barAt(container, '11:00')
-    expect(burstBar.className, '题材首爆应为大红').toContain('bg-up')
-    expect(burstBar.className, '⛔ 不得再用紫色（紫=轮动/回流）').not.toContain('bg-rec')
-    expect(burstBar.className, '首爆是实心红，不是续强那档半透明').not.toContain('bg-up/80')
+    const burstMark = markAt(container, '11:00')
+    expect(burstMark.tagName.toLowerCase(), '尖角形状应走 SVG（14px 的 clip-path 三角会糊）').toBe('svg')
+    expect(burstMark.getAttribute('data-node-shape')).toBe('sparkle')
+    expect(clsAt(container, '11:00'), '题材首爆应为紫（regime=semantic: 紫=题材）').toContain('text-rec')
+    expect(clsAt(container, '11:00'), '首爆是满色，不是续强那档 60%').not.toContain('/60')
+    // 光晕 = 同形状外扩两层（1.42x / 1.85x）+ 主体 → 共 3 条 path
+    expect(burstMark.querySelectorAll('path').length, '首爆必须有 2 层同色光晕').toBe(3)
+    expect(burstMark.querySelectorAll('path[opacity]').length, '光晕层靠透明度区分').toBe(2)
     // 轴上标签：带「首爆·」，且文字放大（用户「字体稍微大一点，突出这个题材牛逼」）
     const node = nodeAt(container, '11:00')
     expect(node.textContent).toContain('首爆·光通信')
@@ -581,7 +632,7 @@ describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详�
         width={W}
       />,
     )
-    expect(barAt(c2, '14:00').className).toContain('bg-sub')
+    expect(clsAt(c2, '14:00')).toContain('bg-sub')
   })
 
   it('② 同一题材再次爆发 = 续强（仍是红，弱半档，文案「续强·」）', () => {
@@ -596,21 +647,34 @@ describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详�
         width={W}
       />,
     )
-    expect(barAt(container, '11:00').className, '首爆：实心大红').toContain('bg-up')
-    expect(barAt(container, '13:00').className, '续强：红但弱半档').toContain('bg-up/80')
+    expect(clsAt(container, '11:00'), '首爆：满色紫').toContain('text-rec')
+    expect(clsAt(container, '11:00'), '首爆不是半档').not.toContain('/60')
+    expect(clsAt(container, '13:00'), '续强：紫但弱半档').toContain('text-rec/60')
+    // ⛔ 光晕只给首爆：续强也加的话，密集段落会连成一片紫雾，把首爆淹掉
+    const followMark = container.querySelectorAll('button')[1]?.querySelector('[data-node-shape="sparkle"]')
+    expect(followMark?.querySelectorAll('path').length, '续强只有主体一条 path，无光晕').toBe(1)
     expect(nodeAt(container, '13:00').textContent, '第二次爆发应写「续强」而不是「首爆」').toContain(
       '续强·光通信',
     )
   })
 
-  it('② 同一分钟既有题材爆发又有杀跌板块 → **风险优先**（绿），这是刻意的优先级', () => {
+  it('② 同一分钟既有首爆又有杀跌板块 → **图标跟标题走**（星），风险降到下方绿字', () => {
     const mixed = normalBlock(
       11 * 60,
       slot(11 * 60, { events: [RISE], intradayDown: [ie('sector_down', '白银', { pct: -6.49 })] }),
     )
     const { container } = render(<TimelineSnake blocks={[mixed]} {...props} {...instant} width={W} />)
-    // 文档既定顺序：联动 > 杀跌 > 题材 > 合并 > 普通（与卡片流同源）
-    expect(barAt(container, '11:00').className).toContain('bg-down')
+    /**
+     * ⛔ 2026-10-20 用户：「如果标题写的是首爆，那么这 icon 也改成首爆，不要显示为其他的 icon，
+     *    那样子的话不统一！」
+     *   旧口径是「风险 > 题材」（形状画叉、标题却写首爆）；现在一律以**标题**为准。
+     *   风险并没有丢：它在下区以「白银走弱」绿字 + 绿线呈现。
+     */
+    const mark = nodeAt(container, '11:00').querySelector('[data-node-shape]') as Element
+    expect(mark.getAttribute('data-node-shape'), '标题是首爆 → 图标必须是星').toBe('sparkle')
+    expect(mark.getAttribute('class') ?? '').toContain('text-rec')
+    const down = nodeAt(container, '11:00').querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('白银走弱')
   })
 
   it('③ 轴上直接标出板块名，无障碍名字里也带题材（非题材节点不带）', () => {
@@ -659,17 +723,18 @@ describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详�
 
   it('⑥ 仅龙头轮动的题材也上轴：淡紫弱标记 + 题材名（⛔ 不带 🚀）', () => {
     const { container } = render(<TimelineSnake blocks={[rotatedBlock(14 * 60)]} {...props} {...instant} width={W} />)
-    const bar = barAt(container, '14:00')
-    expect(bar.className, '仅轮动 = 空心紫弱标记（不是爆发的实心紫）').toContain('border-rec')
-    expect(bar.className.split(' '), '⛔ 不得与爆发同色').not.toContain('bg-rec')
+    const bar = nodeAt(container, '14:00').querySelector('[data-node-kind]') as Element
+    const cls = bar.getAttribute('class') ?? ''
+    expect(cls, '仅轮动 = 空心紫弱标记（不是爆发的实心紫）').toContain('border-rec')
+    expect(cls.split(' '), '⛔ 不得与爆发同色').not.toContain('bg-rec')
     const node = nodeAt(container, '14:00')
     expect(node.textContent, '轴上必须看得到题材名').toContain('PCB板')
     expect(node.textContent, '⛔ 轮动不是爆发，不带 🚀').not.toContain('🚀')
     expect(node.getAttribute('aria-label')).toContain('题材轮动PCB板')
   })
 
-  it('⑦ 同层标签放不下时**题材名优先**于普通时刻标签（否则题材等于不可见）', () => {
-    // 10:00 普通显著节点（3 个板块）与 10:01 仅轮动节点相隔 1 分钟 → 两个标签放不下
+  it('⑦ 题材名**占最低层**（离节点最近最显眼），普通时刻标签被让到高层', () => {
+    // 10:00 普通显著节点（3 个板块）与 10:01 仅轮动节点相隔 1 分钟 → 同层放不下
     const plain = normalBlock(
       10 * 60,
       slot(10 * 60, { sectors: [sec('电力', 3), sec('半导体', 3), sec('医药', 3)] }),
@@ -677,8 +742,11 @@ describe('TimelineSnake · 题材爆发节点（大红首爆 + 板块名 + 详�
     const { container } = render(
       <TimelineSnake blocks={[plain, rotatedBlock(10 * 60 + 1)]} {...props} {...instant} width={W} />,
     )
-    expect(nodeAt(container, '10:01').textContent, '题材名必须赢得空间').toContain('PCB板')
-    expect(nodeAt(container, '10:00').textContent, '普通时刻标签让位').toBe('')
+    const tierOf = (clock: string) =>
+      nodeAt(container, clock).querySelector('[data-label-tier]')?.getAttribute('data-label-tier') ?? null
+    expect(nodeAt(container, '10:01').textContent, '题材名必须上轴').toContain('PCB板')
+    expect(tierOf('10:01'), '题材名必须占最低层（层 0）').toBe('0')
+    expect(tierOf('10:00'), '普通时刻标签让到高层，而不是被丢掉').toBe('1')
   })
 })
 
@@ -729,15 +797,19 @@ describe('TimelineSnake · 形状编码与图例', () => {
   const burstBlock = () => normalBlock(11 * 60, slot(11 * 60, { events: [RISE] }))
 
   const shapeOf = (c: HTMLElement, clock: string) =>
-    nodeAt(c, clock).querySelector('span[data-node-shape]') as HTMLElement
+    nodeAt(c, clock).querySelector('[data-node-shape]') as Element
 
-  it('题材爆发 = 向上三角；普通事实 = 细竖线', () => {
+  it('题材爆发 = 四角星（SVG）；普通事实 = 细竖线', () => {
     const { container } = render(
       <TimelineSnake blocks={[burstBlock()]} {...props} {...instant} width={W} />,
     )
     const burst = shapeOf(container, '11:00')
-    expect(burst.getAttribute('data-node-shape')).toBe('triangle-up')
-    expect(burst.style.clipPath).toContain('polygon(50% 0')
+    expect(burst.getAttribute('data-node-shape')).toBe('sparkle')
+    // 尖角形状走 SVG：14px 下 CSS clip-path 的尖角抗锯齿会糊成一坨
+    expect(burst.tagName.toLowerCase()).toBe('svg')
+    expect(burst.querySelector('path')?.getAttribute('fill')).toBe('currentColor')
+    // ⛔ 三角不得回流
+    expect(burst.getAttribute('data-node-shape')).not.toContain('triangle')
 
     const { container: c2 } = render(
       <TimelineSnake
@@ -749,24 +821,30 @@ describe('TimelineSnake · 形状编码与图例', () => {
     )
     const plain = shapeOf(c2, '14:00')
     expect(plain.getAttribute('data-node-shape')).toBe('bar')
-    expect(plain.style.width).toBe(`${SNAKE_BAR_W}px`)
+    expect((plain as HTMLElement).style.width).toBe(`${SNAKE_BAR_W}px`)
   })
 
-  it('风险节点 = 向下三角（与爆发同为三角但方向相反，色盲也能分辨）', () => {
+  it('风险节点 = 叉（与爆发轮廓完全不同，不靠颜色/方向区分）', () => {
+    // ⛔ 不带 RISE：一旦标题成为「首爆」，图标就必须跟标题走（见上一条②）
     const mixed = normalBlock(
       11 * 60,
-      slot(11 * 60, { events: [RISE], intradayDown: [ie('sector_down', '白银', { pct: -6.49 })] }),
+      slot(11 * 60, { intradayDown: [ie('sector_down', '白银', { pct: -6.49 })] }),
     )
     const { container } = render(<TimelineSnake blocks={[mixed]} {...props} {...instant} width={W} />)
     const risk = shapeOf(container, '11:00')
-    expect(risk.getAttribute('data-node-shape')).toBe('triangle-down')
-    expect(risk.style.clipPath).toContain('polygon(0 0')
+    expect(risk.getAttribute('data-node-shape')).toBe('cross')
+    expect(risk.tagName.toLowerCase()).toBe('svg')
+    // 叉是描边路径（stroke），星是填充路径（fill）—— 两者渲染方式也必须不同
+    const path = risk.querySelector('path')
+    expect(path?.getAttribute('stroke')).toBe('currentColor')
+    expect(path?.getAttribute('fill')).toBe('none')
   })
 
-  it('图例把 7 种形状全部解释清楚（每个都有名字）', () => {
+  it('图例把 8 种形状全部解释清楚（顺序 = 实际优先级，炸板垫底）', () => {
     const { container } = render(<ShapeLegend />)
     const items = Array.from(container.querySelectorAll('[data-legend-kind]'))
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(8)
+    // 首爆居首、炸板垫底（2026-10-20 用户：「还是首爆优先，炸板不需要权重」）
     expect(items.map((el) => el.textContent?.trim())).toEqual([
       '首爆',
       '风险',
@@ -774,9 +852,453 @@ describe('TimelineSnake · 形状编码与图例', () => {
       '走强',
       '轮动',
       '记录',
+      '炸板',
       '事实',
     ])
     // 每个图例项都带解释（title），不是只有个图形
     for (const el of items) expect(el.getAttribute('title')).toBeTruthy()
+  })
+})
+
+/**
+ * 走强序号累加（2026-10-20 用户：「走强可以设置为 +1，然后无限叠，
+ * 比如机器人走强可以改为：机器人+1，机器人+2」）。
+ *
+ * ⛔ 这里锁的是「同一条线第 N 次走强」的**事实序号**，不是「图上第 N 个标签」——
+ *    标签可能因为放不下被省略（序号会跳），但序号本身不能重排，否则就是在撒谎。
+ */
+describe('TimelineSnake · 走强序号 +N 累加', () => {
+  const upAt = (m: number, name = '机器人') =>
+    normalBlock(m, slot(m, { intradayUp: [ie('sector_up', name)] }))
+
+  it('同一板块第一次=首爆、第二次=+2（首次触发即首爆，不再从 +1 起跳）', () => {
+    const { container } = render(
+      <TimelineSnake blocks={[upAt(10 * 60), upAt(10 * 60 + 20)]} {...props} {...instant} width={W} />,
+    )
+    const texts = Array.from(container.querySelectorAll('[data-label-tier]')).map((el) =>
+      el.textContent?.trim() ?? '',
+    )
+    // 2026-10-20 用户：「9:43 国产芯片就已经触发了，为什么还是首爆」→ 首次触发即首爆
+    expect(texts.some((t) => t.endsWith('首爆·机器人')), `实际：${texts.join(' | ')}`).toBe(true)
+    expect(texts.some((t) => t.endsWith('机器人+2')), `实际：${texts.join(' | ')}`).toBe(true)
+  })
+
+  it('不同板块各自从 +1 起算（计数键是板块名）', () => {
+    const { container } = render(
+      <TimelineSnake
+        blocks={[upAt(10 * 60, '机器人'), upAt(10 * 60 + 20, '低空经济')]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    const texts = Array.from(container.querySelectorAll('[data-label-tier]')).map((el) =>
+      el.textContent?.trim() ?? '',
+    )
+    // 两条线各自「第一次」→ 各自都是首爆，互不干扰
+    expect(texts.some((t) => t.endsWith('首爆·机器人'))).toBe(true)
+    expect(texts.some((t) => t.endsWith('首爆·低空经济'))).toBe(true)
+  })
+
+  /**
+   * ⛔⛔ 2026-10-22 用户抓包：「09:26 / 09:31 / 09:32」三个节点全写「首爆·机器人」。
+   *
+   * 根因：`isFirst` 是**节点级**布尔值（「这一刻引入了新名字」），而标签名固定取
+   * `upSectors[0].name`（最强板块）—— 两者不同源。09:31 真正新出现的是
+   * 「云计算数据中心」（排第 2），最强的机器人只是又涨一只，却被写成「首爆·机器人」。
+   *
+   * 口径：**首爆按名字判**。一条线一天只能首爆一次；最强板块是旧线时，
+   * 标签要让位给该节点真正的新线（否则那条新线今天就永远没有首爆点）。
+   */
+  it('⛔ 同一板块一天只能首爆一次；旧线走强不得顶掉新线的首爆', () => {
+    const rich = (m: number, names: string[]) =>
+      normalBlock(m, slot(m, { intradayUp: names.map((n) => ie('sector_up', n)) }))
+    const { container } = render(
+      <TimelineSnake
+        blocks={[
+          // 09:26 机器人首爆
+          rich(10 * 60, ['机器人']),
+          // 09:31 机器人（旧）继续走强 + 云计算数据中心（新）
+          rich(10 * 60 + 20, ['机器人', '云计算数据中心']),
+          // 09:32 机器人（旧）+ 业绩增长（新）
+          rich(10 * 60 + 40, ['机器人', '业绩增长']),
+        ]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    const texts = Array.from(container.querySelectorAll('[data-label-tier]')).map((el) =>
+      el.textContent?.trim() ?? '',
+    )
+    const firsts = texts.filter((t) => t.endsWith('首爆·机器人'))
+    expect(firsts.length, `机器人被标了 ${firsts.length} 次首爆：${texts.join(' | ')}`).toBe(1)
+    // 新线各自拿到首爆点，不被旧线吞掉
+    expect(texts.some((t) => t.endsWith('首爆·云计算数据中心')), texts.join(' | ')).toBe(true)
+    expect(texts.some((t) => t.endsWith('首爆·业绩增长')), texts.join(' | ')).toBe(true)
+  })
+
+  /**
+   * ⛔ 首爆判定必须看**全量**板块名，不是截断后的前 3 个。
+   *
+   * `upSectors` 只留最强的 3 个；若拿它判重，当刻排第 4 的板块不会被记「已出现」，
+   * 它下次冒头时就会被误标成首爆（「次次都首爆」的另一种成因）。
+   */
+  it('⛔ 当刻排第 4 的板块也算「已出现」，下次冒头不得标首爆', () => {
+    const many = (m: number, names: Array<[string, number]>) =>
+      normalBlock(
+        m,
+        slot(m, {
+          intradayUp: names.map(([n, zc]) => ie('sector_up', n, { zt_count: zc })),
+        }),
+      )
+    const { container } = render(
+      <TimelineSnake
+        blocks={[
+          // 甲最多 → 前 3 是甲/乙/丙，丁排第 4（截断之外）
+          many(10 * 60, [['甲板块', 5], ['乙板块', 4], ['丙板块', 3], ['丁板块', 1]]),
+          // 20 分钟后丁板块独走强 → 它早已出现过，只能是 +2
+          many(10 * 60 + 20, [['丁板块', 2]]),
+        ]}
+        {...props}
+        {...instant}
+        width={W}
+      />,
+    )
+    const texts = Array.from(container.querySelectorAll('[data-label-tier]')).map((el) =>
+      el.textContent?.trim() ?? '',
+    )
+    expect(texts.some((t) => t.endsWith('首爆·丁板块')), texts.join(' | ')).toBe(false)
+    expect(texts.some((t) => t.endsWith('丁板块+2')), texts.join(' | ')).toBe(true)
+  })
+})
+
+/**
+ * 一个节点同挂上下两条标签（2026-10-20 用户：「一个节点可以同时显示上下两条线路数据！」）。
+ *
+ * ⛔ 旧实现是 `themeTagOf` 返回单个 tag，走强分支直接 return ——
+ *    「某板块走强的同一分钟恰好有另一个板块走弱」时，走弱那条被整条吞掉，
+ *    页面照常渲染、不报错，只有肉眼能发现少了一行。
+ */
+describe('TimelineSnake · 同一节点上下双标签', () => {
+  it('同时有板块走强 + 板块走弱 → 上下各出一条，互不吞并', () => {
+    const both = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [ie('sector_up', '机器人')],
+        intradayDown: [ie('sector_down', '医药', { pct: -3.2 })],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[both]} {...props} {...instant} width={W} />)
+    const labels = Array.from(nodeAt(container, '10:00').querySelectorAll('[data-label-tier]'))
+    expect(labels).toHaveLength(2)
+    const up = labels.find((el) => el.getAttribute('data-label-dir') === 'up')
+    const down = labels.find((el) => el.getAttribute('data-label-dir') === 'down')
+    expect(up?.textContent ?? '', '上区 = 走强').toContain('机器人')
+    expect(down?.textContent ?? '', '下区 = 走弱').toContain('医药走弱')
+    // 上下各一条引导线
+    const leaders = Array.from(nodeAt(container, '10:00').querySelectorAll('[data-label-leader]'))
+    expect(leaders).toHaveLength(2)
+  })
+
+  it('只有个股回落（非板块）→ 下区不出标签（个股降权）', () => {
+    const stockOnly = normalBlock(
+      10 * 60,
+      slot(10 * 60, { intradayUp: [ie('sector_up', '机器人')], otherDownCount: 3 } as never),
+    )
+    const { container } = render(<TimelineSnake blocks={[stockOnly]} {...props} {...instant} width={W} />)
+    const downs = nodeAt(container, '10:00').querySelectorAll('[data-label-dir="down"]')
+    expect(downs).toHaveLength(0)
+  })
+
+  /**
+   * 消息面（2026-10-20 用户：「消息面也要提示，目前还是很多空白」）。
+   *
+   * `pushed_topics` 早已建成独立 push 节点，但轴上不给标签 → 每个推送时刻只剩一个灰点。
+   * 现规则：落在**下区空位**（有走弱时让位），灰色引导线 + 「消息·」前缀。
+   */
+  it('只有推送的节点 → 下区出「消息·题材」标签，且引导线不是走弱的绿线', () => {
+    const pushed = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        pushes: [
+          {
+            name: '机器人',
+            type: 'sector',
+            first_pushed: '10:00',
+            last_pushed: '10:00',
+            push_count: 2,
+            context: '特斯拉Optimus催化',
+            last_catalyst: '',
+          },
+        ] as never,
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[pushed]} {...props} {...instant} width={W} />)
+    const node = nodeAt(container, '10:00')
+    // ⛔ 必须带 `[data-label-tier]`：引导线也有 `data-label-dir`，只用 dir 会选到没有文字的那根线
+    const down = node.querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('消息·机器人')
+    // 引导线走中性灰，⛔ 不能沿用它所在下半区的绿线
+    const leader = node.querySelector('[data-label-leader][data-label-dir="down"]') as Element
+    expect(leader.getAttribute('class') ?? '').toContain('bg-line-strong/70')
+    expect(leader.getAttribute('class') ?? '').not.toContain('bg-down')
+  })
+
+  it('同时有板块走弱 + 推送 → 走弱优先，消息不抢位置', () => {
+    const both = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayDown: [ie('sector_down', '医药', { pct: -3 })],
+        pushes: [{ name: '机器人', type: 'sector', first_pushed: '10:00', last_pushed: '10:00', push_count: 1, context: '', last_catalyst: '' }] as never,
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[both]} {...props} {...instant} width={W} />)
+    const down = nodeAt(container, '10:00').querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('医药走弱')
+    expect(down?.textContent ?? '').not.toContain('消息·')
+  })
+
+  /**
+   * 短线精灵（消息面第二档 · 2026-10-20 用户：「消息面呢？这边是否介入快讯
+   * 【短线精灵 + 终端！！】」）。
+   *
+   * 数据来自 `short_spirit_signals.json` 的 `signals_today[].first_seen`，
+   * 在页面层转成 `signal_new` 事件并入分钟槽。轴上的规则：
+   *   · 下区第三顺位（板块走弱 > 消息·推送 > 异动·个股）；
+   *   · 文案前缀「异动·」，文字半档紫（机会向但未经题材归类）；
+   *   · 引导线走中性灰 —— ⛔ 不能因为它落在下半区就画绿线（会被读成「在跌」）。
+   */
+  it('只有短线精灵信号的节点 → 下区出「异动·个股」标签，引导线是中性灰不是绿', () => {
+    const sig = normalBlock(
+      10 * 60,
+      slot(10 * 60, { intradayUp: [ie('signal_new', '博汇股份', { code: '300839', pct: 16.02, type: '接近涨停', strength: 0.46 })] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[sig]} {...props} {...instant} width={W} />)
+    const node = nodeAt(container, '10:00')
+    const down = node.querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('异动·博汇股份')
+    const leader = node.querySelector('[data-label-leader][data-label-dir="down"]') as Element
+    expect(leader.getAttribute('class') ?? '').toContain('bg-line-strong/70')
+    expect(leader.getAttribute('class') ?? '', '异动不是走弱，禁绿线').not.toContain('bg-down')
+    // 消息面第一档优先：推送在时，异动让位
+  })
+
+  it('推送与短线精灵同刻 → 「消息·」优先，「异动·」让位（⛔ 不叠两条消息）', () => {
+    const both = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [ie('signal_new', '博汇股份', { code: '300839' })],
+        pushes: [{ name: '机器人', type: 'sector', first_pushed: '10:00', last_pushed: '10:00', push_count: 1, context: '', last_catalyst: '' }] as never,
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[both]} {...props} {...instant} width={W} />)
+    const down = nodeAt(container, '10:00').querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('消息·机器人')
+    expect(down?.textContent ?? '').not.toContain('异动·')
+  })
+
+  it('⛔ 短线精灵不得把节点染成「个股走强」红圆（它是消息面，不是走强）', () => {
+    const sig = normalBlock(
+      10 * 60,
+      slot(10 * 60, { intradayUp: [ie('signal_new', '博汇股份', { code: '300839' })] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[sig]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind'), '消息面节点应保持中性').not.toBe('up')
+  })
+
+  /**
+   * ⛔ 同一时刻只标一次（用户反复强调「同一件事实全卡只说一次」）。
+   *
+   * 下区标签自带时钟 → 上区再挂一根「纯时刻」标签会让 10:00 在节点上下各出现一次，
+   * 看上去像两个不同的时刻。
+   */
+  it('下区已有标签时，上区不再重复标同一时刻（只留一条）', () => {
+    const pushed = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        pushes: [{ name: '机器人', type: 'sector', first_pushed: '10:00', last_pushed: '10:00', push_count: 1, context: '', last_catalyst: '' }] as never,
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[pushed]} {...props} {...instant} width={W} />)
+    const labels = Array.from(nodeAt(container, '10:00').querySelectorAll('[data-label-tier]'))
+    expect(labels, '同一时刻不能上下各标一次').toHaveLength(1)
+    expect(labels[0].getAttribute('data-label-dir')).toBe('down')
+  })
+
+  /**
+   * 外部快讯（`newsflash_new`）—— 消息面**第一档**。
+   *
+   * 落盘在 `intraday_timeline_<date>.jsonl`（`scripts/intraday_timeline.py` 按 id 去重、
+   * 时刻取快讯自己的 `ctime`），故它是真能落到分钟轴的「消息本身」。
+   * 轴上只留前半句（快讯标题 30+ 字会横跨好几个节点），全文进 hover 明细。
+   */
+  it('外部快讯 → 下区「快讯·」标签；长标题在轴上截断，全文留在明细', () => {
+    const title = '工信部：加快推进人形机器人产业创新发展与场景落地'
+    const nf = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [
+          ie('newsflash_new', title, { title, plates: ['机器人'], stocks: ['科森科技'], id: '1300001' }),
+        ],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[nf]} {...props} {...instant} width={W} />)
+    const node = nodeAt(container, '10:00')
+    const down = node.querySelector('[data-label-tier][data-label-dir="down"]')
+    const text = down?.textContent ?? ''
+    expect(text).toContain('快讯·工信部：加快推进人')
+    expect(text, '轴上不得出现整条 30+ 字标题').not.toContain('场景落地')
+    expect(text).toContain('…')
+    // 全文必须能在明细里读到（截断只在轴上，不在数据里）
+    fireEvent.mouseEnter(node)
+    const dialog = container.querySelector('[role="dialog"]') as HTMLElement
+    expect(dialog.textContent ?? '').toContain('场景落地')
+    /**
+     * ⛔ 明细里消息面必须**单列一段**：塞进「盘中走强与涨停变化」的红框，
+     * 会让「有条消息」被读成「这个板块在涨」。文案上「消息面」段要出现在标题之前。
+     */
+    const detail = dialog.textContent ?? ''
+    expect(detail).toContain('消息面')
+    expect(detail.indexOf('消息面'), '快讯应归入消息面段，而不是走强段').toBeLessThan(detail.indexOf('场景落地'))
+  })
+
+  it('⛔ 快讯与板块走弱同刻 → 走弱优先（风险在前，消息让位）', () => {
+    const both = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [ie('newsflash_new', '某快讯标题很长很长', { title: '某快讯标题很长很长' })],
+        intradayDown: [ie('sector_down', '医药', { pct: -3 })],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[both]} {...props} {...instant} width={W} />)
+    const down = nodeAt(container, '10:00').querySelector('[data-label-tier][data-label-dir="down"]')
+    expect(down?.textContent ?? '').toContain('医药走弱')
+    expect(down?.textContent ?? '').not.toContain('快讯·')
+  })
+})
+
+/**
+ * 炸板（打开涨停）→ 黄色缺口环（2026-10-20 用户：「打开涨停可以提示为黄色节点」）。
+ *
+ * ⛔ 必须与「板块走弱（绿叉）」分开：炸板是涨停被打断，不是板块普跌。
+ *    旧实现里 broken_new 被并进 otherDownCount，只能画成绿叉，和走弱完全同形同色。
+ *
+ * ## ⛔⛔ 同日晚些时候用户两次修正，最终口径「降权 ≠ 不显示」
+ *
+ * ①「炸板炸板不需要……还是首爆优先，炸板不需要权重，你这全是炸板了！！」
+ *   → 炸板降到**最低权重**：有首爆 / 走弱 / 走强 / 轮动一律让位。
+ * ②「我说降低权重不是不显示哈，当节点没有更多重要信息的时候，单一个股信息还是可以显示的！！」
+ *   → 上一版加的「≥2 只才显示」门槛把单票炸板整个藏掉了，属于把降权做成删除。
+ *     现在单票照样画黄环，只是降到 70% 透明（成批才满色）。
+ */
+describe('TimelineSnake · 炸板黄环（最低权重，但单票也显示）', () => {
+  it('成批炸板（≥2 只）且无其它信号 = 满色黄色缺口环', () => {
+    const broken = normalBlock(
+      10 * 60,
+      slot(10 * 60, { intradayDown: [ie('broken_new', '慈文传媒'), ie('broken_new', '华脉科技')] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[broken]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind')).toBe('broken')
+    expect(mark.getAttribute('data-node-shape')).toBe('ring-gap')
+    expect(mark.getAttribute('class') ?? '').toContain('text-break')
+    expect(mark.getAttribute('class') ?? '', '成批炸板不该被弱化').not.toContain('text-break/70')
+    // 缺口环：stroke-dasharray 留缺口（不是实心圆、也不是叉）
+    const circle = mark.querySelector('circle')
+    expect(circle?.getAttribute('stroke-dasharray')).toBeTruthy()
+    expect(circle?.getAttribute('fill')).toBe('none')
+  })
+
+  /**
+   * ⛔ 2026-10-20 用户：「降低权重不是不显示，当节点没有更多重要信息的时候，
+   *    单一个股信息还是可以显示的」—— 单票炸板必须还是个黄环，只是淡一档。
+   */
+  it('单票炸板 → 仍然是黄环，但降为 70% 透明（弱化 ≠ 隐藏）', () => {
+    const broken = normalBlock(10 * 60, slot(10 * 60, { intradayDown: [ie('broken_new', '慈文传媒')] }))
+    const { container } = render(<TimelineSnake blocks={[broken]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind'), '单票炸板不得退化成灰细线').toBe('broken')
+    expect(mark.getAttribute('data-node-shape')).toBe('ring-gap')
+    expect(mark.getAttribute('class') ?? '', '单票炸板弱化显示').toContain('text-break/70')
+  })
+
+  it('⛔ 炸板 + 板块走弱 → 让位给绿叉（炸板不抢风险）', () => {
+    const broken = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayDown: [ie('broken_new', '慈文传媒'), ie('sector_down', '医药', { pct: -3 })],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[broken]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind'), '板块走弱应压过炸板').toBe('risk')
+  })
+
+  it('⛔ 炸板 + 首爆 → 首爆优先（用户：「还是首爆优先」）', () => {
+    const burst = normalBlock(
+      11 * 60,
+      slot(11 * 60, {
+        intradayDown: [ie('broken_new', '慈文传媒')],
+        events: [
+          {
+            time: '11:00',
+            event: '新主线崛起：光通信 涨停7只，龙头 华脉科技',
+            severity: 'high',
+            topic: '光通信',
+          },
+        ],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[burst]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '11:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind'), '首爆应压过炸板').toBe('burst')
+    expect(mark.getAttribute('data-node-shape')).toBe('sparkle')
+  })
+
+  it('炸板 + 首次板块走强 → 让位（标题是「首爆」，图标就得是星）', () => {
+    const broken = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        // 该板块当日第一次出现 → 标签首爆 → 图标必须跟标签一致
+        intradayUp: [ie('sector_up', '机器人')],
+        intradayDown: [ie('broken_new', '慈文传媒')],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[broken]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind')).toBe('burst')
+  })
+
+  it('炸板 + 非首次的板块走强 → 走强圆点（标题是 +N，图标是圆）', () => {
+    const first = normalBlock(9 * 60 + 40, slot(9 * 60 + 40, { intradayUp: [ie('sector_up', '机器人')] }))
+    const broken = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [ie('sector_up', '机器人')],
+        intradayDown: [ie('broken_new', '慈文传媒')],
+      }),
+    )
+    const { container } = render(
+      <TimelineSnake blocks={[first, broken]} {...props} {...instant} width={W} />,
+    )
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind')).toBe('up')
+  })
+
+  it('⛔ 跌停节点仍是绿叉（只降炸板，别把跌停一起降成灰线）', () => {
+    const ld = normalBlock(10 * 60, slot(10 * 60, { intradayDown: [ie('limit_down_new', '风险股')] }))
+    const { container } = render(<TimelineSnake blocks={[ld]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind')).toBe('risk')
+    expect(mark.getAttribute('data-node-shape')).toBe('cross')
+  })
+
+  it('无炸板时不会误标成黄环', () => {
+    const normal = normalBlock(10 * 60, slot(10 * 60, { intradayUp: [ie('sector_up', '机器人')] }))
+    const { container } = render(<TimelineSnake blocks={[normal]} {...props} {...instant} width={W} />)
+    const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
+    expect(mark.getAttribute('data-node-kind')).not.toBe('broken')
   })
 })

@@ -8,6 +8,7 @@ import { minToClock, SLOT_VISIBLE_SECTORS, type TimelineBlock } from '../lib/tim
 import {
   layoutSnake,
   shapeBox,
+  SHAPE_ICON_SIZE,
   SHAPE_LEGEND_ORDER,
   SIGNAL_SHAPE,
   snakePos,
@@ -15,8 +16,9 @@ import {
   SNAKE_BAR_W,
   SNAKE_NODE_W,
   type SignalKind,
+  type SignalShape,
 } from '../lib/snake'
-import { firstBurstByKey, type StockThemeTag, type ThemeBurst } from '../lib/theme-burst'
+import { normTheme, type StockThemeTag, type ThemeBurst } from '../lib/theme-burst'
 
 /**
  * 图例：轴上每种图形代表什么（2026-10-18 用户要求「时间轴顶部给每个图形做解释」）。
@@ -25,8 +27,9 @@ import { firstBurstByKey, type StockThemeTag, type ThemeBurst } from '../lib/the
  * 改形状时必然出现「图例是三角、轴上是圆」的静默漂移。
  */
 const LEGEND_TONE: Record<SignalKind, string> = {
-  burst: 'bg-up',
-  risk: 'bg-down',
+  burst: 'text-rec',
+  broken: 'text-break',
+  risk: 'text-down',
   linkage: 'bg-up',
   up: 'bg-up/70',
   rotation: 'border border-rec bg-transparent',
@@ -35,6 +38,219 @@ const LEGEND_TONE: Record<SignalKind, string> = {
 }
 
 const LEGEND_SIZE = 15
+
+/**
+ * hover 高亮环直径。19px = 14px 图标 + 2.5px 呼吸边。
+ *
+ * ⛔ 不能再大：相邻节点间距中位 ~23px，22px 的环已经会蹭到隔壁图标，
+ *    在一串密集风险节点上看起来像「两个节点都被选中」。
+ */
+const HOVER_RING = 19
+
+/** 四角星：四向尖角 + 凹边贝塞尔（14px 下是「亮点炸开」，不是几何三角） */
+const SPARKLE_PATH =
+  'M7 0 C7.55 4.45 9.55 6.45 14 7 C9.55 7.55 7.55 9.55 7 14 C6.45 9.55 4.45 7.55 0 7 C4.45 6.45 6.45 4.45 7 0 Z'
+
+/** 叉：两条圆头斜线（最通用的「否定/异常」符号） */
+const CROSS_PATH = 'M3.6 3.6 L10.4 10.4 M10.4 3.6 L3.6 10.4'
+
+/**
+ * 形状标记 —— 节点与图例**唯一**的绘制出口（2026-10-20 抽出）。
+ *
+ * ⛔ 抽出来的理由：形状规范化之后，节点和图例各写一遍 `clipPath` / `borderRadius` 分支，
+ *    改形状时必然出现「图例是星、轴上是三角」的静默漂移 —— 页面不会报错，只有肉眼能发现。
+ *    尖角形状（星/叉）走 SVG，几何形状（圆/方/菱形）走 CSS，两路都在这一个函数里分支。
+ */
+function ShapeMark({
+  shape,
+  height = SHAPE_ICON_SIZE,
+  tone,
+  className,
+  title,
+  nodeKind,
+  glow = false,
+}: {
+  shape: SignalShape
+  height?: number
+  tone: string
+  className?: string
+  title?: string
+  /** 只有**轴上的节点**才传；图例不传（否则会把图例算进节点统计） */
+  nodeKind?: SignalKind
+  /**
+   * 同色柔和光晕（2026-10-20 用户：「加一圈很淡的同色光晕」）。
+   * 用 `drop-shadow` 而不是再画一个圆：圆是实心的会盖住形状边缘，
+   * drop-shadow 是**沿轮廓**扩散，星形的四个尖角会自然带出一圈光。
+   */
+  glow?: boolean
+}) {
+  const box = shapeBox(shape, height)
+  const boxStyle = { width: box.width, height: box.height }
+  const common = {
+    title,
+    'data-node-kind': nodeKind,
+    'data-node-shape': nodeKind ? shape : undefined,
+  }
+
+  if (box.glyph) {
+    return (
+      <svg
+        viewBox="0 0 14 14"
+        className={cn(
+          'inline-block overflow-visible',
+          tone,
+          className,
+        )}
+        style={boxStyle}
+        aria-hidden
+        {...common}
+      >
+        {box.glyph === 'ring-gap' ? (
+          /*
+          炸板 = **缺口圆环**（黄色）：一圈「板」被打掉一块。
+          ⛔ 用 stroke-dasharray 而不是剪裁：缺口是「线断掉」的语义，
+             剪掉一块扇形会变成「饼图」，读不出「环被打开」。
+          */
+          <circle
+            cx={7}
+            cy={7}
+            r={5.2}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.6}
+            strokeDasharray="25 7"
+            strokeLinecap="round"
+            transform="rotate(-90 7 7)"
+          />
+        ) : box.glyph === 'sparkle' ? (
+          <>
+            {/*
+              光晕 = **同形状放大 1.4/1.8 倍的淡紫**，不是 drop-shadow。
+              ⛔ 为什么不用 `filter: drop-shadow(0 0 4px currentColor)`：
+                 14px 的星在 4px 模糊下几乎看不出（实测截图），加大到 9px 又会糊到隔壁节点。
+                 同形状外扩是可控的：形状完全同构、透明度固定、尺寸精确。
+              ⛔ svg 必须 `overflow-visible`，否则外扩部分被 14×14 的 viewBox 裁掉。
+            */}
+            {glow && (
+              <>
+                <path
+                  d={SPARKLE_PATH}
+                  fill="currentColor"
+                  opacity={0.22}
+                  transform="translate(7 7) scale(1.42) translate(-7 -7)"
+                />
+                <path
+                  d={SPARKLE_PATH}
+                  fill="currentColor"
+                  opacity={0.11}
+                  transform="translate(7 7) scale(1.85) translate(-7 -7)"
+                />
+              </>
+            )}
+            <path d={SPARKLE_PATH} fill="currentColor" />
+          </>
+        ) : (
+          // 2.2 在 14 的 viewBox 里 → 缩到 11px 后视觉约 1.7px；用 2.4 会糊成一团墨点
+          <path
+            d={CROSS_PATH}
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            fill="none"
+          />
+        )}
+      </svg>
+    )
+  }
+
+  return (
+    <span
+      className={cn('inline-block', tone, className)}
+      style={{
+        ...boxStyle,
+        clipPath: box.clipPath,
+        borderRadius: box.borderRadius,
+        borderWidth: box.borderWidth,
+        borderStyle: box.borderWidth ? 'solid' : undefined,
+      }}
+      {...common}
+    />
+  )
+}
+
+/**
+ * 轴上的一枚标签 + 它的引导线（2026-10-20 抽出）。
+ *
+ * ⛔ 上下两侧各渲染一次，互不感知 —— 这是「一个节点同时显示上下两条线路」的落点。
+ * ⛔ 位置与线长完全由 `slot.tier` 决定，⛔ 不要在这里再算避让：
+ *    排版决策全部发生在 `labelSlots`（那里才知道同层还有谁）。
+ */
+function LabelChip({
+  slot,
+  dir,
+  clock,
+  outside,
+}: {
+  slot: LabelSlot
+  dir: SnakeLabelDir
+  clock: string
+  outside: 'pre' | 'post' | null
+}) {
+  const isUp = dir === 'up'
+  const tag = slot.tag
+  return (
+    <>
+      {/* 引导线：第 0 层也画（长度 = LEADER_DROP），否则贴轴的标签找不到对应节点 */}
+      <span
+        className={cn(
+          'absolute left-1/2 -translate-x-1/2 w-px pointer-events-none',
+          slot.tone === 'rec'
+            ? 'bg-rec/45'
+            : slot.tone === 'up'
+              ? 'bg-up/45'
+              : slot.tone === 'news'
+                ? 'bg-line-strong/70'
+                : 'bg-down/45',
+        )}
+        style={
+          isUp
+            ? { bottom: HIT_H - LEADER_DROP, height: slot.tier * LABEL_STEP + LEADER_DROP }
+            : { top: HIT_H - LEADER_DROP, height: slot.tier * LABEL_STEP + LEADER_DROP }
+        }
+        data-label-leader={slot.tier}
+        data-label-dir={dir}
+      />
+      <span
+        className="absolute left-1/2 -translate-x-1/2 num text-[9.5px] text-txt whitespace-nowrap pointer-events-none"
+        style={isUp ? { bottom: HIT_H + slot.tier * LABEL_STEP } : { top: HIT_H + slot.tier * LABEL_STEP }}
+        data-label-tier={slot.tier}
+        data-label-dir={dir}
+      >
+        {clock}
+        {outside && <span className="text-warn">{outside === 'post' ? '盘后' : '盘前'}</span>}
+        {tag && (
+          <span
+            className={cn(
+              'ml-1',
+              tag.kind === 'first' && 'text-[11.5px] font-bold text-rec',
+              tag.kind === 'follow' && 'text-[11px] font-semibold text-rec/80',
+              tag.kind === 'rotation' && 'text-rec',
+              // 走强红、走弱绿 —— 与引导线同色，除「上/下」之外还能直接读强弱
+              tag.kind === 'plain' && (tag.dir === 'down' ? 'text-down/75' : 'text-up/75'),
+              // 消息面：中性深灰（既不是机会红也不是风险绿），带「消息·」前缀自解释
+              tag.kind === 'news' && 'text-txt/70',
+              // 短线精灵异动：机会向（半档紫），但比板块走强弱 —— 它没有题材归属
+              tag.kind === 'signal' && 'text-rec/70',
+            )}
+            data-burst={tag.kind === 'first' ? 'first' : tag.kind === 'follow' ? 'follow' : undefined}
+          >
+            {tag.text}
+          </span>
+        )}
+      </span>
+    </>
+  )
+}
 
 export function ShapeLegend({ className }: { className?: string }) {
   return (
@@ -45,28 +261,21 @@ export function ShapeLegend({ className }: { className?: string }) {
       )}
       aria-label="时间轴图形说明"
     >
-      <span className="text-[10.5px] font-semibold tracking-[0.1em] text-sub">图形说明</span>
+      <span className="text-[10.5px] font-semibold tracking-[0.1em] text-txt">图形说明</span>
       {SHAPE_LEGEND_ORDER.map((kind) => {
         const spec = SIGNAL_SHAPE[kind]
-        const box = shapeBox(spec.shape, LEGEND_SIZE)
         return (
           <span
             key={kind}
-            className="flex items-center gap-1 text-[11px] text-sub"
+            className="flex items-center gap-1 text-[11px] text-txt/85"
             title={spec.desc}
             data-legend-kind={kind}
           >
             <span className="flex h-[16px] w-[16px] flex-none items-center justify-center">
-              <span
-                className={cn('inline-block', LEGEND_TONE[kind])}
-                style={{
-                  width: box.width,
-                  height: box.height,
-                  clipPath: box.clipPath,
-                  borderRadius: box.borderRadius,
-                  borderWidth: box.borderWidth,
-                  borderStyle: box.borderWidth ? 'solid' : undefined,
-                }}
+              <ShapeMark
+                shape={spec.shape}
+                height={LEGEND_SIZE}
+                tone={LEGEND_TONE[kind]}
               />
             </span>
             {spec.label}
@@ -140,32 +349,111 @@ const AI_TRADER_QUOTES = [
  * 「低空经济首次爆发……可以跟这个紫色再做一个区分，变为大红色……后面继续走强也保持红色，
  *   字体稍微大一点，突出这个题材牛逼」。
  *
- * 现规则（两档，都红）：
- *   · **首爆**（该题材当日第一次爆发）→ 实心大红 `bg-up` + 竖条加宽 3px + 标签加粗放大，文案带「首爆」；
- *   · **续爆**（同一题材后续再爆发/走强）→ `bg-up/80`（仍是红，弱半档），文案带「续强」；
- *   · **轮动/回流** 保持紫色空心 —— 紫色从此只表示「不是新爆发」。
+ * ## ⚡ 2026-10-20（下半场）用户再改口：首爆回到**紫色 + 同色光晕**
+ *
+ * 「首爆改为紫色，然后加一圈很淡的同色光晕！」
+ *
+ * 现规则（两档，都紫）：
+ *   · **首爆**（该题材当日第一次出现在轴上）→ 实心紫四角星 + **一圈很淡的同色光晕** + 标签加粗放大；
+ *   · **续强**（同一题材后续再爆发）→ 60% 紫四角星（无光晕），文案带「续强」；
+ *   · **轮动/回流** 仍是紫色空心圆 —— 与首爆靠**形状**分开（星 vs 空心圆），不再靠色相。
+ *
+ * ⛔ 光晕只给首爆：它承担「强调」职责。给续强也加，密集段落会连成一片紫雾，
+ *    反而把首爆淹掉（同一天续强节点是首爆的数倍）。
+ * ⚠️ 2026-10-20 早些时候：「首爆和风险换一个 icon，这个红绿三角不好看」→ 三角改星/叉。
  */
-function barVisual(s: BlockSummary, block: TimelineBlock, firstBurst = false): {
+function barVisual(
+  s: BlockSummary,
+  block: TimelineBlock,
+  firstBurst = false,
+  /**
+   * 该节点**上区标签的类型**（`labelSlots` 已经算好）。
+   *
+   * ⛔ 2026-10-20 用户：「如果标题写的是首爆，那么这 icon 也改成首爆，不要显示为其他的 icon，
+   *    那样子的话不统一！」
+   *    标签文案与节点形状原本是两套独立判据：标签按「首次出现」判首爆（`firstSeen`），
+   *    形状按「有没有 burst 事件」判 —— 于是会出现「标题写首爆·国产芯片，图标却是红圆」。
+   *    现在只要**标签是首爆/续强**，形状一律让位给紫星；反之亦然。
+   */
+  tagKind?: SnakeThemeTag['kind'],
+): {
   kind: SignalKind
   className: string
   width: number
   title: string
 } {
+  // 标题与图标必须统一：标签说首爆/续强 → 图标就是星（压过联动/风险/走强的形状判定）
+  if (tagKind === 'first' || tagKind === 'follow') {
+    return tagKind === 'first'
+      ? { kind: 'burst', className: 'text-rec', width: SNAKE_BAR_W, title: '题材首次爆发' }
+      : { kind: 'burst', className: 'text-rec/60', width: SNAKE_BAR_W, title: '题材继续走强' }
+  }
   // 颜色表示方向与题材，宽度/空心表示事件类型；不能只靠色相区分。
   // 联动 = 菱形（原 `ring-1` 在裁剪成菱形后会变成一圈怪边，故只用实心底色）
   if (block.kind === 'linkage') return { kind: 'linkage', className: 'bg-up', width: 14, title: '多板块联动' }
-  if (s.fade.length > 0 || s.downSectorCount > 0 || s.otherDownCount > 0) return { kind: 'risk', className: 'bg-down', width: SNAKE_BAR_W, title: '风险或负反馈' }
+  // 走弱同理分两档：板块杀跌 = 满色绿叉（异动，必须看见）；纯个股回落 = 35% 绿（背景）
+  if (s.fade.length > 0 || s.downSectorCount > 0) return { kind: 'risk', className: 'text-down/70', width: SNAKE_BAR_W, title: '板块走弱或负反馈' }
+  if (s.otherDownCount > 0) return { kind: 'risk', className: 'text-down/35', width: SNAKE_BAR_W, title: '个股走弱' }
   if (s.burst.length > 0) {
     return firstBurst
-      ? { kind: 'burst', className: 'bg-up', width: SNAKE_BAR_W + 3, title: '题材首次爆发' }
-      : { kind: 'burst', className: 'bg-up/80', width: SNAKE_BAR_W, title: '题材继续走强' }
+      ? { kind: 'burst', className: 'text-rec', width: SNAKE_BAR_W, title: '题材首次爆发' }
+      : { kind: 'burst', className: 'text-rec/60', width: SNAKE_BAR_W, title: '题材继续走强' }
   }
+
   // 轮动 = 空心圆（描边紫，内部透明 → 一眼区分「不是新爆发」）
   if (s.rotated.length > 0) return { kind: 'rotation', className: 'border border-rec bg-transparent', width: SNAKE_BAR_W, title: '题材轮动或回流' }
-  if (s.upSectorCount > 0 || s.otherUpCount > 0) return { kind: 'up', className: 'bg-up/70', width: SNAKE_BAR_W, title: '盘中走强' }
+  /**
+   * 走强分两档（2026-10-20 用户：「单独的个股提示可以减弱，但类似板块异动的这种一定要提示出来」）：
+   *   · 有**板块**走强 → 实心红圆，满色（这是要看见的异动）
+   *   · 只有**个股**走强 → 同形状但 35% 红（背景信息，不抢板块的眼）
+   */
+  if (s.upSectorCount > 0) return { kind: 'up', className: 'bg-up/70', width: SNAKE_BAR_W, title: '板块走强' }
+  if (s.otherUpCount > 0) return { kind: 'up', className: 'bg-up/35', width: SNAKE_BAR_W, title: '个股走强' }
   if (block.kind === 'merged') return { kind: 'system', className: 'bg-line-strong', width: SNAKE_BAR_W, title: '低频系统记录' }
+  /**
+   * 炸板（涨停被打开）→ 黄色缺口环（2026-10-20 用户：「打开涨停可以提示为黄色节点」）。
+   *
+   * ## ⛔⛔ 2026-10-20 用户两次修正，最终口径「降权 ≠ 不显示」
+   *
+   * 第一次：「炸板炸板不需要……还是首爆优先，炸板不需要权重，你这全是炸板了！！」
+   *   → 原因是旧版把它排在 **linkage 之后、所有信号之前**，只要该分钟有 `broken_new`
+   *     整根轴就变黄环，首爆/走弱/走强全被吞掉。**优先级必须降到最低**。
+   *
+   * 第二次：「我说降低权重不是不显示哈，当节点没有更多重要信息的时候，
+   *   单一个股信息还是可以显示的！！」
+   *   → 我一度加了「≥2 只才显示」的门槛，结果**单票炸板直接消失**（退成灰细线），
+   *     这属于把「降权」做成了「删除」。现改为**弱化显示**：
+   *
+   * | 情形 | 节点形状 |
+   * |---|---|
+   * | 该刻有 首爆/续强 · 板块走弱 · 轮动 · 走强 · 低频记录 | 显示那些（炸板让位） |
+   * | 只剩炸板，单只 | 黄环 · **70% 透明**（与「板块走弱 70%」同档，看得见但不抢） |
+   * | 只剩炸板，≥2 只 | 黄环 · 满色（炸板潮） |
+   * | 什么都没有 | 灰色细线 |
+   *
+   * ⛔ 与 `normal` 的相对位置不能反过来：`normal` 是 catch-all 兜底，
+   *    放到它后面炸板就真的渲染不出来了。
+   */
+  if (s.brokenCount > 0) {
+    const batch = s.brokenCount >= BROKEN_BATCH_MIN
+    return {
+      kind: 'broken',
+      className: batch ? 'text-break' : 'text-break/70',
+      width: SNAKE_BAR_W,
+      title: `涨停打开${s.brokenCount > 1 ? ` ×${s.brokenCount}` : ''}`,
+    }
+  }
   return { kind: 'normal', className: 'bg-sub', width: SNAKE_BAR_W, title: '盘中事实' }
 }
+
+/**
+ * 一个节点要**几只**票炸板才算「炸板潮」（满色显示）。
+ *
+ * ⛔ 这个阈值只决定**颜色深浅**，不决定「显示还是不显示」——
+ *    2026-10-20 用户明确：「降低权重不是不显示，单一个股信息还是可以显示的」。
+ *    单票炸板照样画黄环，只是降到 70% 透明，让成批炸板自然更抢眼。
+ */
+const BROKEN_BATCH_MIN = 2
 
 /** 该刻的**活跃度**（用于竖条高度）—— 收盘口径个股 + 盘中板块事件 + 题材信号权重 */
 function activityOf(s: BlockSummary): number {
@@ -173,6 +461,8 @@ function activityOf(s: BlockSummary): number {
     s.stockCount +
     s.otherUpCount +
     s.otherDownCount +
+    // 炸板已从 otherDownCount 单列，活跃度要补回来（跌停没拆，仍在其内）
+    s.brokenCount +
     s.upSectorCount +
     s.downSectorCount +
     s.burst.length * 3 +
@@ -200,6 +490,16 @@ function isNotable(s: BlockSummary, block: TimelineBlock): boolean {
     // 不标的话，仅轮动的题材在轴上依然不可见，等于白标记
     s.rotated.length > 0 ||
     s.fade.length > 0 ||
+    // 消息面（2026-10-20 用户「消息面也要提示，目前还是很多空白」）：
+    // 只推了消息、没有板块异动的时刻，此前连时刻都不标 → 轴上只剩一个灰点
+    s.pushed.length > 0 ||
+    // 短线精灵信号（同一诉求的第二档）：不认它的话，`labelSlots` 的准入闸门
+    // 会在 `downTagOf` 之前就把节点跳过 —— 下区「异动·」标签永远渲染不出来
+    s.signals.length > 0 ||
+    // 外部快讯（消息面第一档）：同上，进了准入闸门才有机会占位
+    s.news.length > 0 ||
+    // 个股走强同样要能标（否则「有票在动」的时刻仍是一片空白）
+    s.upStocks.length > 0 ||
     s.sectorCount >= SLOT_VISIBLE_SECTORS ||
     s.upSectorCount + s.downSectorCount >= 1
   )
@@ -207,6 +507,261 @@ function isNotable(s: BlockSummary, block: TimelineBlock): boolean {
 
 /** 同层相邻两个**时刻标签**的最小间距（px）—— 小于它就不标，防止叠字 */
 const MIN_LABEL_GAP = 48
+
+/**
+ * 标签三层错位 + 引导线（2026-10-20 用户：「标题做一个引导线，可以链接三个高度的标题，
+ * 避免标题重叠在一起」）。
+ *
+ * 原来所有标签挤在同一条水平线上，只能靠「放不下就不标」来避让 —— 密集段落里
+ * 「首爆·军工」和「首爆·国产芯片」两个 ~118px 的长标签，中心距 75px 时就压字了。
+ * 现在每个标签可以落在 0/1/2 三档高度，用一条 1px 竖线连回节点。
+ *
+ * ## 2026-10-20（下半场）用户加了一条：走强在上、走弱在下
+ *
+ * 「上方显示走强红线，下方再来一根绿线显示走弱！单独的个股提示可以减弱，
+ *   但是类似板块异动的这种一定要提示出来。」
+ *
+ *   ┌ 首爆·国产芯片        ← 上方第 2 层（红线 up）
+ *   │ ┌ 军工走强           ← 上方第 1 层
+ *   │ │
+ *   ✦ │ │                 ← 节点
+ *   │ │ └ 白银走弱         ← 下方第 0 层（绿线 down）
+ *   │     └ 医药走弱       ← 下方第 1 层
+ *
+ * ⛔ 方向 = 标签的**语义**（走强/爆发/轮动 vs 走弱/杀跌），不是节点的颜色。
+ * ⛔ 上下两区各自独立分三层：它们占据不同纵向空间，互不遮挡，不该互相挤占。
+ * ⛔ 层间距必须 ≥ 标签行高（首爆标签 11.5px 加粗 → 约 16px），否则上下两层自己会压。
+ *
+ * ## ⛔⛔ 三层空间必须**常驻预留**（2026-10-20 用户：「还是把高度预留出来吧！！」）
+ *
+ * 当天上午试过「逐段行高自适应」：按每段实际堆到的层数收窄段距（实测 196/120/120，
+ * 总高 824→616）。用户当场否掉：「高度压缩了，我有些线看不到了」——
+ * 收窄后上一段的下标签与下一段的上标签挤在一起，引导线看着像被截断；
+ * 而密集时段随时会再冒一层标签，预留不足必然压字。宁可有留白。
+ */
+const LABEL_TIERS = 3
+/**
+ * 层间距 20px：首爆标签是 11.5px 加粗，实际行高约 16px —— 用 16px 时上下两层
+ * 几乎贴在一起（实测截图里层 1 和层 2 只差 16px，看上去仍像压字）。
+ */
+const LABEL_STEP = 20
+/** 节点命中区高度（标签与引导线都以它的顶边为基准） */
+const HIT_H = SNAKE_BAR_MAX_H + 22
+/**
+ * 引导线从「命中区顶边」往下再吃的长度：命中区 68px 而图标只有 11–14px，
+ * 图标顶边其实在命中区内部约 26px 处。线不往下吃这段，标签和图标之间就是断开的。
+ */
+const LEADER_DROP = 26
+
+/** 标签方向：走强（上 / 红线）还是走弱（下 / 绿线） */
+export type SnakeLabelDir = 'up' | 'down'
+
+/** 引导线色调：题材紫 / 上涨红 / 下跌绿 / 消息面灰 */
+export type LabelTone = 'rec' | 'up' | 'down' | 'news'
+
+/** 某个节点在某一侧占到的位置 */
+export interface LabelSlot {
+  tier: number
+  tone: LabelTone
+  /** 文案为 null = 只有时刻、没有题材名 */
+  tag: SnakeThemeTag | null
+}
+
+/** 轴上题材名标签（渲染与碰撞判据共用同一份结构） */
+export type SnakeThemeTag = {
+  /**
+   * `signal` = 短线精灵个股异动（2026-10-20 用户：「消息面呢？这边是否介入快讯
+   * 【短线精灵 + 终端！！】」）—— 它是**消息面通道的第二档**，排在「消息·推送」之后：
+   * 文案前缀「异动·」，文字用半档紫（机会向但未经题材归类），引导线仍走中性灰。
+   */
+  kind: 'first' | 'follow' | 'rotation' | 'plain' | 'news' | 'signal'
+  dir: SnakeLabelDir
+  text: string
+}
+
+/**
+ * 该节点的轴上标签内容 —— **纯函数，标签挑选与最终渲染都走这里**。
+ *
+ * ## ⚡ 2026-10-20 用户：「9:43，国产芯片就已经触发了，为什么还是首爆？！」
+ *
+ * 原实现把「首爆」绑在 memory 的 `rise` 事件上（「新主线崛起：X 涨停 N 只」），
+ * 而那条事件要等**涨停家数达标**才生成 —— 实测 10-20 国产芯片 09:43 就 `sector_up`（1 只涨停），
+ * 但 `rise` 到 10:48（3 只）才出现，于是轴上标了个 10:48 的「首爆」，比真实触发晚了 65 分钟。
+ *
+ * 现在：**首次触发即首爆** —— 由 `firstSeenNames`（该题材/板块当日第一次出现在轴上）决定，
+ * 不再依赖后端阈值。`burst` 事件如果**不是**首次出现，就降级为「续强」。
+ *
+ * ⛔ 抽成纯函数的原因：标签宽度估算与最终文案必须同源，否则会出现「算着放得下、渲染却压字」。
+ */
+function upTagOf(
+  summary: BlockSummary,
+  /**
+   * 该节点上「当日首次出现」的题材/板块名（见 `firstSeen`）。
+   * 非空 = 它就是这个题材的首爆点。
+   */
+  firstSeenNames: string[] | undefined,
+  /**
+   * 该**板块名**当日第几次走强（2026-10-20 用户：「走强可以设置为 +1，然后无限叠，
+   * 比如机器人走强可以改为：机器人+1，机器人+2」）。
+   * ⛔ 缺省 1：第一次出现就叫 `+1`，不从 0 起（`+0` 读起来像「没发生」）。
+   * ⛔ 必须**按名字**取序号，不能按节点取（见下）：`streakOf(name)`。
+   */
+  streakOf: (name?: string | null) => number = () => 1,
+): SnakeThemeTag | null {
+  /**
+   * ## ⛔⛔ 首爆必须按**名字**判，不能按节点判（2026-10-22 用户抓包）
+   *
+   * 用户截图：「09:26 / 09:31 / 09:32」三个节点全写「首爆·机器人」。
+   *
+   * 旧实现 `isFirst = firstSeenNames?.length > 0` 是**节点级**布尔值 ——
+   * 「这个节点引入了新名字」；而标签上的名字固定取 `upSectors[0].name`（最强板块）。
+   * 两者不同源 → 09:31 当刻真正新出现的是「云计算数据中心」（排名第 2），
+   * 最强的机器人只是又涨了一只（第 2 次），却因为 `isFirst=true` 被写成「首爆·机器人」。
+   *
+   * 现改为 `fresh(name)`：**这个名字**今天第一次出现才算首爆。三条口径：
+   *   · 最强板块本身是新的 → 首爆·它；
+   *   · 最强板块是旧的、但有别的板块是新的 → 首爆·那条新线（信息量更大，且不会被误读）；
+   *   · 全都旧 → 最强板块 `+N`。
+   */
+  const fresh = (name?: string | null): boolean => {
+    if (!name) return false
+    const key = normTheme(name)
+    if (!key) return false
+    return (firstSeenNames ?? []).some((n) => normTheme(n) === key)
+  }
+  const burstLead = summary.burst[0]?.theme
+  const extraBurst = summary.burst.length > 1 ? `+${summary.burst.length - 1}` : ''
+  if (summary.burst.length > 0 && burstLead) {
+    const first = fresh(burstLead)
+    return {
+      kind: first ? 'first' : 'follow',
+      dir: 'up',
+      text: `${first ? '首爆' : '续强'}·${burstLead}${extraBurst}`,
+    }
+  }
+  if (summary.rotated.length > 0) {
+    const extra = summary.rotated.length > 1 ? `+${summary.rotated.length - 1}` : ''
+    // 轮动是「旧线又活了」，属于机会侧 → 也走上区
+    return { kind: 'rotation', dir: 'up', text: `${summary.rotated[0].theme}${extra}` }
+  }
+  if (summary.upSectors.length > 0) {
+    const name = summary.upSectors[0].name
+    // 板块当日第一次出现在轴上 → 这就是「首爆」（不再等涨停家数达标）
+    if (fresh(name)) return { kind: 'first', dir: 'up', text: `首爆·${name}` }
+    // 最强板块是旧线，但该节点确有一条**新线**首次触发 → 标新线（否则这条线今天就永远没有首爆点）
+    const freshName = (firstSeenNames ?? []).find((n) => n && n !== name)
+    if (freshName) return { kind: 'first', dir: 'up', text: `首爆·${freshName}` }
+    // 「+N」= 这条线今天第 N 次走强（同一板块名跨节点累加），不是涨停家数
+    return { kind: 'plain', dir: 'up', text: `${name}+${streakOf(name)}` }
+  }
+  /**
+   * 个股兜底（最弱一档）—— 2026-10-20 用户两句话合起来的口径：
+   * 「单一个股信息还是可以显示的」「目前还是很多空白」。
+   *
+   * 只在该节点**没有任何板块/题材**时才出手，⛔ 不与板块抢上方跑道；
+   * 出现的是 `stock_up` 里涨幅最高的那只，多只用 `+N` 收口（全名在 hover 明细）。
+   */
+  if (summary.upStocks.length > 0 && summary.upStocks[0].name) {
+    const extra = summary.upStocks.length > 1 ? `+${summary.upStocks.length - 1}` : ''
+    return { kind: 'plain', dir: 'up', text: `${summary.upStocks[0].name}${extra}` }
+  }
+  return null
+}
+
+/**
+ * 下方（走弱）标签 —— 与上区**完全独立**。
+ *
+ * 2026-10-20 用户：「一个节点可以同时显示上下两条线路数据！」
+ * 旧实现是 `themeTagOf` 返回**单个** tag，走强分支在前面直接 return，
+ * 于是「某个板块走强的同一分钟恰好有另一个板块走弱」时，走弱那条被整条吞掉。
+ *
+ * ⛔ 只对**板块级**走弱出标签：`downSectors` 是板块；`otherDownCount` 是个股回落，
+ *    个股按用户要求「降低权重」—— 不占标签位（hover 明细里仍然能看到）。
+ */
+function downTagOf(summary: BlockSummary): SnakeThemeTag | null {
+  if (summary.downSectors.length > 0) {
+    const name = summary.downSectors[0].name
+    const extra = summary.downSectors.length > 1 ? `+${summary.downSectors.length - 1}` : ''
+    return { kind: 'plain', dir: 'down', text: `${name}走弱${extra}` }
+  }
+  /**
+   * **外部快讯**（2026-10-20 用户：「消息面呢？这边是否介入快讯【短线精灵+终端！！】」）
+   *
+   * 消息面通道的**第一档**：`newsflash_new` 由 `scripts/intraday_timeline.py` 按 id 去重后
+   * append-only 记账，时刻取快讯自己的 `ctime` —— 是真能落到分钟轴的事实。
+   * ⛔ 标题压到 `NEWS_LABEL_MAX` 字（快讯标题常 30+ 字，原样上轴会横跨好几个节点）；
+   *    全文在 hover 明细里，⛔ 不在轴上硬塞。
+   * ⛔ 仍让位给「板块走弱」：风险优先，消息次要。
+   */
+  if (summary.news.length > 0) {
+    const first = summary.news[0]
+    // `title` 在事件上是开放字段（`[k: string]: unknown`）→ 先收窄再压字
+    const raw = typeof first.title === 'string' ? first.title : first.name
+    const title = shortNewsTitle(raw)
+    const extra = summary.news.length > 1 ? `+${summary.news.length - 1}` : ''
+    if (title) return { kind: 'news', dir: 'down', text: `快讯·${title}${extra}` }
+  }
+  /**
+   * **消息面落在下方空位**（2026-10-20 用户：「消息面也要提示，目前还是很多空白」）。
+   *
+   * `pushed_topics` 带 `first_pushed` 时刻与 `context` 摘要，`buildTimeline` 早已把它
+   * 建成独立 push 节点 —— 但此前轴上**完全不给标签**（`isNotable` 也不认它），
+   * 于是每个推送时刻只剩一个灰点，正是用户说的「很多空白」。
+   *
+   * ⛔ 为什么放**下方**而不是抢上方：上区是题材/走强的跑道（一天 70+ 条标签，三层常满），
+   *    消息面挤进去必然被吞；下区只有走弱（一天 18 条），大量空位正好放消息。
+   *    且「消息·」前缀 + 灰色引导线（tone=news）与走弱的绿线能一眼分开。
+   * ⛔ 同一节点的消息**只显示一次**：下方没有走弱/快讯时才顶上，绝不与走强争同一行。
+   */
+  if (summary.pushed.length > 0 && summary.pushed[0].name) {
+    const extra = summary.pushed.length > 1 ? `+${summary.pushed.length - 1}` : ''
+    return { kind: 'news', dir: 'down', text: `消息·${summary.pushed[0].name}${extra}` }
+  }
+  /**
+   * 短线精灵信号（2026-10-20 用户：「消息面呢？这边是否介入快讯【短线精灵+终端！！】」）。
+   *
+   * `signals_today` 带 `first_seen`（全天 79 条），是**个股级异动**：涨停/放量/共振。
+   * 排在「走弱」「消息」之后 —— 它数量最多、信息密度最低，只用来填最后一批空位。
+   * 文案前缀「异动·」+ 半档红（tone=signal），既能看出是机会向，又不会抢走强的眼。
+   */
+  if (summary.signals.length > 0 && summary.signals[0].name) {
+    const extra = summary.signals.length > 1 ? `+${summary.signals.length - 1}` : ''
+    return { kind: 'signal', dir: 'down', text: `异动·${summary.signals[0].name}${extra}` }
+  }
+  return null
+}
+
+/** 时刻文字「09:42」的估算宽度（9.5px 等宽数字 ≈ 5.4px/字符） */
+const CLOCK_LABEL_W = 5 * 5.4
+
+/**
+ * 快讯标题在轴上最多占几个字。
+ *
+ * ⛔ 快讯标题常 30+ 字（「工信部：加快推进人形机器人产业创新发展」），原样上轴会横跨
+ *    好几个节点、把三层跑道一次吃光。轴上只留「够认出来的前半句」，全文进 hover 明细。
+ */
+const NEWS_LABEL_MAX = 10
+
+/** 快讯标题压成轴上可读的短标签（超长截断加省略号） */
+function shortNewsTitle(text?: string | null, max = NEWS_LABEL_MAX): string {
+  const s = String(text ?? '').trim()
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
+/**
+ * 标签宽度估算（px）—— 用于「放不放得下」。
+ *
+ * ⚠️ 2026-10-20：原判据是**固定 48px 中心距**，但「09:42」只有 ~27px，
+ * 而「09:46 首爆·国产芯片」有 ~110px —— 两个长标签中心距 60px 时照样压字
+ * （实测截图出现「09:42 机器 09:46 机器」叠在一起）。
+ * 现按「时刻宽 + 题材名宽」估算，判据改为**半宽之和**。
+ */
+function labelWidth(tag: SnakeThemeTag | null): number {
+  if (!tag) return CLOCK_LABEL_W
+  const fontSize = tag.kind === 'first' ? 11.5 : tag.kind === 'follow' ? 11 : 9.5
+  // 汉字按字号满宽、数字/符号略窄，取 0.95 折中；+4 是「分钟」与题材名之间的 ml-1
+  return CLOCK_LABEL_W + 4 + tag.text.length * fontSize * 0.95
+}
 
 /** 一条竖虚线 + 时刻文字，给横轴一个「读到哪一段」的参照 */
 function TimeGrid({ x, y, rowHeight, label }: { x: number; y: number; rowHeight: number; label: string }) {
@@ -331,9 +886,14 @@ export function TimelineSnake({
   // 与盘中轮询同量级轮换，不写入数据流，也不影响事件轴的坐标或排序。
   const now = useNow(30_000)
   const W = width ?? measured
+  /**
+   * 布局（四段行高固定 196 = 3+3 排完整预留）。
+   * ⛔ 2026-10-20 已回退「按实际标签层数收窄段距」：压缩后引导线看着像被截断，
+   *    用户明确要求「还是把高度预留出来」。
+   */
   const layout = useMemo(() => layoutSnake({ marks: blocks.map((b) => b.at), width: W }), [blocks, W])
   const aiQuote = AI_TRADER_QUOTES[Math.floor(now.getTime() / 30_000) % AI_TRADER_QUOTES.length]
-  const noonSeamY = layout.lanes[1].y + layout.rowHeight / 2
+  const noonSeamY = (layout.lanes[1].y + layout.lanes[2].y) / 2
 
   /**
    * hover 打开的节点（内部状态）。
@@ -396,58 +956,189 @@ export function TimelineSnake({
   }, [blocks, layout])
 
   /**
-   * 首爆判定（2026-10-18 用户要求）：按**时间顺序**扫一遍，题材名第一次出现在
-   * `burst` 里的那个节点 = 首爆；之后再爆发 = 续强。
+   * **首爆判定 = 该题材/板块当日第一次出现在轴上**（2026-10-20 用户纠正口径）。
    *
-   * ⛔ 必须跨节点累积，不能只看单节点 —— `summarizeBlock` 只回答「这一块有没有爆发」，
-   *    同一个题材一天爆发 3 次时它三次都返回 burst，无法区分「第一次」。
+   * 「9:43，国产芯片就已经触发了，为什么还是首爆？！」—— 原来只在 memory 的 `burst`
+   * （= 「新主线崛起：X 涨停 N 只」）里找第一次，而那条事件要等**涨停家数达标**才生成：
+   * 实测 10-20 国产芯片 09:43 就 `sector_up`（1 只涨停），`rise` 直到 10:48（3 只）才出现，
+   * 轴上于是标了个晚 65 分钟的「首爆」。
+   *
+   * 现在把 `burst` 和 `upSectors` **两路来源合并**成「当日首次出现」：
+   *   · 先出现的那个节点 → 首爆（不论当时几只涨停）；
+   *   · 之后同题材的 burst → 降级为「续强」；
+   *   · 之后同板块走强 → `+N`。
+   *
+   * ⛔ 两路名字可能不同（`burst.theme` = 题材名、`upSectors[].name` = 板块名），
+   *    必须用 `normTheme` 归一后再判重，否则「国产芯片」和「国产芯片概念」会各算一次首爆。
+   * ⛔ 必须按时间顺序扫，不能只看单节点。
+   * ⛔ **必须用 `upSectorNames`（全量）而不是 `upSectors`（截断 3 个）**：
+   *    当刻排第 4 的板块若不算「已出现」，它下次冒头就会被误标首爆。
    */
-  const firstBursts = useMemo(
-    () => firstBurstByKey(nodes.map((n) => ({ key: n.block.key, burst: n.summary.burst }))),
-    [nodes],
-  )
+  const firstSeen = useMemo(() => {
+    const seen = new Set<string>()
+    const out = new Map<string, string[]>()
+    const ordered = [...nodes].sort((a, b) => a.block.at - b.block.at)
+    for (const n of ordered) {
+      const names = [
+        ...n.summary.burst.map((b) => b.theme),
+        ...n.summary.upSectorNames,
+      ].filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+      const fresh: string[] = []
+      for (const raw of names) {
+        const key = normTheme(raw)
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        fresh.push(raw)
+      }
+      if (fresh.length > 0) out.set(n.block.key, fresh)
+    }
+    return out
+  }, [nodes])
+
+  /**
+   * 每条线当天第几次走强 → 轴上标 `机器人+1 / +2 / +3`（2026-10-20 用户要求）。
+   *
+   * ⛔ 必须**按时间顺序**累加：`nodes` 虽然来自有序的 blocks，但这里仍显式排一遍 ——
+   *    一旦上游改了分块顺序（比如按强度排），计数会变成「按强度序」的假序号，
+   *    而页面照常渲染、不报错，属于最难发现的那类错。
+   * ⛔ 计数键是**板块名**（归一后），不是「节点最强板块」：
+   *    2026-10-22 实测 —— 「丁板块」10:00 排第 4（被截断，没上标签），10:20 单独走强时
+   *    按节点计数只数到 1，于是标成 `丁板块+1`，与事实（今天第 2 次走强）不符。
+   *    现按 `upSectorNames`（全量）逐节点累加，任何一次出现都计入。
+   */
+  const streakByNode = useMemo(() => {
+    const counter = new Map<string, number>()
+    const out = new Map<string, Map<string, number>>()
+    const ordered = [...nodes].sort((a, b) => a.block.at - b.block.at)
+    for (const n of ordered) {
+      const perNode = new Map<string, number>()
+      for (const raw of n.summary.upSectorNames) {
+        const k = normTheme(raw)
+        if (!k || perNode.has(k)) continue
+        const next = (counter.get(k) ?? 0) + 1
+        counter.set(k, next)
+        perNode.set(k, next)
+      }
+      out.set(n.block.key, perNode)
+    }
+    return out
+  }, [nodes])
 
   const openNode = nodes.find((n) => n.block.key === openKey) ?? null
 
   /**
-   * 哪些节点直接标时刻 —— 同层内按 x 从左到右**贪心**挑选（与上一个标签间距 ≥ MIN_LABEL_GAP）。
-   * ⛔ 纯函数式，且**确定性**：同一份数据每次选中的都是同一批节点。
+   * 哪个节点在轴上标字、标在**哪一侧（上/下）**、以及该侧的第几层。
+   *
+   * 同侧层内按 x 从左到右贪心挑选，横向放不下就往高一层让（最多三层），
+   * 三层都放不下才放弃标注。
+   *
+   * ⛔ 上下两区**各自独立分层**：它们占不同纵向空间，互不遮挡 ——
+   *    如果共用一套层级，一段「上方全满」会连带把下方的走弱标签也挤掉。
+   * ⛔ 纯函数式，且**确定性**：同一份数据每次选中的都是同一批节点、同一层。
    */
-  const labeled = useMemo(() => {
+  const labelSlots = useMemo(() => {
     const byLane = new Map<number, typeof nodes>()
     for (const n of nodes) {
       const list = byLane.get(n.point.row)
       if (list) list.push(n)
       else byLane.set(n.point.row, [n])
     }
-    const out = new Set<string>()
+    const out = new Map<string, { up?: LabelSlot; down?: LabelSlot }>()
     for (const list of byLane.values()) {
       const sorted = [...list].sort((a, b) => a.point.x - b.point.x)
       /**
-       * ⛔ **题材节点优先占位**（2026-09-20 用户「其他的题材全部都没看到了」）：
-       *
-       * 旧实现是「按 x 从左到右贪心」—— 先到的普通时刻标签会把题材名挤掉，
-       * 于是密集段落里的题材在轴上彻底不可见（等于没标记）。
-       * 现改为**两轮**：① 先让带题材名（爆发/轮动）的节点占位；
-       * ② 再用剩余空间给普通节点标时刻。间距判据对**已放置的全部标签**成立（不是只比前一个）。
+       * 占位优先级（从高到低）：
+       *   0. **首爆** —— 用户 2026-10-20：「有首爆的节点优先显示首爆」。
+       *      首爆是当天信息量最大的一格，必须先拿到离节点最近的位置，不能被普通走强挤掉。
+       *   1. 有题材/轮动、**板块走弱**、该线第一次走强（+1）。
+       *      ⛔ 板块走弱必须进这一档：用户「下跌标题显示不够全量」，根因就是它被当成普通节点。
+       *   2. 其余（普通时刻、+N 走强等）。
        */
-      const hasTheme = (n: (typeof sorted)[number]) =>
-        n.summary.burst.length > 0 || n.summary.rotated.length > 0
-      const ordered = [
-        ...sorted.filter(hasTheme),
-        ...sorted.filter((n) => !hasTheme(n)),
-      ]
-      const placed: number[] = []
+      const rankOf = (n: (typeof sorted)[number]) => {
+        if (firstSeen.has(n.block.key)) return 0
+        if (n.summary.burst.length > 0 || n.summary.rotated.length > 0) return 1
+        if (n.summary.downSectors.length > 0) return 1
+        // 该线当天第一次走强（+1）也要占好位置 —— 首爆是「新线第一次」，这里兜的是
+        // 「该板块首次走强但当天已出现过（比如先前被截断/在合并块里）」的情形
+        const top = n.summary.upSectors[0]?.name
+        if (top && (streakByNode.get(n.block.key)?.get(normTheme(top)) ?? 0) === 1) return 1
+        return 2
+      }
+      const ordered = [0, 1, 2].flatMap((rank) => sorted.filter((n) => rankOf(n) === rank))
+      /** 每层已放置的标签：中心 x + 估算半宽（⛔ 只存 x 的话，长短标签混排必然压字） */
+      const emptyTiers = () =>
+        Array.from({ length: LABEL_TIERS }, () => [] as Array<{ x: number; half: number }>)
+      // 上区（走强/爆发/轮动）与下区（走弱）各三层，互不抢位
+      const lanes: Record<SnakeLabelDir, Array<Array<{ x: number; half: number }>>> = {
+        up: emptyTiers(),
+        down: emptyTiers(),
+      }
+      /**
+       * 在某一侧找一个放得下的层。
+       * 间距要求 = max(两者半宽之和 + 4, MIN_LABEL_GAP)：
+       * ⛔ 保留 MIN_LABEL_GAP 作**下限** —— 短标签本来 30px 就不重叠，但轴上太密会糊成一片。
+       */
+      const place = (dir: SnakeLabelDir, half: number, x: number): number => {
+        const need = (p: { half: number }) => Math.max(half + p.half + 4, MIN_LABEL_GAP)
+        const tiers = lanes[dir]
+        const tier = tiers.findIndex((placed) => !placed.some((p) => Math.abs(x - p.x) < need(p)))
+        if (tier >= 0) tiers[tier].push({ x, half })
+        return tier
+      }
       for (const n of ordered) {
+        const notable = isNotable(n.summary, n.block)
+        const streaks = streakByNode.get(n.block.key)
+        const upTag = upTagOf(n.summary, firstSeen.get(n.block.key), (name) =>
+          (name ? streaks?.get(normTheme(name)) : undefined) ?? 1,
+        )
+        const downTag = downTagOf(n.summary)
         // ⛔ 盘外记录**一律标注**（它被夹到边界，没有标签就完全无法辨认）
-        if (!n.point.outside && !isNotable(n.summary, n.block)) continue
-        if (placed.some((x) => Math.abs(n.point.x - x) < MIN_LABEL_GAP)) continue
-        out.add(n.block.key)
-        placed.push(n.point.x)
+        if (!n.point.outside && !notable && !upTag && !downTag) continue
+        /**
+         * 2026-10-20 用户：「一个节点可以同时显示上下两条线路数据！」
+         *
+         * 上区条件 = 盘外记录 **或** 有走强标签 **或** 该节点本身值得标（纯时刻）。
+         * 下区条件 = 有走弱/消息标签。
+         * ⛔ 盘外记录必须无条件上区（它被夹到边界，没有时刻就完全无法辨认）。
+         * ⛔ 两者独立判断，互不吞并 —— 旧实现是单返回值，走强分支直接 return，
+         *    「同刻另一个板块走弱」那条会被整条吞掉。
+         *
+         * ⛔ **同一时刻不标两遍**：下区标签自带时钟（`LabelChip` 渲染 `{clock}{tag}`），
+         *    若上区只剩一根「纯时刻」标签，同一个 10:00 会在节点上下各出现一次 ——
+         *    违反用户反复强调的「同一件事实只说一次」。故有下区标签时，
+         *    上区只在**真有内容**（走强/爆发/轮动/盘外）时才占位。
+         */
+        const wantUp = n.point.outside || !!upTag || (notable && !downTag)
+        if (wantUp) {
+          const half = labelWidth(upTag) / 2
+          const tier = place('up', half, n.point.x)
+          if (tier >= 0) {
+            // 消息面单独一档色调：既不是题材紫，也不是走强红（否则引导线会误导方向）
+            const tone: LabelTone =
+              upTag?.kind === 'news' ? 'news' : upTag && upTag.kind !== 'plain' ? 'rec' : 'up'
+            out.set(n.block.key, { ...(out.get(n.block.key) ?? {}), up: { tier, tone, tag: upTag } })
+          }
+        }
+        if (downTag) {
+          const tier = place('down', labelWidth(downTag) / 2, n.point.x)
+          if (tier >= 0) {
+            out.set(n.block.key, {
+              ...(out.get(n.block.key) ?? {}),
+              /**
+               * 引导线色调 = **语义方向**，不是「它落在哪一侧」：
+               *   题材紫（走强/爆发）、上涨红、下跌绿、中性灰（消息面）。
+               * ⛔ 消息(`news`) 与短线精灵异动(`signal`) 都是**中性消息** —— 它们落在下半区
+               *    只是因为上区跑道被题材占满，不能因此给它们画一根「走弱绿线」，
+               *    否则轴上会把「有条消息」误读成「这条线在跌」。
+               */
+              down: { tier, tone: downTag.kind === 'news' || downTag.kind === 'signal' ? 'news' : 'down', tag: downTag },
+            })
+          }
+        }
       }
     }
     return out
-  }, [nodes])
+  }, [nodes, firstSeen, streakByNode])
 
   /** 时间刻度：落在各行内的整点/半点 */
   const ticks = useMemo(
@@ -500,17 +1191,25 @@ export function TimelineSnake({
 
         {/* ── 时间刻度 ── */}
         {ticks.map((t) => (
-          <TimeGrid key={t.m} x={t.x} y={t.y} rowHeight={layout.rowHeight} label={t.label} />
+          // 网格线按**本段**间距画（自适应后四段高度不同，用平均值会画到隔壁段里）
+          <TimeGrid
+            key={t.m}
+            x={t.x}
+            y={t.y}
+            rowHeight={layout.laneGaps[t.row] ?? layout.rowHeight}
+            label={t.label}
+          />
         ))}
 
         {/* ── 行标签（固定四段的墙上时钟范围）── */}
         {layout.lanes.map((lane) => (
           <span
             key={`lane-${lane.row}`}
-            className="absolute text-[9.5px] text-sub whitespace-nowrap pointer-events-none"
+            className="absolute text-[9.5px] text-txt whitespace-nowrap pointer-events-none"
             style={{
               left: lane.reversed ? layout.x1 : layout.x0,
-              top: lane.y + layout.rowHeight / 2 - 12,
+              // 段末标签贴在**本段**底边（行高自适应后不能再用统一 rowHeight）
+              top: lane.y + (layout.laneGaps[lane.row] ?? layout.rowHeight) / 2 - 12,
               transform: lane.reversed ? 'translateX(-100%)' : 'none',
             }}
             aria-hidden
@@ -536,11 +1235,13 @@ export function TimelineSnake({
         {/* ── 节点（小标记：细竖条，高度编码活跃度；明细走 hover）── */}
         {nodes.map(({ block, point, summary }) => {
           const isOpen = block.key === openKey
-          const firstBurstThemes = firstBursts.get(block.key)
-          const isFirstBurst = !!firstBurstThemes?.length
-          const visual = barVisual(summary, block, isFirstBurst)
+          const firstSeenNames = firstSeen.get(block.key)
+          const isFirstBurst = !!firstSeenNames?.length
+          /** 该节点在上下两侧各自占到的位置（可能同时有，也可能都没有） */
+          const slots = labelSlots.get(block.key)
+          // ⛔ 把**已定的标签类型**传给形状判定：标题写「首爆」时图标也必须是星（统一口径）
+          const visual = barVisual(summary, block, isFirstBurst, slots?.up?.tag?.kind)
           const shape = SIGNAL_SHAPE[visual.kind].shape
-          const box = shapeBox(shape, barHeight(summary), visual.width)
           const hitWidth = hitWidthByKey.get(block.key) ?? SNAKE_NODE_W
           const outsideTag =
             point.outside === 'post' ? '（盘后）' : point.outside === 'pre' ? '（盘前）' : ''
@@ -551,29 +1252,12 @@ export function TimelineSnake({
            * 多题材只列第一个 + `+N` 防叠字；完整名单在 hover 明细里。
            */
           /**
-           * 轴上题材名（用户 2026-10-18：首爆要「大红 + 字号大一点」突出）：
-           *   首爆 → `首爆·低空经济`（大红加粗 11.5px）
-           *   续强 → `续强·低空经济`（红 11px，弱半档）
-           *   轮动 → `题材名`（紫 9.5px，保持原样）
+           * 文案由 `labelSlots` 里带出来（与挑位置时**同一份**，避免「算着放得下、渲染却压字」）。
+           * 上区：首爆紫加粗 / 续强紫半档 / 轮动紫 / 走强红 / 纯时刻灰；
+           * 下区：板块走弱绿。
            */
-          const burstLead = isFirstBurst ? firstBurstThemes![0] : summary.burst[0]?.theme
-          const extraBurst = summary.burst.length > 1 ? `+${summary.burst.length - 1}` : ''
-          const themeTag =
-            summary.burst.length > 0 && burstLead
-              ? {
-                  kind: (isFirstBurst ? 'first' : 'follow') as 'first' | 'follow',
-                  text: `${isFirstBurst ? '首爆' : '续强'}·${burstLead}${extraBurst}`,
-                }
-              : summary.rotated.length > 0
-                ? {
-                    kind: 'rotation' as const,
-                    text: `${summary.rotated[0].theme}${summary.rotated.length > 1 ? `+${summary.rotated.length - 1}` : ''}`,
-                  }
-                : summary.upSectors.length > 0
-                  ? { kind: 'plain' as const, text: `${summary.upSectors[0].name}走强` }
-                  : summary.downSectors.length > 0
-                    ? { kind: 'plain' as const, text: `${summary.downSectors[0].name}走弱` }
-                    : null
+          const upSlot = slots?.up
+          const downSlot = slots?.down
           return (
             <button
               key={block.key}
@@ -588,7 +1272,7 @@ export function TimelineSnake({
                 left: point.x,
                 top: point.y,
                 width: hitWidth,
-                height: SNAKE_BAR_MAX_H + 22,
+                height: HIT_H,
                 // 命中区中心对齐落点（竖条再以命中区中心为基准）
                 transform: 'translate(-50%, -50%)',
                 zIndex: isOpen ? 12 : 10,
@@ -605,60 +1289,46 @@ export function TimelineSnake({
               aria-haspopup="dialog"
               aria-expanded={isOpen}
             >
-              {/* 展开态描边（⛔ 只作视觉强调，不改命中区尺寸 → 不会造成 hover 抖动） */}
+              {/*
+                展开态高亮（⛔ 只作视觉强调，不改命中区尺寸 → 不会造成 hover 抖动）。
+
+                ⚠️ 2026-10-20 用户：「hover 的边框那一部分样式，修改一下」。
+                原实现是 `ring-2 rounded-[4px]`，尺寸 26 × 56 的**细长方框**，
+                套在一个 11–14px 的小图标上 —— 看起来像选中了一个空单元格，不是「选中这个点」；
+                而且标记自身还叠了第二圈 `ring-2`，两层方框重影，越看越脏。
+                现在改为：单一 **圆形细环**（22px，1.5px），贴合图标轮廓，不再有第二层。
+              */}
               {isOpen && (
                 <span
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[4px] ring-2 ring-line-strong pointer-events-none"
-                  style={{ width: Math.max(SNAKE_BAR_W, hitWidth - 6), height: SNAKE_BAR_MAX_H + 10 }}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-[1.5px] ring-txt/35 pointer-events-none"
+                  style={{ width: HOVER_RING, height: HOVER_RING }}
                 />
               )}
-              {/* 竖条：高度 = 活跃度，颜色 = 性质 */}
+              {/* 竖条：高度 = 活跃度，形状 = 性质 */}
               {/*
                 形状 = 信号性质（2026-10-18 用户：不再全部用椭圆柱体）：
-                ▲首爆 ▼风险 ◆联动 ●走强 ○轮动 ■记录 │普通。
+                ✦首爆 ✕风险 ◆联动 ●走强 ○轮动 ■记录 │普通。
                 图标**等大**（不随活跃度缩放，2026-10-18 用户：「不要忽大忽小」）；
                 活跃度只由细竖线的高度表达 —— 见 `lib/snake.ts` 的 SHAPE_ICON_SIZE。
+                ⚠️ 2026-10-20 用户：「红绿三角不好看」→ 首爆改四角星、风险改叉（见 ShapeMark）。
+                ⛔ 标记自身**不加** ring：SVG/span 的 ring 是方形 box-shadow，会和上面的圆环重影。
               */}
-              <span
-                className={cn(
-                  'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none',
-                  visual.className,
-                  isOpen && 'ring-2 ring-line-strong',
-                )}
-                style={{
-                  width: box.width,
-                  height: box.height,
-                  clipPath: box.clipPath,
-                  borderRadius: box.borderRadius,
-                  borderWidth: box.borderWidth,
-                  borderStyle: box.borderWidth ? 'solid' : undefined,
-                }}
-                data-node-kind={visual.kind}
-                data-node-shape={shape}
+              <ShapeMark
+                shape={shape}
+                height={barHeight(summary)}
+                tone={visual.className}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                nodeKind={visual.kind}
                 title={visual.title}
+                glow={isFirstBurst}
               />
-              {/* 时刻标签：只给显著节点 / 盘外记录，且同层不挤才显示 */}
-              {labeled.has(block.key) && (
-                <span className="absolute left-1/2 top-0 -translate-x-1/2 num text-[9.5px] text-sub whitespace-nowrap pointer-events-none">
-                  {minToClock(block.at)}
-                  {point.outside && (
-                    <span className="text-warn">{point.outside === 'post' ? '盘后' : '盘前'}</span>
-                  )}
-                  {themeTag && (
-                    <span
-                      className={cn(
-                        'ml-1',
-                        themeTag.kind === 'first' && 'text-[11.5px] font-bold text-up',
-                        themeTag.kind === 'follow' && 'text-[11px] font-semibold text-up/90',
-                        themeTag.kind === 'rotation' && 'text-rec',
-                        themeTag.kind === 'plain' && 'text-rec/60',
-                      )}
-                      data-burst={themeTag.kind === 'first' ? 'first' : themeTag.kind === 'follow' ? 'follow' : undefined}
-                    >
-                      {themeTag.text}
-                    </span>
-                  )}
-                </span>
+              {/* 上区标签：走强 / 首爆 / 续强 / 轮动（紫或红） */}
+              {upSlot && (
+                <LabelChip slot={upSlot} dir="up" clock={minToClock(block.at)} outside={point.outside} />
+              )}
+              {/* 下区标签：板块走弱（绿）。与上区**独立** —— 一个节点可以同时挂两条 */}
+              {downSlot && (
+                <LabelChip slot={downSlot} dir="down" clock={minToClock(block.at)} outside={point.outside} />
               )}
             </button>
           )

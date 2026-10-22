@@ -276,7 +276,8 @@ function ThemeSlotGroup({
           className={cn(
             'font-semibold break-all min-w-0',
             // 爆发 = 大红 + 放大一号（用户 2026-10-18：「字体稍微大一点，突出这个题材牛逼」）
-            burst ? 'text-[13.5px] font-bold text-up' : 'text-[12.5px] text-txt',
+            // 首爆 = 紫（2026-10-20 用户：「首爆改为紫色」），与轴上标记同色
+            burst ? 'text-[13.5px] font-bold text-rec' : 'text-[12.5px] text-txt',
           )}
         >
           {theme}
@@ -602,10 +603,10 @@ export function SlotBody({
                 {/* 题材爆发 = **大红**（2026-10-18 用户定调：与「题材轮动紫」分家）——
                     原为紫色，与「轮动/回流」同色，看不出「新爆发」还是「又轮动一下」。
                     轴上竖条已同步为红：首爆实心大红、后续续强半档红。 */}
-                <span className="text-[11.5px] font-bold text-up flex-none">🚀 首爆</span>
+                <span className="text-[11.5px] font-bold text-rec flex-none">🚀 首爆</span>
                 {bursts.map(({ key, item: b }) => (
                   <span key={key} className="flex items-baseline gap-1 flex-none">
-                    <span className="text-[12px] font-semibold text-up break-all">{b.theme}</span>
+                    <span className="text-[12px] font-semibold text-rec break-all">{b.theme}</span>
                     {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
                     {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
                   </span>

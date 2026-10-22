@@ -28,6 +28,20 @@ export {
 // 飞书卡片存档阅读器（复盘/盘前/机构/脉冲卡共用）
 export { CardArchiveView, cardDate, type ArchiveCard } from './components/CardArchiveView'
 
+// 竞价资金榜（09:25 竞价：涨幅 / 竞额 / 榜内占比）
+export { AuctionMoneyCard } from './components/AuctionMoneyCard'
+export {
+  buildAuctionRows,
+  buildAuctionThemeAgg,
+  sortAuctionRows,
+  median,
+  type AuctionPoolView,
+  type AuctionRow,
+  type AuctionSortKey,
+  type AuctionThemeAgg,
+  type PoolRole,
+} from './lib/auction-money'
+
 // 财富密码每日决策档案（`wealth_code_candidates_v1`）
 export { DossierView } from './components/DossierView'
 

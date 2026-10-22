@@ -86,7 +86,13 @@ export function BlockDetail({
         {KIND_LABEL[block.kind]}
       </span>
       <span className="num text-sub text-[10.5px] min-w-0 break-all">
-        {summary.stockCount > 0 && <>封板 {summary.stockCount} · </>}题材 {themeCount} · 盘中记录 {summary.upSectorCount + summary.downSectorCount + summary.otherUpCount + summary.otherDownCount}
+        {summary.stockCount > 0 && <>封板 {summary.stockCount} · </>}题材 {themeCount} · 盘中记录{' '}
+        {/* 炸板已从 otherDownCount 单列，这里补回；跌停仍在 otherDownCount 内，⛔ 不要重复加 */}
+        {summary.upSectorCount +
+          summary.downSectorCount +
+          summary.otherUpCount +
+          summary.otherDownCount +
+          summary.brokenCount}
       </span>
     </>
   )

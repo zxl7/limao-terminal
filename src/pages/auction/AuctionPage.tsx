@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryClient, ROUTES } from '@/shared/api'
-import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, RelayShadow } from '@/shared/api'
-import { analyticsQueries, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
+import type { CandidatesFile, DecisionDossier, DossierStock, EarlyItem, PoolCallFile, RelayShadow } from '@/shared/api'
+import { analyticsQueries, AuctionMoneyCard, buildAuctionRows, DataTable, StatPair, Tag, n1 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, fmtPct, regimeText, tradableStocks } from '@/shared/lib'
@@ -37,6 +37,8 @@ export async function loader() {
     queryClient.ensureQueryData(analyticsQueries.shadowRelay()),
     queryClient.ensureQueryData(marketQueries.candidates()),
     queryClient.ensureQueryData(marketQueries.auction()),
+    queryClient.ensureQueryData(analyticsQueries.decisionAuctionHistory()),
+    queryClient.ensureQueryData(analyticsQueries.decisionPoolCall()),
   ])
   return null
 }
@@ -73,6 +75,11 @@ export function Component() {
   const shadowQ = useQuery(analyticsQueries.shadowRelay())
   const cands = useQuery(marketQueries.candidates())
   const auction = useQuery(marketQueries.auction())
+  const auctionHist = useQuery(analyticsQueries.decisionAuctionHistory())
+  /** 当日 09:25 池内裁决 —— 给竞价榜贴「该不该跟」；只有 trade_date 与竞价文件同日才可用 */
+  const poolCall = useQuery(analyticsQueries.decisionPoolCall())
+  /** 竞价文件只有代码，名称优先用「昨日涨停池」（覆盖当日竞价大名单）补齐 */
+  const ztYesterday = useQuery(marketQueries.yesterday())
 
   const d: DecisionDossier | undefined = dossier.data
   /** 接力权重影子模式（只观察·不改产池 · 升级项 P2-13 的观测入口） */
@@ -88,11 +95,45 @@ export function Component() {
   const nameByCode = new Map<string, string>()
   for (const s of [...(d?.relay ?? []), ...(d?.watch ?? [])]) nameByCode.set(s.code, s.name)
   for (const c of cf?.candidates ?? []) nameByCode.set(c.code, c.name)
+  for (const z of ztYesterday.data?.zt_list ?? []) nameByCode.set(z.code, z.name)
   const quotes = Object.entries(au?.quotes ?? {}).map(([code, pct]) => ({
     code,
     name: nameByCode.get(code) ?? '—',
     pct,
   }))
+
+  /**
+   * 竞价资金榜（2026-10-19）。
+   *
+   * `decision/auction-history` 按文件名升序返回多日存档 → 取最后一份（最新交易日）。
+   * ⛔ 只用**真实落盘字段**（prev_close / auction_price / auction_amount_yi）：
+   *    净额需要逐笔委托方向，我们不造（见 lib/auction-money.ts 头注）。
+   */
+  const auctionFiles = (auctionHist.data ?? []) as Array<{
+    file?: string
+    data?: Record<string, { prev_close: number | null; auction_price: number | null; auction_amount_yi: number | null; time?: string }>
+  }>
+  const latestAuction = [...auctionFiles].sort((a, b) => (a.file ?? '').localeCompare(b.file ?? '')).at(-1)
+  const auctionDate = /(\d{4}-\d{2}-\d{2})/.exec(latestAuction?.file ?? '')?.[1] ?? null
+
+  /**
+   * 池内裁决 → 竞价榜。
+   *
+   * ⛔ **必须按 `trade_date` 对齐竞价文件日期**：日期不同就不合并。
+   *    理由是这一条一旦放松，昨天的「参与」会被标到今天的竞价榜上，页面看起来完全正常，
+   *    但结论是错的 —— 属于最难发现的一类错（`pool_call.trade_date` = 执行日，不是预案写作日）。
+   */
+  const poolFiles = (poolCall.data ?? []) as Array<{ data?: PoolCallFile | null }>
+  const latestPool = [...poolFiles]
+    .filter((f) => f.data)
+    .sort((a, b) => (a.data!.trade_date ?? '').localeCompare(b.data!.trade_date ?? ''))
+    .at(-1)
+  const poolViews =
+    latestPool?.data && auctionDate && latestPool.data.trade_date === auctionDate
+      ? latestPool.data.views
+      : null
+
+  const auctionMoneyRows = buildAuctionRows(latestAuction?.data, nameByCode, { pool: poolViews })
 
   const dg = d?.diagnostics as Record<string, unknown> | undefined
 
@@ -106,6 +147,9 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* 竞价资金榜：09:25 钱往哪去（通栏，按竞额降序，暖黄=高开且有量） */}
+      <AuctionMoneyCard rows={auctionMoneyRows} date={auctionDate} />
+
       {/* 档案定性通栏：脚本环境 vs 真实盘面 —— 两套读数并列才有意义 */}
       <Card
         title="⚡ 决策档案 · 环境与定调"

@@ -45,12 +45,48 @@ export interface BlockSummary {
   /** 盘中板块走强（强度降序，截断）+ 总数 */
   upSectors: IntradayTimelineEvent[]
   upSectorCount: number
+  /**
+   * 盘中走强板块的**全部名字**（强度降序、去重、**不截断**）。
+   *
+   * ⛔ 为什么必须单列：`upSectors` 只留最强的 3 个，而「首爆」判定要求
+   *    「这条线今天第一次出现」—— 若拿截断后的 3 个去判，某个当刻排第 4 的板块
+   *    不会被记为「已出现」，它下一次冒头时就会被**错标成首爆**。
+   *    实测 2026-10-22：机器人一天被标了 3 次「首爆」。
+   */
+  upSectorNames: string[]
+  /** 盘中**个股**走强（涨幅降序，截断）—— 没有板块异动时的最弱一档标签 */
+  upStocks: IntradayTimelineEvent[]
+  /** 短线精灵信号（强度降序，截断）—— 消息面通道的最弱一档，不参与形状判定 */
+  signals: IntradayTimelineEvent[]
+  /**
+   * 外部快讯（`newsflash_new`，来自 `intraday_timeline_<date>.jsonl`）。
+   *
+   * ⚠️ 2026-10-20 用户：「消息面呢？这边是否介入快讯【短线精灵+终端！！】」
+   *    快讯由 `scripts/intraday_timeline.py` 按 id 去重后 append-only 记账，
+   *    时刻取快讯自己的 `ctime` —— 故它是**真能落到分钟轴**的消息面第一档。
+   * ⛔ 与 `pushed`（系统推送台账）不是一个东西：前者是外部消息，后者是我们的动作。
+   */
+  news: IntradayTimelineEvent[]
   /** 盘中杀跌板块（强度降序，截断）+ 总数 */
   downSectors: IntradayTimelineEvent[]
   downSectorCount: number
   /** 盘中非板块事件条数（涨停总数 / 个股 / 炸板 / 跌停） */
   otherUpCount: number
   otherDownCount: number
+  /**
+   * 当刻**炸板**（涨停被打开）条数 —— `broken_new`。
+   *
+   * ⚠️ 2026-10-20 用户：「打开涨停可以提示为黄色节点」。
+   * 炸板原本被并进 `otherDownCount`，只能靠绿色叉表达，与「板块走弱」混在一起；
+   * 但它是**涨停被打断**，性质和板块下跌不同，需要单独的黄色标识。
+   *
+   * ⛔ 同日晚些时候用户再改口：「炸板不需要权重，你这全是炸板了」——
+   *    黄环只做**兜底显示**（同节点有首爆/走弱/走强/轮动时一律让位），
+   *    但 `brokenCount` 本身要继续算：hover 明细与「涨停打开 ×N」标题靠它。
+   */
+  brokenCount: number
+  /** 当刻**新跌停**条数 —— `limit_down_new`（⛔ 与「打开跌停」不是一回事） */
+  limitDownCount: number
   /** 题材标记（各自截断） */
   burst: Marks['burst']
   /** 该时刻仅发生**龙头轮动**的题材（弱标记 · 见 `SlotThemeMarks.rotated` 头注） */
@@ -115,7 +151,24 @@ export function summarizeBlock(block: TimelineBlock, cap: number = SUMMARY_CAP):
   const upEvents = slots.flatMap((s) => s.intradayUp)
   const downEvents = slots.flatMap((s) => s.intradayDown)
   const upSectorAll = upEvents.filter((e) => String(e.kind) === 'sector_up')
+  /**
+   * 个股级走强（`stock_up`）—— 2026-10-20 用户：「单一个股信息还是可以显示的」。
+   *
+   * 没有板块异动的时刻，轴上原本连名字都没有（只剩一个点）；现在作为**最弱一档**
+   * 的标签兜底（`upTagOf` 里排在板块之后），让这些空位至少能读出「谁在动」。
+   */
+  const upStockAll = upEvents.filter((e) => String(e.kind) === 'stock_up')
+  /**
+   * 短线精灵信号（`signal_new`，来自 `short_spirit_signals.json` 的 `signals_today`）。
+   * 它们是**消息面**而不是「个股走强」——必须从 `otherUpCount` 里单列，
+   * 否则会把节点染成红圆、并顶掉真正的板块走强。
+   */
+  const signalAll = upEvents.filter((e) => String(e.kind) === 'signal_new')
+  /** 外部快讯（`newsflash_new`）—— 消息面第一档，同样必须从 `otherUpCount` 里单列 */
+  const newsAll = upEvents.filter((e) => String(e.kind) === 'newsflash_new')
   const downSectorAll = downEvents.filter((e) => String(e.kind) === 'sector_down')
+  const brokenAll = downEvents.filter((e) => String(e.kind) === 'broken_new')
+  const limitDownAll = downEvents.filter((e) => String(e.kind) === 'limit_down_new')
 
   // ── 题材标记：逐槽解析后合并去重（题材家数取最大） ──
   const marksList = slots.map((s) => slotThemeMarks(s.events, s.pushes))
@@ -153,10 +206,43 @@ export function summarizeBlock(block: TimelineBlock, cap: number = SUMMARY_CAP):
     topStocks,
     upSectors: sortIntradaySectorEvents(upSectorAll, 'up').slice(0, cap),
     upSectorCount: upSectorAll.length,
+    // 首爆判定用**全量**名字（⛔ 不能用上面截断后的 3 个，否则会误判首爆）
+    upSectorNames: [
+      ...new Set(
+        sortIntradaySectorEvents(upSectorAll, 'up')
+          .map((e) => (e.name == null ? '' : String(e.name)))
+          .filter((n) => n !== ''),
+      ),
+    ],
+    /** 个股级走强（按涨幅降序，截断） */
+    upStocks: [...upStockAll]
+      .sort((a, b) => Number(b.pct ?? -Infinity) - Number(a.pct ?? -Infinity))
+      .slice(0, cap),
+    signals: [...signalAll]
+      .sort((a, b) => Number(b.strength ?? -Infinity) - Number(a.strength ?? -Infinity))
+      .slice(0, cap),
+    // 快讯按发布时刻升序（同一分钟内保持「先说的在前」）
+    news: [...newsAll]
+      .sort((a, b) => String(a.at ?? '').localeCompare(String(b.at ?? '')))
+      .slice(0, cap),
     downSectors: sortIntradaySectorEvents(downSectorAll, 'down').slice(0, cap),
     downSectorCount: downSectorAll.length,
-    otherUpCount: upEvents.length - upSectorAll.length,
-    otherDownCount: downEvents.length - downSectorAll.length,
+    // ⛔ 短线精灵信号（signal_new）与外部快讯（newsflash_new）都不是「个股走强」，
+    //    必须扣掉，否则节点会被染成红圆、并顶掉真正的板块走强
+    otherUpCount: upEvents.length - upSectorAll.length - signalAll.length - newsAll.length,
+    /**
+     * 个股级回落 = 下跌事件 **减去** 已单列的板块走弱与炸板。
+     *
+     * ⛔ 2026-10-20：原式只减了 `downSectorAll`，于是 `broken_new` 同时算进 `otherDownCount`
+     *    → `barVisual` 里「个股走弱」的绿叉总会先命中，炸板黄环**永远出不来**（移到末位后更明显）。
+     *    各类信号必须互斥拆分，否则「降权」会变成「删除」，图例里还留着一条永远不出现的项。
+     *
+     * ⛔ 只扣炸板，**不扣 `limit_down_new`**：跌停是硬风险，仍要走「绿叉」那条
+     *    （上一版把跌停也扣掉后，跌停节点会掉成灰色细线 —— 那是降权降过头了）。
+     */
+    otherDownCount: downEvents.length - downSectorAll.length - brokenAll.length,
+    brokenCount: brokenAll.length,
+    limitDownCount: limitDownAll.length,
     burst,
     rotated,
     fade,

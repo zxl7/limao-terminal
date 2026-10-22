@@ -139,6 +139,20 @@ export const analyticsQueries = {
       refetchInterval: livePollMs,
       staleTime: 15_000,
     }),
+  /**
+   * 短线精灵信号（`short_spirit_signals.json`）。
+   *
+   * ⚠️ 2026-10-20 用户：「消息面呢？这边是否介入快讯【短线精灵 + 终端！！】」
+   *    时间轴此前只吃 `pushed_topics`，短线精灵的 `signals_today`（带 `first_seen`，
+   *    实测一天 79 条）完全没进轴 —— 这里补上查询，页面层转成时间轴事件。
+   */
+  signals: () =>
+    queryOptions({
+      queryKey: ['market', 'signals'] as const,
+      queryFn: api.signals,
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
+    }),
 
   // ══════════════ 财富密码决策链 ══════════════
   /** 选股候选存档（近 3 期） */

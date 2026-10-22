@@ -46,7 +46,9 @@
   --color-rec-soft: #f1ecfe;
   --color-lead: #e8940a; /* 涨停标杆龙（标杆，非机会） */
   --color-lead-soft: #fdf3e0;
-  --color-warn: #0d9488; /* 退潮 / 风险预警 */
+  --color-warn: #0d9488; /* 退潮 / 风险预警（⛔ 是青绿，不是黄） */
+  --color-break: #e8940a; /* 炸板 / 打开涨停（警示琥珀 —— 与 warn 的青绿、down 的草绿都分得开） */
+  --color-break-soft: #fdf0dc;
   --color-warn-soft: #dcf1ef; /* 退潮预警底（青绿浅底，与 down-soft 的草绿区分开） */
   --color-mid: #3b82c4; /* 中性偏弱（情绪分 3–6 的蓝） */
   --color-mid-soft: #e6f0fa; /* 中性蓝浅底（分歧 / 中性提示） */

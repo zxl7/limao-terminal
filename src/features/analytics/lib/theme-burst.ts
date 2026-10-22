@@ -101,6 +101,18 @@ export function parseThemeEvents(events: MarketMemory['event_log']): ThemeEvent[
     const text = e.event ?? ''
     const at = clockMin(e.time)
     if (at == null) continue
+    /**
+     * ⛔ 08:30 之前的时间戳一律视为**无效**（2026-10-20 实测踩到）。
+     *
+     * 10-16 的 `market_memory` 里有 4 条 `time: "00:18"` 的「新主线崛起」：
+     * 大消费 / PCB板 / 医药 / 短剧·互动影游 —— 它们是盘后补写的，时间字段退化成午夜，
+     * 前端按 00:18 定位 → `at < SESSION_OPEN` → 被布局夹到**开盘前最左端**，
+     * 于是左边缘堆了 4 个「首爆」，看起来像「首爆时间全错」。
+     *
+     * 题材的「崛起 / 杀跌」最早只可能发生在集合竞价（09:15）之后，
+     * 08:30 之前没有任何合法时段 → 直接丢弃这个时间点（题材本身仍在涨停池里可见）。
+     */
+    if (at < 8 * 60 + 30) continue
 
     const base = { at, severity: e.severity ?? '' }
 

@@ -98,7 +98,59 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
     case 'limit_down_new':
       return <span className="text-[11.5px] text-down">{e.name} 跌停</span>
     case 'broken_new':
-      return <span className="text-[11.5px] text-warn">{e.name} 炸板</span>
+      /**
+       * ⛔ 2026-10-20 自查：这里原来用 `text-warn`（青绿 #0d9488），
+       * 而轴上的炸板节点是 `text-break`（琥珀 #e8940a）——
+       * 同一个事实「炸板」在两个地方两种颜色，读者会以为是两类事件。
+       * 统一到琥珀（warn 是「退潮预警」的青绿，另有归属）。
+       */
+      return <span className="text-[11.5px] text-break">{e.name} 炸板</span>
+    /**
+     * 短线精灵个股异动（2026-10-20 用户：「消息面呢？这边是否介入快讯
+     * 【短线精灵 + 终端！！】」）。
+     *
+     * 来源是 `short_spirit_signals.json` 的 `signals_today[].first_seen`，
+     * 由 `TimelinePage` 转成 `signal_new` 事件并入分钟槽。
+     * ⛔ 不用「+x%」写法（那不是涨幅陈述，是异动）——给「异动」小标签 + 类型 + 涨幅。
+     */
+    /**
+     * 外部快讯（2026-10-20 用户：「消息面呢？这边是否介入快讯【短线精灵+终端！！】」）。
+     *
+     * 由 `scripts/intraday_timeline.py` 落盘（`newsflash_new`，时刻=快讯自己的 `ctime`）。
+     * ⛔ 标题**全文照抄**（轴上才截断）—— 明细里读的就是原文，不得改写、不得加判断。
+     */
+    case 'newsflash_new': {
+      const title = typeof e.title === 'string' ? e.title : String(e.name ?? '')
+      const plates = Array.isArray(e.plates) ? (e.plates as string[]) : []
+      const stocks = Array.isArray(e.stocks) ? (e.stocks as string[]) : []
+      return (
+        <div className="flex flex-col gap-0.5 text-[11.5px] text-txt">
+          <span>
+            <span className="mr-1 rounded-sm bg-line-faint px-1 text-[10px] text-txt/70">快讯</span>
+            {title}
+          </span>
+          {(plates.length > 0 || stocks.length > 0) && (
+            <span className="pl-1.5 text-[10.5px] text-sub">
+              {plates.length > 0 && <>板块 {plates.join('、')}</>}
+              {plates.length > 0 && stocks.length > 0 && ' · '}
+              {stocks.length > 0 && <>点名 {stocks.join('、')}</>}
+            </span>
+          )}
+        </div>
+      )
+    }
+    case 'signal_new': {
+      // 索引签名是 `unknown`（事件是开放结构）→ 先收窄，⛔ 不直接把 unknown 塞进 JSX
+      const sigType = typeof e.type === 'string' ? e.type : ''
+      return (
+        <span className="text-[11.5px] text-rec">
+          <span className="mr-1 rounded-sm bg-rec-soft px-1 text-[10px] text-rec">异动</span>
+          <StockLink code={e.code} className="font-medium">{e.name}</StockLink>
+          {sigType && <span className="text-sub ml-1">{sigType}</span>}
+          {e.pct != null && <span className="num ml-1">+{Number(e.pct).toFixed(2)}%</span>}
+        </span>
+      )
+    }
     default:
       return (
         <span className="text-[11.5px] text-sub">
@@ -207,9 +259,16 @@ function DirectionSection({
   )
 }
 
+/** 消息面事件（既不是「涨」也不是「跌」—— 单独一段，⛔ 不能塞进走强红框里） */
+const NEWS_KINDS = new Set(['newsflash_new', 'signal_new'])
+
 /**
- * 槽内的「🔴 涨 / 🟢 跌」两段（合进主时间轴后共用）。
+ * 槽内的「🔴 涨 / 🟢 跌 / 📰 消息面」三段（合进主时间轴后共用）。
  * 空数组不渲染，保证无盘中事件的槽形态不变。
+ *
+ * ⚠️ 2026-10-20：消息面（外部快讯 + 短线精灵异动）此前混在「盘中走强」里，
+ *    红框 + 走强标题会让「有条消息」被读成「这个板块在涨」。现在单列一段，
+ *    中性灰底、无方向色 —— 与轴上的灰引导线同语义。
  */
 export function IntradayEventBlock({
   up,
@@ -221,13 +280,37 @@ export function IntradayEventBlock({
   /** 取消「板块最多 3 个」上限（明细浮层用） */
   showAll?: boolean
 }) {
+  const news = up.filter((e) => NEWS_KINDS.has(String(e.kind)))
+  const upRest = up.filter((e) => !NEWS_KINDS.has(String(e.kind)))
   if (up.length === 0 && down.length === 0) return null
   return (
     <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
-      {up.length > 0 && <DirectionSection dir="up" label="盘中走强与涨停变化" events={up} showAll={showAll} />}
+      {upRest.length > 0 && <DirectionSection dir="up" label="盘中走强与涨停变化" events={upRest} showAll={showAll} />}
       {down.length > 0 && (
         <DirectionSection dir="down" label="盘中走弱与风险变化" events={down} showAll={showAll} />
       )}
+      {news.length > 0 && <NewsSection events={news} />}
+    </div>
+  )
+}
+
+/** 消息面一段（外部快讯 + 短线精灵异动）—— 中性灰，⛔ 不带涨跌方向色 */
+function NewsSection({ events }: { events: IntradayTimelineEvent[] }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 rounded-sm border-l-2 border-line-strong bg-line-faint/70 px-2 py-1.5">
+      <span className="text-[10.5px] font-semibold text-txt/75">
+        消息面
+        <span className="ml-1.5 font-normal text-sub">
+          快讯 {events.filter((e) => String(e.kind) === 'newsflash_new').length} 条 · 异动{' '}
+          {events.filter((e) => String(e.kind) === 'signal_new').length} 条
+        </span>
+      </span>
+      <div className="flex min-w-0 flex-col gap-0.5 pl-1.5">
+        {events.map((e, i) => (
+          // oxlint-disable-next-line react/no-array-index-key -- 同刻可重复同一标的，索引即身份
+          <IntradayEventLine key={i} e={e} />
+        ))}
+      </div>
     </div>
   )
 }

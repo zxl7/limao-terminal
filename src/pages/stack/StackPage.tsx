@@ -221,7 +221,7 @@ export function Component() {
               <StatPair label="20cm 家数" value={lastDetail.count_20cm ?? '—'} />
               <StatPair label="2板以上" value={lastDetail.boards_2plus ?? '—'} />
               <StatPair label="封板率" value={lastDetail.seal_rate != null ? `${n1(lastDetail.seal_rate)}%` : '—'} />
-              <StatPair label="炸板" value={lastDetail.broken ?? '—'} tone="warn" />
+              <StatPair label="炸板" value={lastDetail.broken ?? '—'} tone="down" />
             </>
           )}
         </div>
