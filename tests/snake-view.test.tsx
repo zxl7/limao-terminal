@@ -687,7 +687,7 @@ describe('TimelineSnake · 题材爆发节点（紫四角星首爆 + 光晕 + �
     expect(plainNode.textContent).not.toContain('🚀')
   })
 
-  it('④ hover 详情展开该题材的催化 / 涨停成员 / 观测时刻，且浮层已放大', () => {
+  it('④ hover 详情展开该题材的催化 / 涨停成员 / 观测时刻，且浮层足够宽', () => {
     const { container } = render(
       <TimelineSnake blocks={threeBlocks()} {...props} themeInfo={themeInfo} {...instant} width={W} />,
     )
@@ -696,8 +696,17 @@ describe('TimelineSnake · 题材爆发节点（紫四角星首爆 + 光晕 + �
     expect(dlg.textContent, '详情缺催化原文').toContain('催化：黄仁勋产能翻倍 + 光刻胶涨价')
     expect(dlg.textContent, '详情缺当日涨停成员（个股）').toContain('当日涨停成员：中天科技')
     expect(dlg.textContent, '详情缺观测时刻序列').toContain('观测 11:00 → 14:53')
-    // 用户 2026-09-20「卡片 hover 可以显示大一点」：700 → 980
-    expect(dlg.style.width).toBe('980px')
+    /**
+     * ⚠️ 2026-10-22 用户两次纠正后，宽度语义已变：
+     *   ① 写死 980 → ② 容器×0.82（仍是固定值，`14:30` 那种 4 行内容也 1052px，留白太大）
+     *   → ③ **按内容量估宽**（`DETAIL_BASE_W + 行数×24 + 长句加成`，夹在 [340, 1180] 与容器内）。
+     * ⛔ 所以这里**不能**再断言「≥ 某固定宽度」—— 该节点内容不多，估出来就该窄。
+     *    改锁两件真正的不变量：宽度在合法区间内 + zoom 生效。
+     */
+    const w = Number.parseFloat(dlg.style.width) * Number.parseFloat(dlg.style.zoom || '1')
+    expect(w, '浮层宽度不得窄于可读下限').toBeGreaterThanOrEqual(340)
+    expect(w, '浮层宽度不得超过上限').toBeLessThanOrEqual(1180)
+    expect(dlg.style.zoom, '字体放大走 zoom').toBeTruthy()
   })
 
   it('⑤ ⛔ 不传 `themeInfo` 时详情不出现催化行（卡面/默认保持紧凑）', () => {
@@ -1180,6 +1189,120 @@ describe('TimelineSnake · 同一节点上下双标签', () => {
 })
 
 /**
+ * ## 兜底描述：每个点位都要读得出「发生了什么」（2026-10-22 用户：「这些点位的描述呢？」）
+ *
+ * 用户截图上有一长串**只有图标、没有任何文字**的 × 点位。两个成因：
+ *   ① `downTagOf` 到 `return null` 为止只覆盖「板块走弱/快讯/消息/异动」四类，
+ *      **炸板、跌停、打开涨停、新封板**一律不给标签 → 那些点位彻底沉默；
+ *   ② 密集段三层一满，上区标签被直接丢弃 —— 不是没数据，是排版吞了。
+ *
+ * ⛔ 兜底顺序按信息量：有名字的（炸板/跌停/打开/涨停·名字）＞ 只有数字的（涨停-1）＞ 只有只数的（回落·N只）。
+ * ⛔ 炸板仍是 70% 琥珀（「炸板降权」，弱化 ≠ 隐藏）。
+ */
+describe('TimelineSnake · 每个点位都有描述（兜底标签）', () => {
+  const downOf = (c: HTMLElement) =>
+    nodeAt(c, '10:00').querySelector('[data-label-tier][data-label-dir="down"]')
+  const upOf = (c: HTMLElement) =>
+    nodeAt(c, '10:00').querySelector('[data-label-tier][data-label-dir="up"]')
+
+  it('只有炸板 → 下区「炸板·个股名」，引导线琥珀（不是走弱绿）', () => {
+    const b = normalBlock(10 * 60, slot(10 * 60, { intradayDown: [ie('broken_new', '天马科技')] }))
+    const { container } = render(<TimelineSnake blocks={[b]} {...props} {...instant} width={W} />)
+    expect(downOf(container)?.textContent ?? '').toContain('炸板·天马科技')
+    const leader = nodeAt(container, '10:00').querySelector('[data-label-leader][data-label-dir="down"]') as Element
+    expect(leader.getAttribute('class') ?? '').toContain('bg-break/45')
+    expect(leader.getAttribute('class') ?? '', '炸板不是走弱').not.toContain('bg-down')
+  })
+
+  it('只有跌停 → 下区「跌停·个股名」', () => {
+    const b = normalBlock(10 * 60, slot(10 * 60, { intradayDown: [ie('limit_down_new', '德才股份')] }))
+    const { container } = render(<TimelineSnake blocks={[b]} {...props} {...instant} width={W} />)
+    expect(downOf(container)?.textContent ?? '').toContain('跌停·德才股份')
+  })
+
+  it('新封板（zt_total.added 带名字）→ 上区「涨停·个股名」，不是干巴巴的「涨停+1」', () => {
+    const b = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayUp: [
+          ie('zt_total', '', {
+            total: 31,
+            delta: 1,
+            added: [{ code: '300839', name: '博汇股份' }],
+            removed: [],
+          }),
+        ],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[b]} {...props} {...instant} width={W} />)
+    const text = upOf(container)?.textContent ?? ''
+    expect(text).toContain('涨停·博汇股份')
+    expect(text, '有名字就不该只写数字').not.toContain('涨停+1')
+  })
+
+  it('打开涨停（zt_total.removed 带名字）→ 下区「打开·个股名」', () => {
+    const b = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayDown: [
+          ie('zt_total', '', {
+            total: 30,
+            delta: -1,
+            added: [],
+            removed: [{ code: '600551', name: '出版传媒' }],
+          }),
+        ],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[b]} {...props} {...instant} width={W} />)
+    const text = downOf(container)?.textContent ?? ''
+    expect(text).toContain('打开·出版传媒')
+    expect(text, '有名字就不该退化成「涨停-1」').not.toContain('涨停-1')
+  })
+
+  it('⛔ 兜底不得顶掉更重要的标签：同刻有板块走弱 → 仍显示走弱', () => {
+    const b = normalBlock(
+      10 * 60,
+      slot(10 * 60, {
+        intradayDown: [ie('sector_down', '医药', { pct: -3 }), ie('broken_new', '天马科技')],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[b]} {...props} {...instant} width={W} />)
+    const text = downOf(container)?.textContent ?? ''
+    expect(text).toContain('医药走弱')
+    expect(text, '炸板兜底只能填空位，不能抢板块走弱的位').not.toContain('炸板·')
+  })
+})
+
+/**
+ * ## 密集段不许「丢标签」，只许「缩形态」（2026-10-22）
+ *
+ * 18.8px/分钟的密集段，三层跑道很容易被邻座占满。上一版直接丢弃 → 用户看到一串
+ * 没有任何描述的点位。现在退到**紧凑形态**（不渲染时刻，省 ~31px）再试一次。
+ *
+ * ⛔ 缩的是排版冗余（时刻在邻近标签上仍读得到），不是事实。
+ */
+describe('TimelineSnake · 密集段紧凑降级', () => {
+  it('三层被占满时，标签退到紧凑形态而不是消失', () => {
+    // 每分钟一个节点、全部带题材名 —— 宽度 900 下三层必定挤爆
+    const blocks = Array.from({ length: 14 }, (_, i) =>
+      normalBlock(
+        10 * 60 + i,
+        slot(10 * 60 + i, { intradayUp: [ie('sector_up', `板块名${i}`)] }),
+      ),
+    )
+    const { container } = render(<TimelineSnake blocks={blocks} {...props} {...instant} width={900} />)
+    const labels = Array.from(container.querySelectorAll('[data-label-tier][data-label-dir="up"]')).map(
+      (el) => el.textContent?.trim() ?? '',
+    )
+    // 至少有一条紧凑形态（无时刻前缀）—— 这条是「降级生效」的直接证据
+    expect(labels.some((t) => !/^\d\d:\d\d/.test(t)), `实际：${labels.join(' | ')}`).toBe(true)
+    // 且不是只剩零星一两条（14 个密集节点至少要标出 6 条）
+    expect(labels.length, `实际：${labels.join(' | ')}`).toBeGreaterThanOrEqual(6)
+  })
+})
+
+/**
  * 炸板（打开涨停）→ 黄色缺口环（2026-10-20 用户：「打开涨停可以提示为黄色节点」）。
  *
  * ⛔ 必须与「板块走弱（绿叉）」分开：炸板是涨停被打断，不是板块普跌。
@@ -1300,5 +1423,79 @@ describe('TimelineSnake · 炸板黄环（最低权重，但单票也显示）',
     const { container } = render(<TimelineSnake blocks={[normal]} {...props} {...instant} width={W} />)
     const mark = nodeAt(container, '10:00').querySelector('[data-node-kind]') as Element
     expect(mark.getAttribute('data-node-kind')).not.toBe('broken')
+  })
+})
+
+/**
+ * ## 弹窗宽度必须**跟着内容走**（2026-10-22 用户第二次纠正）
+ *
+ * 用户原话：「弹窗的宽度自适应啊。弹窗宽度没有自适应，现在宽度很宽，留白太大了！！」
+ *
+ * 演进：写死 `980` → `容器×0.82` → 本版「按内容量估宽」。
+ * 中间那版之所以被否，是因为 `容器×0.82` **仍是个固定值**：
+ * `14:30` 只有 4 行内容（涨停总数 / 新增封板 / 走弱板块 / 跌停）也照样 1052px，右侧全空。
+ *
+ * ⛔ 试过 CSS `width: max-content`，不行 —— 内部 `flex-wrap` + `grid(1fr)` 在
+ *    `max-content` 下会被压塌（实测 37 行内容只算出 365px、高 548px，挤成一列）。
+ */
+describe('TimelineSnake · 弹窗宽度跟着内容走', () => {
+  const dialogW = (c: HTMLElement) => {
+    const dlg = dialogOf(c)!
+    return Number.parseFloat(dlg.style.width) * Number.parseFloat(dlg.style.zoom || '1')
+  }
+
+  it('内容少的节点 → 弹窗窄（不再撑满容器，消除右侧留白）', () => {
+    // 只有一个板块走弱 + 一只炸板：信息量很小
+    const tiny = normalBlock(
+      10 * 60,
+      slot(10 * 60, { intradayDown: [ie('sector_down', '广告媒体', { pct: -2.6 }), ie('broken_new', '冰山冷热')] }),
+    )
+    const { container } = render(<TimelineSnake blocks={[tiny]} {...props} {...instant} width={W} />)
+    fireEvent.mouseEnter(nodeAt(container, '10:00'))
+    const w = dialogW(container)
+    expect(w, `内容只有 2 条，弹窗不该撑到容器级宽度（实际 ${w}px）`).toBeLessThan(520)
+  })
+
+  it('内容多的节点 → 弹窗明显更宽（同一容器下对比，不是同一个固定值）', () => {
+    const rich = normalBlock(
+      11 * 60,
+      slot(11 * 60, {
+        sectors: [sec('光通信', 4), sec('半导体', 3), sec('医药', 2)],
+        intradayUp: [
+          ie('sector_up', '机器人', { zt_count: 6 }),
+          ie('sector_up', '云计算数据中心', { zt_count: 3 }),
+          ie('sector_up', '网络安全', { zt_count: 2 }),
+        ],
+        intradayDown: [ie('sector_down', '白银', { pct: -6.49 }), ie('broken_new', '慈文传媒'), ie('broken_new', '华脉科技')],
+        events: [
+          {
+            time: '11:00',
+            event: '新主线崛起：光通信 涨停7只，龙头 华脉科技（含光模块与光芯片两条支线）',
+            severity: 'high',
+            topic: '光通信',
+          },
+        ],
+      }),
+    )
+    const { container } = render(<TimelineSnake blocks={[rich]} {...props} {...instant} width={W} />)
+    fireEvent.mouseEnter(nodeAt(container, '11:00'))
+    const w = dialogW(container)
+    expect(w, `内容明显更多，弹窗应更宽（实际 ${w}px）`).toBeGreaterThan(560)
+  })
+
+  it('⛔ 宽度永不超过容器（自适应 ≠ 允许溢出）', () => {
+    const rich = normalBlock(
+      11 * 60,
+      slot(11 * 60, {
+        intradayUp: Array.from({ length: 20 }, (_, i) => ie('sector_up', `板块${i}`, { zt_count: 3 })),
+        intradayDown: Array.from({ length: 12 }, (_, i) => ie('broken_new', `炸板股${i}`)),
+      }),
+    )
+    const narrow = 600
+    const { container } = render(
+      <TimelineSnake blocks={[rich]} {...props} {...instant} width={narrow} />,
+    )
+    fireEvent.mouseEnter(nodeAt(container, '11:00'))
+    expect(dialogW(container), '窄容器里弹窗必须收进来').toBeLessThanOrEqual(narrow - 16)
   })
 })

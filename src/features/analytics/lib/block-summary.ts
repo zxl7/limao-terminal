@@ -87,6 +87,30 @@ export interface BlockSummary {
   brokenCount: number
   /** 当刻**新跌停**条数 —— `limit_down_new`（⛔ 与「打开跌停」不是一回事） */
   limitDownCount: number
+  /**
+   * 当刻炸板 / 跌停的**名字**（去重、按出现顺序）。
+   *
+   * ⚠️ 2026-10-22 用户拿着截图问「这些点位的描述呢？」—— 截图上有一长串只有图标、
+   *    没有任何文字的 × 点位。根因之一是 `downTagOf` 只给「板块走弱/快讯/消息/异动」
+   *    四类出标签，而**炸板、跌停、个股回落、涨停总数变化**一律不给 → 那些点位彻底沉默。
+   *    下区三层平时只用 0–1 层，空位大量闲置，正好放这些「有名字的事实」。
+   */
+  brokenNames: string[]
+  limitDownNames: string[]
+  /**
+   * 当刻 `zt_total` 的净变化（无完整个股差分时后端不写 `zt_total`，故 0 是「无事实」而非「有事实但为 0」）。
+   * 用于「涨停+1 / 涨停-1」这类没有名字可标的兜底描述。
+   */
+  ztDelta: number
+  /**
+   * `zt_total` 差分里的**新增封板 / 打开涨停**名字。
+   *
+   * ⛔ 为什么需要：`zt_total` 的 `added/removed` 是全市场涨停池的**唯一完整名单**
+   *    （`stock_up` 只覆盖「板块领涨精选」那 20%）。只写「涨停+1」等于把已知的名字丢掉。
+   *    2026-10-22 实测 09:38 的 `added=[博汇股份]` —— 轴上却只显示「涨停+1」。
+   */
+  ztAdded: string[]
+  ztRemoved: string[]
   /** 题材标记（各自截断） */
   burst: Marks['burst']
   /** 该时刻仅发生**龙头轮动**的题材（弱标记 · 见 `SlotThemeMarks.rotated` 头注） */
@@ -103,8 +127,32 @@ function slotsOf(block: TimelineBlock): TimelineSlot[] {
   return block.kind === 'normal' ? [block.slot] : block.slots
 }
 
-/** 按 key 去重合并（保留首次顺序；数值取**最大**，如题材家数） */
-function mergeBy<T>(items: T[], key: (t: T) => string, better?: (a: T, b: T) => T): T[] {
+/**
+ * 从 `zt_total` 事件里抽名字（`added` / `removed`）。
+ *
+ * ⛔ 只认 `IntradayLimitUpStock` 形状的条目（有 `code`）—— 旧日志可能只写计数，
+ *    那种情况下宁可不给名字（返回空）也不要瞎猜。
+ */
+function ztNames(events: IntradayTimelineEvent[], ...fields: Array<'added' | 'removed'>): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const e of events) {
+    if (String(e.kind) !== 'zt_total') continue
+    for (const f of fields) {
+      const rows = e[f]
+      if (!Array.isArray(rows)) continue
+      for (const r of rows) {
+        const name = typeof r?.name === 'string' ? r.name.trim() : ''
+        if (!name || seen.has(name)) continue
+        seen.add(name)
+        out.push(name)
+      }
+    }
+  }
+  return out
+}
+
+/** 按 key 去重合并（保留首次顺序；数值取**最大**，如题材家数） */function mergeBy<T>(items: T[], key: (t: T) => string, better?: (a: T, b: T) => T): T[] {
   const idx = new Map<string, number>()
   const out: T[] = []
   for (const it of items) {
@@ -243,6 +291,18 @@ export function summarizeBlock(block: TimelineBlock, cap: number = SUMMARY_CAP):
     otherDownCount: downEvents.length - downSectorAll.length - brokenAll.length,
     brokenCount: brokenAll.length,
     limitDownCount: limitDownAll.length,
+    brokenNames: [
+      ...new Set(brokenAll.map((e) => String(e.name ?? '')).filter((n) => n !== '')),
+    ],
+    limitDownNames: [
+      ...new Set(limitDownAll.map((e) => String(e.name ?? '')).filter((n) => n !== '')),
+    ],
+    // ⛔ 只累加「已验证」的 zt_total（后端只在个股集合差分校验通过时才写 added/removed）
+    ztDelta: [...upEvents, ...downEvents]
+      .filter((e) => String(e.kind) === 'zt_total' && typeof e.delta === 'number')
+      .reduce((n, e) => n + Number(e.delta), 0),
+    ztAdded: ztNames(upEvents, 'added'),
+    ztRemoved: ztNames(downEvents, 'added', 'removed'),
     burst,
     rotated,
     fade,

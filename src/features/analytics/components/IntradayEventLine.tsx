@@ -199,12 +199,25 @@ function DirectionSection({
   label,
   events,
   showAll = false,
+  flat = false,
+  /** 扁平模式下本段顶部要不要一根分隔线（由父级决定，因为「第一段不需要」） */
+  divider = false,
 }: {
   dir: IntradayDirection
   label: string
   events: IntradayTimelineEvent[]
   /** ⛔ 明细浮层必须传 true —— 它是「完整明细」的落点，不能再截到 3 个 */
   showAll?: boolean
+  /**
+   * **扁平模式**（2026-10-22 用户：「Hover 弹窗里面简洁一点，不要嵌套三张卡片了」）。
+   *
+   * 详情浮层原本是「弹窗 → 槽白卡 → 灰底块 → 彩色左边框块」四层，
+   * 一眼看上去全是框。扁平模式下只保留**一行小标题 + 条目**：
+   * ⛔ 无底色、无圆角、无左边框、无边框 —— 靠字色、缩进与**一根 hairline 分隔线**分层
+   * （用户 2026-10-22 追加：「可以有分割线」）。
+   */
+  flat?: boolean
+  divider?: boolean
 }) {
   const kind = SECTOR_KIND[dir]
   const sectors = withKeys(
@@ -219,17 +232,10 @@ function DirectionSection({
   const top = sectors.slice(0, cap)
   const rest = sectors.slice(cap)
 
-  return (
-    <div className={cn("flex flex-col gap-1 min-w-0 rounded-sm border-l-2 px-2 py-1.5", dir === "up" ? "bg-up-soft/40 border-up/40" : "bg-down-soft/40 border-down/40")}>
-      <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
-        {label}
-        {sectors.length > 0 && (
-          <span className="text-sub font-normal ml-1.5">板块 {sectors.length} 个</span>
-        )}
-      </span>
-
+  const items = (
+    <>
       {top.length > 0 && (
-        <div className="flex flex-col gap-0.5 min-w-0 pl-1.5">
+        <div className={cn('flex flex-col gap-0.5 min-w-0', !flat && 'pl-1.5')}>
           {top.map(({ key, item }) => (
             <IntradayEventLine key={key} e={item} />
           ))}
@@ -238,8 +244,10 @@ function DirectionSection({
 
       {rest.length > 0 && (
         <>
-          <div className="text-[10px] text-sub pl-1.5">↓ 其余 {rest.length} 个板块</div>
-          <div className="flex flex-col gap-0.5 min-w-0 pl-1.5">
+          <div className={cn('text-[10px] text-sub', !flat && 'pl-1.5')}>
+            ↓ 其余 {rest.length} 个板块
+          </div>
+          <div className={cn('flex flex-col gap-0.5 min-w-0', !flat && 'pl-1.5')}>
             {rest.map(({ key, item }) => (
               <IntradayEventLine key={key} e={item} />
             ))}
@@ -248,13 +256,51 @@ function DirectionSection({
       )}
 
       {others.length > 0 && (
-        <div className="flex flex-col gap-0.5 min-w-0 pl-1.5">
+        <div className={cn('flex flex-col gap-0.5 min-w-0', !flat && 'pl-1.5')}>
           {others.map((e, i) => (
             // oxlint-disable-next-line react/no-array-index-key -- 同刻可重复同一标的，索引即身份
             <IntradayEventLine key={i} e={e} />
           ))}
         </div>
       )}
+    </>
+  )
+
+  if (flat) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col gap-0.5 min-w-0 py-1',
+          /**
+           * 扁平模式的**分隔线**（2026-10-22 用户：「可以有分割线」）。
+           *
+           * 拆掉卡片后靠什么分层就成了关键 —— 只靠字色太弱，段落会连成一片。
+           * 这里用一根 hairline：⛔ 不是边框（只有上边、不带左右下），
+           * 视觉上是「分隔」而不是「又一个框」。
+           */
+          divider && 'border-t border-line-faint pt-1.5',
+        )}
+      >
+        <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
+          {label}
+          {sectors.length > 0 && (
+            <span className="ml-1.5 font-normal text-sub">板块 {sectors.length} 个</span>
+          )}
+        </span>
+        {items}
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn("flex flex-col gap-1 min-w-0 rounded-sm border-l-2 px-2 py-1.5", dir === "up" ? "bg-up-soft/40 border-up/40" : "bg-down-soft/40 border-down/40")}>
+      <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
+        {label}
+        {sectors.length > 0 && (
+          <span className="text-sub font-normal ml-1.5">板块 {sectors.length} 个</span>
+        )}
+      </span>
+      {items}
     </div>
   )
 }
@@ -274,15 +320,35 @@ export function IntradayEventBlock({
   up,
   down,
   showAll = false,
+  flat = false,
 }: {
   up: IntradayTimelineEvent[]
   down: IntradayTimelineEvent[]
   /** 取消「板块最多 3 个」上限（明细浮层用） */
   showAll?: boolean
+  /** 扁平模式（详情浮层用）：丢掉所有底色/边框/圆角，只留小标题 + 条目 */
+  flat?: boolean
 }) {
   const news = up.filter((e) => NEWS_KINDS.has(String(e.kind)))
   const upRest = up.filter((e) => !NEWS_KINDS.has(String(e.kind)))
   if (up.length === 0 && down.length === 0) return null
+
+  if (flat) {
+    return (
+      <div className="flex flex-col gap-0 min-w-0">
+        {upRest.length > 0 && (
+          <DirectionSection dir="up" label="盘中走强" events={upRest} showAll={showAll} flat />
+        )}
+        {down.length > 0 && (
+          <DirectionSection dir="down" label="盘中走弱" events={down} showAll={showAll} flat divider={upRest.length > 0} />
+        )}
+        {news.length > 0 && (
+          <NewsSection events={news} flat divider={upRest.length > 0 || down.length > 0} />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
       {upRest.length > 0 && <DirectionSection dir="up" label="盘中走强与涨停变化" events={upRest} showAll={showAll} />}
@@ -295,22 +361,52 @@ export function IntradayEventBlock({
 }
 
 /** 消息面一段（外部快讯 + 短线精灵异动）—— 中性灰，⛔ 不带涨跌方向色 */
-function NewsSection({ events }: { events: IntradayTimelineEvent[] }) {
+function NewsSection({
+  events,
+  flat = false,
+  divider = false,
+}: {
+  events: IntradayTimelineEvent[]
+  flat?: boolean
+  /** 扁平模式下顶部加一根 hairline（前一段存在时才有意义） */
+  divider?: boolean
+}) {
+  const body = (
+    <>
+      {events.map((e, i) => (
+        // oxlint-disable-next-line react/no-array-index-key -- 同刻可重复同一标的，索引即身份
+        <IntradayEventLine key={i} e={e} />
+      ))}
+    </>
+  )
+  const head = (
+    <>
+      消息面
+      <span className={cn('font-normal text-sub', flat ? 'ml-1.5' : 'ml-1.5')}>
+        快讯 {events.filter((e) => String(e.kind) === 'newsflash_new').length} 条 · 异动{' '}
+        {events.filter((e) => String(e.kind) === 'signal_new').length} 条
+      </span>
+    </>
+  )
+
+  if (flat) {
+    return (
+      <div
+        className={cn(
+          'flex flex-col gap-0.5 min-w-0 py-1',
+          divider && 'border-t border-line-faint pt-1.5',
+        )}
+      >
+        <span className="text-[10.5px] font-semibold text-txt/75">{head}</span>
+        <div className="flex flex-col gap-0.5 min-w-0">{body}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-sm border-l-2 border-line-strong bg-line-faint/70 px-2 py-1.5">
-      <span className="text-[10.5px] font-semibold text-txt/75">
-        消息面
-        <span className="ml-1.5 font-normal text-sub">
-          快讯 {events.filter((e) => String(e.kind) === 'newsflash_new').length} 条 · 异动{' '}
-          {events.filter((e) => String(e.kind) === 'signal_new').length} 条
-        </span>
-      </span>
-      <div className="flex min-w-0 flex-col gap-0.5 pl-1.5">
-        {events.map((e, i) => (
-          // oxlint-disable-next-line react/no-array-index-key -- 同刻可重复同一标的，索引即身份
-          <IntradayEventLine key={i} e={e} />
-        ))}
-      </div>
+      <span className="text-[10.5px] font-semibold text-txt/75">{head}</span>
+      <div className="flex min-w-0 flex-col gap-0.5 pl-1.5">{body}</div>
     </div>
   )
 }

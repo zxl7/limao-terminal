@@ -210,7 +210,9 @@ function LabelChip({
               ? 'bg-up/45'
               : slot.tone === 'news'
                 ? 'bg-line-strong/70'
-                : 'bg-down/45',
+                : slot.tone === 'break'
+                  ? 'bg-break/45'
+                  : 'bg-down/45',
         )}
         style={
           isUp
@@ -226,12 +228,13 @@ function LabelChip({
         data-label-tier={slot.tier}
         data-label-dir={dir}
       >
-        {clock}
+        {/* 紧凑形态不带时刻（见 `SnakeThemeTag.compact`）；ml-1 也不加，省下每一像素 */}
+        {!tag?.compact && clock}
         {outside && <span className="text-warn">{outside === 'post' ? '盘后' : '盘前'}</span>}
         {tag && (
           <span
             className={cn(
-              'ml-1',
+              tag.compact ? undefined : 'ml-1',
               tag.kind === 'first' && 'text-[11.5px] font-bold text-rec',
               tag.kind === 'follow' && 'text-[11px] font-semibold text-rec/80',
               tag.kind === 'rotation' && 'text-rec',
@@ -241,6 +244,9 @@ function LabelChip({
               tag.kind === 'news' && 'text-txt/70',
               // 短线精灵异动：机会向（半档紫），但比板块走强弱 —— 它没有题材归属
               tag.kind === 'signal' && 'text-rec/70',
+              // 炸板：琥珀（与轴上黄环同色，一眼认得「这是涨停被打断」）；
+              // 70% 透明 —— 用户定过「炸板降权」，弱化但不隐藏
+              tag.kind === 'break' && 'text-break/70',
             )}
             data-burst={tag.kind === 'first' ? 'first' : tag.kind === 'follow' ? 'follow' : undefined}
           >
@@ -319,12 +325,48 @@ export function ShapeLegend({ className }: { className?: string }) {
 
 /** 未测量时的兜底宽度（PC 端典型内容区宽） */
 const FALLBACK_WIDTH = 1440
-/** 明细浮层宽度（px）—— 2026-09-20 用户「卡片 hover 可以显示大一点」：700 → 980 */
-const DETAIL_W = 980
+/**
+ * 明细浮层宽度（px）—— **跟着内容走，不是跟着容器走**。
+ *
+ * ⚠️ 2026-10-22 用户两次纠正：
+ *   ①「弹窗宽度自适应」→ 我把写死的 980 换成 `容器×0.82`；
+ *   ②「弹窗的宽度自适应啊。弹窗宽度没有自适应，现在宽度很宽，留白太大了！！」
+ *      —— 对，那只是**换了个固定值**：14:30 那种只有 4 行的节点照样 1052px，右边全空。
+ *
+ * ## 为什么不直接用 CSS `width: max-content`
+ *
+ * 实测过，不行：`max-content` 取的是「所有子项不换行时的最大宽」，而本组件内部大量用
+ * `flex flex-wrap` + `grid(1fr)`：
+ *   · `flex-wrap` 的子项在 `max-content` 下**不撑开**，反而被压；
+ *   · `grid` 的 `1fr` 在 `max-content` 下算 0。
+ * 结果 09:31（37 行内容）只算出 365px、高 548px —— 内容被挤成一列，比原来看。
+ *
+ * 故改为**按内容量估算**：条目越多越宽，到 `DETAIL_W_MAX` 封顶；内容少就窄。
+ * 估算用的是可数的业务量（板块/个股/事件条数），⛔ 不读 DOM（读 DOM 要两帧、会闪）。
+ */
+const DETAIL_W_MIN = 340
+const DETAIL_W_MAX = 1180
+/** 估算：每「视觉行」占多少宽度（含缩进与列间距的空隙） */
+const DETAIL_LINE_W = 24
+/** 估算：基础宽度（时刻 + 类型标签 + 计数那一行本身） */
+const DETAIL_BASE_W = 330
+/** 浮层与容器左右边的最小留白（px）—— 贴边会看不清边界 */
+const DETAIL_EDGE = 16
 /** 明细浮层最大高度（vh）—— 超出则浮层内部滚动（62 → 76，配合宽度一起放大） */
 const DETAIL_MAX_VH = 76
 /** 浮层「往上放还是往下放」的 y 判定阈值（px） */
 const DETAIL_FLIP_Y = 300
+
+/**
+ * 浮层**字号缩放**（2026-10-22 用户：「字体放大一点」）。
+ *
+ * ⛔ 为什么用 `zoom` 而不是逐个改 `text-[11px]`：详情内容是 `SlotBody` +
+ *    `IntradayEventLine` + `StockRow` + `EventSlot` 六七个组件拼的，逐个改字号
+ *    必然漏一两处，出现「题材名 13.5px、股票名 12px、事件 11.5px」的混排错位。
+ *    `zoom` 是**整块等比放大**（字号/间距/圆角一起），不会互相错位；且真实布局重算，
+ *    文字不发虚。改一个数就能整体调，好回退。
+ */
+const DETAIL_ZOOM = 1.15
 
 /** 时间刻度：整点 + 下午半点 —— 给「横轴读到哪一段」一个参照 */
 const TICK_MINUTES = [10 * 60, 11 * 60, 13 * 60 + 30, 14 * 60, 14 * 60 + 30, 15 * 60]
@@ -556,8 +598,8 @@ const LEADER_DROP = 26
 /** 标签方向：走强（上 / 红线）还是走弱（下 / 绿线） */
 export type SnakeLabelDir = 'up' | 'down'
 
-/** 引导线色调：题材紫 / 上涨红 / 下跌绿 / 消息面灰 */
-export type LabelTone = 'rec' | 'up' | 'down' | 'news'
+/** 引导线色调：题材紫 / 上涨红 / 下跌绿 / 消息面灰 / 炸板琥珀 */
+export type LabelTone = 'rec' | 'up' | 'down' | 'news' | 'break'
 
 /** 某个节点在某一侧占到的位置 */
 export interface LabelSlot {
@@ -566,7 +608,6 @@ export interface LabelSlot {
   /** 文案为 null = 只有时刻、没有题材名 */
   tag: SnakeThemeTag | null
 }
-
 /** 轴上题材名标签（渲染与碰撞判据共用同一份结构） */
 export type SnakeThemeTag = {
   /**
@@ -574,9 +615,18 @@ export type SnakeThemeTag = {
    * 【短线精灵 + 终端！！】」）—— 它是**消息面通道的第二档**，排在「消息·推送」之后：
    * 文案前缀「异动·」，文字用半档紫（机会向但未经题材归类），引导线仍走中性灰。
    */
-  kind: 'first' | 'follow' | 'rotation' | 'plain' | 'news' | 'signal'
+  kind: 'first' | 'follow' | 'rotation' | 'plain' | 'news' | 'signal' | 'break'
   dir: SnakeLabelDir
   text: string
+  /**
+   * **紧凑形态**：轴上不渲染时刻，只留文案（2026-10-22）。
+   *
+   * ⛔ 密集段三层全被相邻标签占满时，原实现直接把这条标签**丢掉** —— 用户看到的
+   *    就是「点位在那儿、一句描述都没有」。现改为「先试完整形态（含时刻），
+   *    放不下就退到紧凑形态再试」，实在放不下才丢。
+   * ⚠️ 缩略的是**我方的排版冗余**，不是事实：时刻在同一段邻近标签上仍可读到。
+   */
+  compact?: boolean
 }
 
 /**
@@ -665,6 +715,15 @@ function upTagOf(
     const extra = summary.upStocks.length > 1 ? `+${summary.upStocks.length - 1}` : ''
     return { kind: 'plain', dir: 'up', text: `${summary.upStocks[0].name}${extra}` }
   }
+  /**
+   * 最后一档：**新封板**。`zt_total.added` 是全市场涨停池的完整名单，
+   * 比「涨停+1」多出「是谁」——同一件事实里信息量最大的那部分。
+   */
+  if (summary.ztAdded.length > 0) {
+    const extra = summary.ztAdded.length > 1 ? `+${summary.ztAdded.length - 1}` : ''
+    return { kind: 'plain', dir: 'up', text: `涨停·${summary.ztAdded[0]}${extra}` }
+  }
+  if (summary.ztDelta > 0) return { kind: 'plain', dir: 'up', text: `涨停+${summary.ztDelta}` }
   return null
 }
 
@@ -728,6 +787,51 @@ function downTagOf(summary: BlockSummary): SnakeThemeTag | null {
     const extra = summary.signals.length > 1 ? `+${summary.signals.length - 1}` : ''
     return { kind: 'signal', dir: 'down', text: `异动·${summary.signals[0].name}${extra}` }
   }
+  /**
+   * ## 兜底：让**每个点位**都读得出发生了什么（2026-10-22 用户：「这些点位的描述呢？」）
+   *
+   * 用户截图上有一长串只有图标、没有任何文字的 × 点位。根因是这里到 `return null` 为止，
+   * 而**炸板 / 跌停 / 个股回落 / 涨停总数变化**四类事实**从不给标签** ——
+   * 轴上于是只剩一个「×」或「黄环」，读者完全读不出是哪只票、发生了什么事。
+   *
+   * ⛔ 下区三层平时只用 0–1 层（板块走弱一天 ~20 条），空位大量闲置 ——
+   *    这些「有名字的事实」正该占这些空位，不占上区跑道。
+   * ⛔ 仍然**排在上区之后**：只有该节点上区没有更重要的题材/走强时，才轮到它们。
+   * ⛔ 顺序＝信息量降序：炸板（有名字，且是涨停被打断）＞ 跌停（有名字）＞
+   *    涨停总数变化（有数字）＞ 个股回落（只有只数，最模糊）。
+   * ⛔ 炸板用 70% 琥珀：用户 2026-10-20 定过「炸板降权，不要全是炸板」——
+   *    降权 = 弱化显示，不是不给（同「降权 ≠ 不显示」那条铁律）。
+   */
+  if (summary.brokenNames.length > 0) {
+    const extra = summary.brokenNames.length > 1 ? `+${summary.brokenNames.length - 1}` : ''
+    return { kind: 'break', dir: 'down', text: `炸板·${summary.brokenNames[0]}${extra}` }
+  }
+  /**
+   * **打开涨停**（`zt_total.removed`）—— 与 `broken_new` 是同一件事的两个来源：
+   * `broken.names` 来自快照的炸板名单（可能滞后一分钟），`removed` 来自涨停池差分。
+   * 上面那档已覆盖 broken，这里兜住「差分才有、炸板名单没有」的情形，
+   * 避免退化成无名的「涨停-1」。
+   */
+  if (summary.ztRemoved.length > 0) {
+    const extra = summary.ztRemoved.length > 1 ? `+${summary.ztRemoved.length - 1}` : ''
+    return { kind: 'break', dir: 'down', text: `打开·${summary.ztRemoved[0]}${extra}` }
+  }
+  if (summary.limitDownNames.length > 0) {
+    const extra = summary.limitDownNames.length > 1 ? `+${summary.limitDownNames.length - 1}` : ''
+    return { kind: 'plain', dir: 'down', text: `跌停·${summary.limitDownNames[0]}${extra}` }
+  }
+  /**
+   * ⚠️ **必须排在 `otherDownCount` 之前**：`otherDownCount` 是
+   * `下跌事件 − 板块走弱 − 炸板`，里面剩下的主力就是 `zt_total` 的负变化
+   * （跌停已被上一档拦掉）。先判 `ztDelta` 才能写出「涨停-1」这个**准确的**事实；
+   * 否则会笼统写成「回落·1只」——同样的节点，一个说得出数字、一个说不出。
+   */
+  if (summary.ztDelta < 0) {
+    return { kind: 'plain', dir: 'down', text: `涨停${summary.ztDelta}` }
+  }
+  if (summary.otherDownCount > 0) {
+    return { kind: 'plain', dir: 'down', text: `回落·${summary.otherDownCount}只` }
+  }
   return null
 }
 
@@ -760,7 +864,9 @@ function labelWidth(tag: SnakeThemeTag | null): number {
   if (!tag) return CLOCK_LABEL_W
   const fontSize = tag.kind === 'first' ? 11.5 : tag.kind === 'follow' ? 11 : 9.5
   // 汉字按字号满宽、数字/符号略窄，取 0.95 折中；+4 是「分钟」与题材名之间的 ml-1
-  return CLOCK_LABEL_W + 4 + tag.text.length * fontSize * 0.95
+  const textW = tag.text.length * fontSize * 0.95
+  // 紧凑形态不渲染时刻，也不加 ml-1 —— 宽度必须跟着一起减，否则估算永远判「放不下」
+  return tag.compact ? textW : CLOCK_LABEL_W + 4 + textW
 }
 
 /** 一条竖虚线 + 时刻文字，给横轴一个「读到哪一段」的参照 */
@@ -815,17 +921,67 @@ function HoverDetail({
 }) {
   /** 节点偏下 → 浮层往上放（否则会超出画布底部） */
   const above = y > Math.max(DETAIL_FLIP_Y, height * 0.42)
-  const left = Math.min(
-    Math.max(x, DETAIL_W / 2 + 8),
-    Math.max(DETAIL_W / 2 + 8, width - DETAIL_W / 2 - 8),
+
+  /**
+   * **按内容量估宽**（详见 `DETAIL_W_MIN` 上方的取舍说明）。
+   *
+   * 三个权重来自「实际会渲染出几行」：
+   *   · 每个板块走强/走弱 ≈ 1 行；
+   *   · 每只个股 ≈ 1 行（`ROW_GRID` 横排，名称/板数/板块/换手挤一行）；
+   *   · 炸板/跌停/异动/快讯/推送/首爆各自也会占行，按 1～2 行计。
+   * ⛔ 只用 `summarizeBlock` 的计数，⛔ 不读 DOM（读 DOM 要两帧，浮层会先闪一下宽再收）。
+   */
+  const s = summarizeBlock(block, 999)
+  /** 本块的槽（`normal` 单槽、`linkage`/`merged` 多槽）—— 用于取事件文本长度 */
+  const detailSlots = block.kind === 'normal' ? [block.slot] : block.slots
+  const eventCount = detailSlots.reduce((n, sl) => n + (sl.events?.length ?? 0), 0)
+  /** 最长的一条系统观测原文——它决定「换行要几行」，也决定弹窗最少得多宽 */
+  const longestEvent = detailSlots.reduce(
+    (m, sl) => (sl.events ?? []).reduce((k, e) => Math.max(k, String(e.event ?? '').length), m),
+    0,
   )
+  const visualLines =
+    s.upSectorCount +
+    s.downSectorCount +
+    s.stockCount +
+    s.brokenCount +
+    s.limitDownCount +
+    s.signals.length +
+    s.news.length +
+    s.pushed.length * 1.5 +
+    s.burst.length * 2 +
+    eventCount
+  /**
+   * 长句加成：超过 ~18 字的事件原文在窄弹窗里会被折成两三行，
+   * 读起来比「弹窗宽一点、一行读完」更累，故按超出部分补宽度（封顶 240px）。
+   */
+  const textBonus = longestEvent > 18 ? Math.min(240, (longestEvent - 18) * 6) : 0
+  /** 容器能用多宽（留 16px 呼吸）—— 估算再准也不能超出容器 */
+  const cap = Math.round(width - DETAIL_EDGE * 2)
+  const dw = Math.min(
+    DETAIL_W_MAX,
+    cap,
+    Math.max(DETAIL_W_MIN, Math.round(DETAIL_BASE_W + visualLines * DETAIL_LINE_W + textBonus)),
+  )
+  /**
+   * 水平居中于节点，但**不许出容器**。
+   * ⛔ 用 `dw/2`（本次真实宽）而不是任何固定上限：
+   *    宽度现在由内容决定，用固定值会在窄弹窗时把浮层顶偏、宽弹窗时又贴边。
+   */
+  const half = dw / 2 + 8
+  const left = Math.min(Math.max(x, half), Math.max(half, width - half))
   return (
     <div
       className="absolute z-30 flex flex-col min-w-0 rounded-[var(--radius-sm)] border border-line-strong bg-card shadow-xl"
       style={{
-        width: DETAIL_W,
-        maxHeight: `${DETAIL_MAX_VH}vh`,
-        left,
+        /**
+         * `zoom` 会等比放大**布局尺寸**，故 width / maxHeight / left 都要先按 zoom 折算，
+         * 否则 1.15 倍之后视觉宽度溢出容器、高度顶出视口、浮层整体右漂。
+         */
+        width: dw / DETAIL_ZOOM,
+        maxHeight: `calc(${DETAIL_MAX_VH}vh / ${DETAIL_ZOOM})`,
+        zoom: DETAIL_ZOOM,
+        left: left / DETAIL_ZOOM,
         top: above ? y - 16 : y + 34,
         transform: above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
       }}
@@ -1085,6 +1241,25 @@ export function TimelineSnake({
         if (tier >= 0) tiers[tier].push({ x, half })
         return tier
       }
+      /**
+       * 某一侧标签的两级尝试：完整形态 → 紧凑形态（不带时刻）。
+       * 返回 null 表示三层都放不下（调用方就不再渲染这条标签）。
+       */
+      const placeOn = (
+        dir: SnakeLabelDir,
+        n: (typeof nodes)[number],
+        tag: SnakeThemeTag | null,
+      ): { tier: number; tag: SnakeThemeTag | null } | null => {
+        const tier = place(dir, labelWidth(tag) / 2, n.point.x)
+        if (tier >= 0) return { tier, tag }
+        // ⛔ 纯时刻标签没有可压缩的内容（砍掉时刻就等于什么都没有）→ 不做紧凑尝试
+        if (!tag) return null
+        const compactTag: SnakeThemeTag = { ...tag, compact: true }
+        const tier2 = place(dir, labelWidth(compactTag) / 2, n.point.x)
+        return tier2 >= 0 ? { tier: tier2, tag: compactTag } : null
+      }
+      const placeUp = (n: (typeof nodes)[number], tag: SnakeThemeTag | null) =>
+        placeOn('up', n, tag)
       for (const n of ordered) {
         const notable = isNotable(n.summary, n.block)
         const streaks = streakByNode.get(n.block.key)
@@ -1110,28 +1285,45 @@ export function TimelineSnake({
          */
         const wantUp = n.point.outside || !!upTag || (notable && !downTag)
         if (wantUp) {
-          const half = labelWidth(upTag) / 2
-          const tier = place('up', half, n.point.x)
-          if (tier >= 0) {
+          /**
+           * 两级尝试（2026-10-22）：
+           *   ① 完整形态（时刻 + 文案）；
+           *   ② 放不下 → **紧凑形态**（只留文案，省掉 ~31px 时刻宽）再试一次；
+           *   ③ 仍放不下才丢。
+           *
+           * ⛔ 上一版只有 ①，密集段三层一满就直接丢弃 —— 用户截图里那串没有描述的
+           *    点位就是这么来的：**不是没数据，是排版把它吞了**。
+           */
+          const placed = placeUp(n, upTag)
+          if (placed) {
             // 消息面单独一档色调：既不是题材紫，也不是走强红（否则引导线会误导方向）
             const tone: LabelTone =
               upTag?.kind === 'news' ? 'news' : upTag && upTag.kind !== 'plain' ? 'rec' : 'up'
-            out.set(n.block.key, { ...(out.get(n.block.key) ?? {}), up: { tier, tone, tag: upTag } })
+            out.set(n.block.key, { ...(out.get(n.block.key) ?? {}), up: { ...placed, tone } })
           }
         }
         if (downTag) {
-          const tier = place('down', labelWidth(downTag) / 2, n.point.x)
-          if (tier >= 0) {
+          const placed = placeOn('down', n, downTag)
+          if (placed) {
             out.set(n.block.key, {
               ...(out.get(n.block.key) ?? {}),
               /**
                * 引导线色调 = **语义方向**，不是「它落在哪一侧」：
-               *   题材紫（走强/爆发）、上涨红、下跌绿、中性灰（消息面）。
+               *   题材紫（走强/爆发）、上涨红、下跌绿、中性灰（消息面）、琥珀（炸板）。
                * ⛔ 消息(`news`) 与短线精灵异动(`signal`) 都是**中性消息** —— 它们落在下半区
                *    只是因为上区跑道被题材占满，不能因此给它们画一根「走弱绿线」，
                *    否则轴上会把「有条消息」误读成「这条线在跌」。
                */
-              down: { tier, tone: downTag.kind === 'news' || downTag.kind === 'signal' ? 'news' : 'down', tag: downTag },
+              down: {
+                tier: placed.tier,
+                tone:
+                  downTag.kind === 'news' || downTag.kind === 'signal'
+                    ? 'news'
+                    : downTag.kind === 'break'
+                      ? 'break'
+                      : 'down',
+                tag: placed.tag,
+              },
             })
           }
         }

@@ -126,22 +126,56 @@ export function BlockDetail({
       {/* 明细主体：**全量**。`scrollBody` = 浮动层（自身滚动）；否则自然增高（左栏列表滚动） */}
       <div
         className={cn(
-          'p-2 flex flex-col gap-2 min-w-0 bg-line-faint/30',
-          scrollBody && 'flex-1 min-h-0 overflow-y-auto overscroll-contain p-2.5 gap-2.5',
+          'min-w-0',
+          scrollBody && 'flex-1 min-h-0 overflow-y-auto overscroll-contain',
         )}
       >
-        {slots.map((s) => (
-          <div key={s.key} className="rounded-[var(--radius-sm)] border border-line bg-card p-2 min-w-0 shadow-sm">
+        {/**
+         * ⛔⛔ 2026-10-22 用户：「Hover 弹窗里面简洁一点，不要嵌套三张卡片了」。
+         *
+         * 原实现每个槽都套一层 `rounded + border + bg-card + shadow-sm` 的白卡，
+         * 外面还有一圈 `bg-line-faint/30` 的灰底 —— 弹窗里于是同时存在
+         * 「弹窗卡片 → 槽白卡 → 灰底块 → 彩色左边框块」四层框，一眼全是边。
+         *
+         * 现在：**槽与槽之间只留一根细线**，槽内走 `SlotBody flat`（无底色/无边框/无圆角）。
+         *
+         * ## 分层靠什么（用户随后补充：「可以有分割线」）
+         *
+         * 拆框 ≠ 拆线：段落之间保留 **hairline 分隔线**（只有上边框、极淡），
+         * 视觉上是「分隔」而不是「又一个框」。落地两处：
+         *   · 槽内：父级用 `[&>*+*]:border-t` 给**每个顶层段**自动加线 ——
+         *     ⛔ 不逐段手写：`SlotBody` 返回 Fragment，段数随数据变化，
+         *     逐段加必然漏（题材块有/无、事件块有/无都是不同分支）。
+         *   · 段内：`DirectionSection` / `NewsSection` 的 `divider` 自己处理子段。
+         */}
+        {slots.map((s, i) => (
+          <div
+            key={s.key}
+            className={cn(
+              /**
+               * ⛔ 必须 `flex flex-col gap-*`：`SlotBody` 返回的是**Fragment**，
+               *    父级不是 flex 的话，它的各段会紧贴在一起 —— 拆掉内层卡片后
+               *    「题材 / 盘中外强外弱 / 个股」会糊成一坨，比有卡片时更难读。
+               */
+              'flex min-w-0 flex-col gap-1.5 px-3 py-2',
+              // 顶层段之间的分隔线（第一段不带线，靠 `*+*` 天然做到）
+              '[&>*+*]:border-t [&>*+*]:border-line-faint [&>*+*]:pt-1.5',
+              i > 0 && 'border-t border-line-faint',
+            )}
+          >
+            {slots.length > 1 && (
+              <div className="num text-[11px] font-semibold text-txt">{minToClock(s.at)}</div>
+            )}
             <SlotBody
               slot={s}
               topBoard={topBoard}
               tags={tags}
               reasonByCode={reasonByCode}
               themeInfo={themeInfo}
-              showTime={slots.length > 1}
               showAllSectors
               showAllEvents
               themeGrouped
+              flat
             />
           </div>
         ))}

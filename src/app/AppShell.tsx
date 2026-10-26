@@ -1,8 +1,11 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { TideAlgorithmStrip } from '@/features/market'
 import { TopBar } from './TopBar'
 import { RightRail } from './RightRail'
 import { Sidebar, TopNavFallback } from './Sidebar'
+import { preloadPage } from './lazyRoute'
+import type { PagePath } from './pages'
 
 /**
  * 应用外壳 —— 布局与导航。
@@ -26,7 +29,8 @@ import { Sidebar, TopNavFallback } from './Sidebar'
 export type TabGroup = '实时' | '盘面' | '题材' | '决策' | '数据'
 
 interface TabDef {
-  to: string
+  /** 必须来自 `pages.ts` 的 `PAGE_LOADERS` —— 类型层保证「导航项都有对应页面模块」 */
+  to: PagePath
   label: string
   /** 是否精确匹配（首页 `/` 需要，否则永远高亮） */
   end?: boolean
@@ -96,6 +100,7 @@ export const TABS: readonly TabDef[] = [
   { to: '/risk', label: '风险监控', group: '题材' },
 
   // ── 段5 · 数据与运维（日频）──
+  { to: '/data', label: '数据底座', group: '数据' },
   { to: '/record', label: '数据记录', group: '数据' },
   { to: '/ops', label: '运维审计', group: '数据' },
   { to: '/hithink', label: '同花顺数据', group: '数据' },
@@ -106,18 +111,41 @@ export const TABS: readonly TabDef[] = [
 ] as const
 
 export function AppShell() {
+  usePrefetchPriorityPages()
+
   return (
-    <div className="flex min-h-screen bg-bg">
+    /**
+     * ## 高度锁定在视口 —— 三个滚动区各自独立（2026-10-22 用户要求）
+     *
+     * 用户原话：「左边的 tab 侧边栏固定，不要跟着右边的内容一起上下滚动。
+     * 狸猫终端固定在左上角，下面的 tab 可以上下滚动，右侧上下滚动，这两个是分开的」。
+     *
+     * ⛔ 原来这里写的是 **`min-h-screen`**（最小高度），它允许被内容**撑高** ——
+     *    于是页面真实高度 = 内容高度，滚动的是 `document`：
+     *    侧栏 `<nav overflow-y-auto>` 与 `main overflow-y-auto` 都因为「父级没有确定高度」
+     *    而**永不触发**，侧栏跟着整页一起滚，正是用户看到的现象。
+     *
+     * 现改为 `h-screen overflow-hidden`：高度钉死为视口高，`document` 不再滚动，
+     * 滚动权交回各自的容器 ——
+     *   · 侧栏品牌区 `flex-none`（固定左上角）→ tab 列表 `flex-1 overflow-y-auto`（独立滚）
+     *   · 主内容 `main overflow-y-auto`（独立滚）
+     *   · 右侧 rail `overflow-y-auto`（独立滚）
+     *
+     * ⚠️ `min-h-0` 不能省：flex 子项默认 `min-height: auto`，内容超过容器时
+     *    会**拒绝收缩**，把祖先一起撑高，`overflow-y-auto` 又退回失效状态。
+     *    这条链上每一层（中间列 / 内容区）都要带。
+     */
+    <div className="flex h-screen overflow-hidden bg-bg">
       <Sidebar />
 
       {/* 中间区域：顶栏 + 主内容 +（可选）右侧 rail */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <TopBar />
         <TopNavFallback />
 
         {/* 主内容区：≥3xl 与 RightRail 并排 */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <main className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-5 3xl:px-6 py-3">
+          <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain px-4 lg:px-5 3xl:px-6 py-3">
             <TideAlgorithmLayer />
             <Outlet />
           </main>
@@ -138,4 +166,65 @@ function TideAlgorithmLayer() {
   const group = TABS.find((tab) => tab.to === pathname)?.group
   if (group !== '实时' && group !== '盘面') return null
   return <TideAlgorithmStrip group={group} />
+}
+
+/** 相邻两个预取之间的间隔 —— 拉开一点，别和首屏数据请求抢带宽 */
+const PREFETCH_GAP_MS = 150
+
+/**
+ * 重点页面的**空闲预取**。
+ *
+ * ## 为什么值得做
+ *
+ * 29 个页面全是懒加载，默认行为是「点了才开始下载」。dev 环境下单个页面的
+ * 模块图有数百个请求，首次点击要等几百毫秒到数秒；这段时间里任何一次请求
+ * 失败，用户看到的就是「页面加载失败」。把重点页的下载挪到浏览器空闲时，
+ * 点击时直接命中已完成的 promise —— 既是秒开，也把失败窗口提前消化掉了。
+ *
+ * ## 为什么只预取 `priority` 的几页
+ *
+ * 全部 29 页预取会在 dev 下瞬间打出上万请求，把首屏和 HMR 一起拖慢
+ * （生产 build 后每页一个 chunk，代价小很多，但也没有必要）。
+ * 优先页是侧栏带 ★ 的那几个 —— 实际使用频率最高的就是它们。
+ *
+ * ## 为什么是串行 + 可取消
+ *
+ * `StrictMode` 会双调用 effect，卸载时要能停掉剩余定时器，否则会有一批
+ * 预取请求在组件已经卸载后继续跑。
+ */
+function usePrefetchPriorityPages() {
+  useEffect(() => {
+    const targets = TABS.filter((t) => t.priority && t.to !== '/').map((t) => t.to)
+    const timers: number[] = []
+    let cancelled = false
+
+    const run = () => {
+      targets.forEach((to, index) => {
+        timers.push(
+          window.setTimeout(() => {
+            if (!cancelled) preloadPage(to)
+          }, index * PREFETCH_GAP_MS),
+        )
+      })
+    }
+
+    // requestIdleCallback 在 Safari 17+ 才稳定；缺失时退化为「挂载后立即排队」
+    const idle = (
+      globalThis as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      }
+    ).requestIdleCallback
+
+    const cancelIdle = (globalThis as { cancelIdleCallback?: (handle: number) => void })
+      .cancelIdleCallback
+
+    const idleHandle = typeof idle === 'function' ? idle(run, { timeout: 4000 }) : null
+    if (idleHandle === null) run()
+
+    return () => {
+      cancelled = true
+      timers.forEach((timer) => window.clearTimeout(timer))
+      if (idleHandle !== null) cancelIdle?.(idleHandle)
+    }
+  }, [])
 }

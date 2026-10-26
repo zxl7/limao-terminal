@@ -130,6 +130,7 @@ describe('导航顺序 —— 实时优先', () => {
     expect(
       intraday,
       'intraday 路由数量变了 —— 请重新跑「页面 × cadence」审计，确认「实时」段是否需要增删成员',
-    ).toBe(12)
+    // /api/data/exit-peaks 为盘中事实核验，页面主体属数据档案，不加入实时导航前缀。
+    ).toBe(13)
   })
 })

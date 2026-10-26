@@ -948,6 +948,83 @@ export const HealthPayloadSchema = z.object({
 })
 
 // ════════════════════════════════════════════════════════════════
+// 数据底座（盘中核验优先）
+// ════════════════════════════════════════════════════════════════
+
+const ExitPeaksSchema = z.object({
+  schema: s.optional(),
+  date: s.optional(),
+  updated_at: s.optional(),
+  stock_scope: s.optional(),
+  sector_scope: s.optional(),
+  stocks: z.record(s, z.object({
+    name: s.optional(),
+    current_seal_yi: nOrNull.optional(),
+    current_sealed: b.optional(),
+    current_observed_at: s.nullish(),
+    quote_at: s.nullish(),
+    seal_yi_peak: n.optional(),
+    seal_yi_peak_at: s.optional(),
+  })).optional(),
+  sectors: z.record(s, z.object({
+    current_zt_count: nOrNull.optional(),
+    zt_count_peak: n.optional(),
+    zt_count_peak_at: s.optional(),
+  })).optional(),
+})
+
+const ThemeSnapshotSchema = z.array(z.object({
+  file: s.optional(),
+  data: z.object({
+    schema: s.optional(),
+    date: s.optional(),
+    mapping: z.record(s, z.object({
+      name: s.optional(), theme: s.optional(), logic: s.optional(), plates: z.array(s).optional(), desc: s.optional(),
+    }).catchall(z.unknown())).optional(),
+  }).nullable().optional(),
+}))
+
+const Top5HistorySchema = z.array(z.object({
+  file: s.optional(),
+  data: z.object({
+    date: s.optional(), source: s.optional(), archived_at: s.optional(),
+    themes: z.array(z.object({
+      name: s.optional(), zt_count: nOrNull.optional(), leader: s.nullish(), leader_code: s.nullish(),
+    }).catchall(z.unknown())).optional(),
+  }).nullable().optional(),
+}))
+
+const MarketDailyResponseSchema = z.object({
+  code: s.optional(),
+  limit: n.optional(),
+  bars: z.array(z.object({
+    code: s.optional(), thscode: s.nullish(), trade_date: s.optional(), open: nOrNull.optional(),
+    high: nOrNull.optional(), low: nOrNull.optional(), close: nOrNull.optional(), volume: nOrNull.optional(),
+    amount: nOrNull.optional(), currency: s.nullish(), source: s.nullish(), ingested_at: s.nullish(),
+  })).optional(),
+})
+
+const StockRegistryResponseSchema = z.object({
+  code: s.optional(),
+  found: b.optional(),
+  stock: z.object({
+    code: s.optional(), name: s.nullish(), market: s.nullish(), is_20cm: z.union([n, b]).nullable().optional(),
+    industry: s.nullish(), themes: z.array(s).optional(), is_limit_up_today: nOrNull.optional(),
+    is_limit_up_basis: s.nullish(), limit_up_now: nOrNull.optional(), limit_up_touched: nOrNull.optional(),
+    limit_up_close: nOrNull.optional(), boards: nOrNull.optional(), pct: nOrNull.optional(), price: nOrNull.optional(),
+    daily_asof_date: s.nullish(), daily_is_latest_trading_day: b.optional(), first_seen_date: s.nullish(),
+    last_seen_ts: s.nullish(), source: s.nullish(), data_quality_flags: z.array(s).optional(),
+    technical: z.object({
+      bar_date: s.nullish(), source: s.nullish(), status: s.nullish(), close: nOrNull.optional(), high: nOrNull.optional(),
+      low: nOrNull.optional(), ma5: nOrNull.optional(), ma10: nOrNull.optional(), ma20: nOrNull.optional(),
+      ret_3d: nOrNull.optional(), ret_5d: nOrNull.optional(), ret_10d: nOrNull.optional(), high_20d: nOrNull.optional(),
+      high_60d: nOrNull.optional(), new_high_20d: nOrNull.optional(), new_high_60d: nOrNull.optional(),
+      ma_bullish: nOrNull.optional(), volume_ratio_5: nOrNull.optional(), data_quality: z.array(s).nullable().optional(),
+    }).nullable().optional(),
+  }).nullable().optional(),
+})
+
+// ════════════════════════════════════════════════════════════════
 // 路由 → schema 绑定
 // ════════════════════════════════════════════════════════════════
 //
@@ -974,6 +1051,11 @@ const SCHEMA_MAP = {
   '/api/theme/series': ThemeSeriesSchema,
   '/api/theme/sequence': ThemeSequenceSchema,
   '/api/flow/history': FlowHistorySchema,
+  '/api/data/exit-peaks': ExitPeaksSchema,
+  '/api/data/theme-snapshot': ThemeSnapshotSchema,
+  '/api/data/top5-history': Top5HistorySchema,
+  '/api/data/market-daily': MarketDailyResponseSchema,
+  '/api/data/stock-registry': StockRegistryResponseSchema,
   // 财富密码决策档案：三态同构（存档数组 / 最新单份），守卫同一份结构
   '/api/decision/latest': DecisionDossierSchema,
   '/api/decision/candidates': z.array(z.object({ file: s.optional(), data: DecisionDossierSchema.nullable() })),

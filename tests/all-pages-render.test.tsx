@@ -92,6 +92,7 @@ const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['backtest', () => import('@/pages/backtest/BacktestPage')],
   ['institution', () => import('@/pages/institution/InstitutionPage')],
   ['auction', () => import('@/pages/auction/AuctionPage')],
+  ['data', () => import('@/pages/data/DataPage')],
   ['record', () => import('@/pages/record/RecordPage')],
   ['stack', () => import('@/pages/stack/StackPage')],
   ['archive', () => import('@/pages/archive/ArchivePage')],

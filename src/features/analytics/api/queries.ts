@@ -128,6 +128,44 @@ export const analyticsQueries = {
       staleTime: 120_000,
     }),
 
+  // ══════════════ 数据底座（只读事实核验）══════════════
+  /** 昨日涨停池封单与Top5题材的盘中峰值事实，按实时节拍刷新。 */
+  dataExitPeaks: () =>
+    queryOptions({
+      queryKey: ['data', 'exit-peaks'] as const,
+      queryFn: api.dataExitPeaks,
+      refetchInterval: livePollMs,
+      staleTime: 15_000,
+    }),
+  /** 按交易日冻结的题材映射。 */
+  dataThemeSnapshot: () =>
+    queryOptions({
+      queryKey: ['data', 'theme-snapshot'] as const,
+      queryFn: api.dataThemeSnapshot,
+      staleTime: DAILY_STALE,
+    }),
+  /** 每日Top5题材原始归档。 */
+  dataTop5History: () =>
+    queryOptions({
+      queryKey: ['data', 'top5-history'] as const,
+      queryFn: api.dataTop5History,
+      staleTime: DAILY_STALE,
+    }),
+  /** 单票近月OHLCV；只在用户给出代码时调用，不预加载。 */
+  marketDaily: (code: string, limit = 20) =>
+    queryOptions({
+      queryKey: ['data', 'market-daily', code, limit] as const,
+      queryFn: () => api.marketDaily(code, limit),
+      staleTime: DAILY_STALE,
+    }),
+  /** 单票事实档；只在用户给出代码时调用，不预加载。 */
+  stockRegistry: (code: string) =>
+    queryOptions({
+      queryKey: ['data', 'stock-registry', code] as const,
+      queryFn: () => api.stockRegistry(code),
+      staleTime: DAILY_STALE,
+    }),
+
   /**
    * 盘中情绪时间轴（近 5 个交易日逐事件 · **实时**）——
    * 30s 轮询（与后端守护同频）；收盘后数据不再变化，空转代价可忽略。

@@ -123,6 +123,15 @@ export interface GetJsonOptions {
   guard?: ZodType
 }
 
+export function withQuery(route: string, params: Record<string, string | number | undefined>): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, String(value))
+  }
+  const encoded = query.toString()
+  return encoded ? `${route}?${encoded}` : route
+}
+
 export async function getJson<T>(route: string, options: GetJsonOptions = {}): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, guard } = options
   const ctrl = new AbortController()

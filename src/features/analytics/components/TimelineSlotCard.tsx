@@ -255,6 +255,7 @@ function ThemeSlotGroup({
   tags,
   reasonByCode,
   themeInfo,
+  divider = false,
 }: {
   theme: string
   stocks: ZtPoolStock[]
@@ -264,12 +265,22 @@ function ThemeSlotGroup({
   tags: Map<string, StockThemeTag>
   reasonByCode: Map<string, string>
   themeInfo?: Map<string, ThemeBurst>
+  /**
+   * 扁平详情里，多个题材组之间加**一根细分隔线**（2026-10-22）。
+   * ⛔ 一根 hairline 而已，不是卡片：拆掉内层卡片后，不加线它们会糊成一坨。
+   */
+  divider?: boolean
 }) {
   const t = themeInfo?.get(theme)
   const inSlot = new Set(stocks.map((s) => s.code))
   const restMembers = (t?.members ?? []).filter((m) => !inSlot.has(m.code))
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div
+      className={cn(
+        'flex flex-col gap-0.5 min-w-0',
+        divider && 'border-t border-line-faint/70 pt-1',
+      )}
+    >
       <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
         {burst && <span className="text-[11px] flex-none">🚀</span>}
         <span
@@ -344,11 +355,25 @@ const SEG_CLASS: Record<EventSegKind, string> = {
 }
 
 /** 一行系统观测（原文分段着色 + severity 例外标注） */
-function EventRow({ e }: { e: NonNullable<TimelineSlot['events']>[number] }) {
+function EventRow({
+  e,
+  wrap = false,
+}: {
+  e: NonNullable<TimelineSlot['events']>[number]
+  /**
+   * 详情浮层（`unfold`）用 `true`：**换行而不是截断**。
+   *
+   * ⛔ 卡面 240px 里必须 `truncate`（一行一句才排得下），但详情是「来看全的」——
+   *    2026-10-22 弹窗宽度改自适应后实测：`truncate` 的 `white-space: nowrap` 让
+   *    「大消费 个股爆发：百洋股份 +10.0%（该题材原领涨 天马科技）」这类长句
+   *    **直接溢出弹窗 77px**，右侧被切掉且没有省略号（flex 子项 + nowrap 的经典坑）。
+   */
+  wrap?: boolean
+}) {
   const sev = severityNote(e.severity)
   return (
     <li className="flex items-baseline gap-1.5 text-[12px] min-w-0">
-      <span className="truncate min-w-0" title={e.event}>
+      <span className={cn('min-w-0', wrap ? 'break-all' : 'truncate')} title={e.event}>
         {/* 分段与 key 都由内核给（位移即身份）—— ⛔ 组件里不做跨段累加 */}
         {splitEventTextKeyed(e.event).map((seg) => (
           <span key={seg.key} className={SEG_CLASS[seg.kind]}>
@@ -392,7 +417,7 @@ function EventSlot({ slot, unfold = false }: { slot: TimelineSlot; unfold?: bool
           <ul className="flex flex-col gap-0.5">
             {shown.map((e, i) => (
               // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：事件流与时刻严格对齐，同一时刻可能重复同一句话，用内容做 key 反而会撞。
-              <EventRow key={i} e={e} />
+              <EventRow key={i} e={e} wrap={unfold} />
             ))}
           </ul>
         </>
@@ -405,7 +430,7 @@ function EventSlot({ slot, unfold = false }: { slot: TimelineSlot; unfold?: bool
           <ul className="flex flex-col gap-0.5 pt-0.5">
             {hidden.map((e, i) => (
               // oxlint-disable-next-line react/no-array-index-key -- 同上：位置序列即身份
-              <EventRow key={i} e={e} />
+              <EventRow key={i} e={e} wrap={unfold} />
             ))}
           </ul>
         </details>
@@ -534,6 +559,7 @@ export function SlotBody({
   showAllSectors = false,
   showAllEvents = false,
   themeGrouped = false,
+  flat = false,
 }: {
   slot: TimelineSlot
   topBoard: number
@@ -559,6 +585,14 @@ export function SlotBody({
    *    但语义独立 —— ⛔ 不要用 `themeInfo` 的存在性代替本 prop。
    */
   themeGrouped?: boolean
+  /**
+   * **扁平模式**（2026-10-22 用户：「Hover 弹窗里面简洁一点，不要嵌套三张卡片了」）。
+   *
+   * 详情浮层的层级原本是「弹窗 → 槽白卡 → 灰底块 → 彩色左边框块」四层，全是框；
+   * 扁平模式把**内三层全部拆掉**，只留小标题 + 条目，靠字色与缩进分层。
+   * ⛔ 卡片流（`/timeline` 的「卡片流」视图）不传本 prop，视觉不变。
+   */
+  flat?: boolean
 }) {
   /** 🚀 题材爆发 / ⚠️ 题材衰竭 —— 本页的**核心诉求**：每个时间节点哪些题材起、哪些题材落 */
   const marks = slotThemeMarks(slot.events, slot.pushes)
@@ -596,7 +630,12 @@ export function SlotBody({
         marks.rotated.length > 0 ||
         marks.fade.length > 0 ||
         marks.pushed.length > 0) && (
-        <div className="flex flex-col gap-0.5 rounded-sm bg-line-faint/60 px-1.5 py-1 min-w-0">
+        <div
+          className={cn(
+            'flex flex-col gap-0.5 min-w-0',
+            !flat && 'rounded-sm bg-line-faint/60 px-1.5 py-1',
+          )}
+        >
           {marks.burst.length > 0 && (
             <div className="flex flex-col gap-0.5 min-w-0">
               <div className="flex items-baseline gap-1 flex-wrap min-w-0">
@@ -683,12 +722,17 @@ export function SlotBody({
       )}
 
       {/* 涨跌事实在普通卡与完整详情均展示，不能因缺少个股而隐藏整段盘中记录。 */}
-      <IntradayEventBlock up={slot.intradayUp} down={slot.intradayDown} showAll={showAllSectors} />
+      <IntradayEventBlock
+        up={slot.intradayUp}
+        down={slot.intradayDown}
+        showAll={showAllSectors}
+        flat={flat}
+      />
 
       {themeGroups ? (
         /* ── 详情模式：**题材主轴** —— 题材 → 该题材当刻个股 → 该题材当日全部涨停成员 ── */
         <>
-          {themeGroups.groups.map((g) => (
+          {themeGroups.groups.map((g, i) => (
             <ThemeSlotGroup
               key={`thm:${slot.at}:${g.theme}`}
               theme={g.theme}
@@ -698,6 +742,7 @@ export function SlotBody({
               tags={tags}
               reasonByCode={reasonByCode}
               themeInfo={themeInfo}
+              divider={flat && i > 0}
             />
           ))}
           {themeGroups.unthemed.length > 0 && (

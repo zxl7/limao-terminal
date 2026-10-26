@@ -193,8 +193,13 @@ describe('BlockDetail · 详情走题材主轴，并保留盘中事实', () => {
   it('⑤ 盘中走强和风险事件在详情中完整展示，头部仍使用题材维度', () => {
     const { container } = render(<BlockDetail block={block()} {...detailProps} />)
     const txt = container.textContent ?? ''
-    expect(txt, '盘中走强区缺失').toContain('盘中走强与涨停变化')
-    expect(txt, '盘中走弱区缺失').toContain('盘中走弱与风险变化')
+    /**
+     * ⚠️ 2026-10-22 用户：「Hover 弹窗里面简洁一点」—— 详情改扁平后，
+     * 段标题去掉冗余尾字（「盘中走强与涨停变化」→「盘中走强」）。
+     * ⛔ 数据一条不少，只是不再给每段套一张卡片；卡面（非 flat）仍用全称。
+     */
+    expect(txt, '盘中走强区缺失').toContain('盘中走强')
+    expect(txt, '盘中走弱区缺失').toContain('盘中走弱')
     expect(txt, '盘中板块计数缺失').toContain('板块 1 个')
     expect(txt, '⛔ 头部 ↑N/↓N 应换成题材维度').not.toContain('↑')
     expect(txt, '⛔ 头部 ↑N/↓N 应换成题材维度').not.toContain('↓')
@@ -222,5 +227,93 @@ describe('卡面回归 · 240px 卡片仍走行业分组（⛔ 题材主轴只�
     const txt = container.textContent ?? ''
     expect(txt, '卡面应保留行业分组（题材主轴仅详情用）').toContain('含题材')
     expect(txt, '卡面应保留盘中事件块').toContain('盘中走强与涨停变化')
+  })
+})
+
+/**
+ * ## 详情浮层「扁平 + 分隔线」契约（2026-10-22）
+ *
+ * 用户两条连续指令：
+ *   ①「Hover 弹窗里面简洁一点，不要嵌套三张卡片了」
+ *   ②「可以有分割线」
+ *
+ * 合起来的口径 = **拆框不拆线**：
+ *   · ⛔ 内层不能再有独立卡片（圆角 + 边框 + 白底 + 阴影）；
+ *   · ✅ 段与段之间必须有 hairline（只上边框、极淡），否则拆完就糊成一坨。
+ *
+ * ⛔ jsdom 不加载 Tailwind，`getComputedStyle` 读不到实际边框宽度 ——
+ *    所以断言落在 **class 契约**（父级的选择器变体）与**DOM 结构**（不再有卡片壳）上。
+ */
+describe('BlockDetail · 扁平化与分隔线（拆框不拆线）', () => {
+  const flat = () => {
+    const { container } = render(<BlockDetail block={block()} {...detailProps} />)
+    return container
+  }
+
+  it('① 内层不再有卡片壳：无 shadow-sm、无 bg-card 的嵌套块', () => {
+    const c = flat()
+    expect(
+      c.querySelectorAll('[class*="shadow-sm"]').length,
+      '⛔ 详情里不该再有卡片阴影（原来的槽白卡）',
+    ).toBe(0)
+    expect(
+      c.querySelectorAll('[class*="bg-card"]').length,
+      '⛔ 不该再有白底卡片（弹窗外框除外：它由 HoverDetail 提供，不在 BlockDetail 内）',
+    ).toBe(0)
+  })
+
+  it('② 段与段之间必须有分隔线（父级 `[&>*+*]:border-t`）', () => {
+    const c = flat()
+    const slotWrap = c.querySelector('[class*="[&>*+*]:border-t"]')
+    expect(slotWrap, '⛔ 槽内容器缺少顶层分隔线规则').toBeTruthy()
+    expect(
+      slotWrap!.className,
+      '分隔线必须用 hairline（line-faint），不能用实线重色',
+    ).toContain('border-line-faint')
+  })
+
+  it('③ 走强/走弱/消息三段之间各自带线（段内 `divider`）', () => {
+    /**
+     * ⛔ 必须给夹具补一条消息面事件：默认 `UP` 里只有 `sector_up`，
+     *    `NewsSection` 根本不渲染 —— 那样「消息段落缺少分隔线」会**恒真失败**，
+     *    测出来的不是缺线、是缺数据（本用例第一版就踩了）。
+     */
+    const newsSlot = slotObj({
+      intradayUp: [
+        ...UP,
+        {
+          at: '2026-10-22 10:00:01',
+          kind: 'newsflash_new',
+          name: '工信部发布机器人新政',
+          title: '工信部发布机器人新政',
+        },
+      ] as unknown as IntradayTimelineEvent[],
+    })
+    const withNews: TimelineBlock = { kind: 'normal', at: 600, slot: newsSlot, key: 'normal:600' }
+    const { container } = render(<BlockDetail block={withNews} {...detailProps} />)
+    const sections = Array.from(container.querySelectorAll('[class*="border-t"]'))
+    expect(
+      sections.some((el) => (el.textContent ?? '').includes('盘中走弱')),
+      '走弱段缺少分隔线',
+    ).toBe(true)
+    expect(
+      sections.some((el) => (el.textContent ?? '').includes('消息面')),
+      '消息面段缺少分隔线',
+    ).toBe(true)
+  })
+
+  it('④ ⛔ 卡片流不受影响：卡面仍保留内层块（flat 只由 BlockDetail 传）', () => {
+    const { container } = render(
+      <TimelineSlotCard
+        slot={slotObj()}
+        topBoard={3}
+        tags={TAGS}
+        reasonByCode={new Map<string, string>()}
+      />,
+    )
+    expect(
+      container.querySelector('[class*="[&>*+*]:border-t"]'),
+      '⛔ 卡片流不该被扁平化规则波及',
+    ).toBeNull()
   })
 })

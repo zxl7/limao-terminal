@@ -138,6 +138,43 @@ Skyroc UI 自带 `primary` / `destructive`(红) / `success`(绿) —— 服务�
 **同语义的两个执行者**：开发期由 `vite.config.ts` 中间件提供，生产期由 `serve.py` 提供，
 两者共用 `scripts/lib/read-route.mjs` 的读取实现，避免漂移。前端代码无需区分环境。
 
+## 页面加载稳定性（29 个懒加载页面）
+
+每个页面都是 `lazy: () => import(...)`，好处是首屏轻；代价是**模块下载失败时整页进不去**。
+浏览器的原生报错长这样（同一件事，三个内核三种文案）：
+
+| 内核 | 报错 |
+| --- | --- |
+| Safari / WebKit | `TypeError: Importing a module script failed.` |
+| Chrome | `TypeError: Failed to fetch dynamically imported module` |
+| Firefox | `TypeError: error loading dynamically imported module` |
+
+成因都是**瞬时**的，与页面代码无关：
+
+| 成因 | 典型场景 |
+| --- | --- |
+| Vite 依赖重新预构建 | dev 期间发现未预构建的依赖，旧 `?v=` hash 全部失效（`504 Outdated Optimize Dep`） |
+| HMR 打断 | 保存瞬间正在加载；或中间态语法错误让共享 barrel transform 500 |
+| 多个 dev server 共用 `.vite` | 谁触发预构建都让另一个实例的模块图失效（本项目实测过 5181/5182 并存） |
+| 部署换版 | `vite build` 清空 `assets/`，旧 HTML 引用的旧 hash chunk 直接 404 |
+| 网络抖动 | `server.host = true` + 穿透隧道，链路不稳时模块请求批量失败 |
+
+四层防御：
+
+1. **预取**（`Sidebar.tsx`）—— 悬停 / 聚焦即 `preloadPage`，把下载提前到点击之前；重点页在空闲时预取。
+2. **重试 + 幂等缓存**（`lazyRoute.ts`）—— 只重试「模块请求失败」，页面顶层抛错不重试；缓存 promise 让连点 / 预取 / StrictMode 只发一次请求。
+3. **失败清缓存** —— 不清的话「重试」永远拿到那个已失败的 promise，只能整页刷新才能恢复。
+4. **分层兜底** —— 每页挂 `PageError`（只替换 `<Outlet />`，侧栏顶栏保留）；导航失败弹提示条（重试 / 刷新）。
+
+### ⚠️ 三条实测结论（别凭直觉"优化"掉）
+
+- **浏览器会缓存模块加载失败**。CDP 拦截实测：同一 URL 的第二次 `import()` 常常**不发网络请求**、直接失败。
+  所以「重试」不是万能药，**整页刷新才是终极手段**（`autoReloadOnce`，同页 60s 节流防死循环）。
+- **React Router 的 `lazy` 失败会静默取消导航** —— URL 回退、页面不动、目标路由的 `errorElement` 根本不会渲染，
+  只在控制台留一行报错。用户看到的是「点了没反应」。所以导航必须自己拦（`usePageNav`）。
+- **预取绝不允许触发整页刷新**。否则鼠标沿侧栏划一趟（29 个 tab）就可能连刷十几次，
+  比报错本身更难受。`preload()` 内部固定 `autoReload: false`，并由单测锁住。
+
 ## 迁移进度
 
 **已迁（盘中实时）**

@@ -1,6 +1,8 @@
 import { Fragment, useState } from 'react'
 import { NavLink } from 'react-router'
 import { TABS, type TabGroup } from './AppShell'
+import { preloadPage } from './lazyRoute'
+import { NavErrorBanner, usePageNav } from './usePageNav'
 import { cn } from '@/shared/lib'
 
 /**
@@ -78,17 +80,29 @@ function GroupIcon({ group }: { group: TabGroup }) {
 }
 
 export function Sidebar() {
+  const nav = usePageNav()
+
   const grouped = GROUPS.map(
     (g) => [g, TABS.filter((t) => t.group === g)] as const,
   ).filter(([, items]) => items.length > 0)
 
   return (
+    /**
+     * 侧栏高度锁定在视口（父级 `AppShell` 已 `h-screen`），三段切分固定：
+     *   ① 品牌区 `flex-none` —— 「狸猫终端」恒在左上角，滚不动
+     *   ② tab 列表 `flex-1 overflow-y-auto` —— **只有这里滚**
+     *   ③ 页脚 `flex-none` —— 恒在左下角
+     *
+     * ⛔ `min-h-0` 必须有：flex 子项默认 `min-height:auto`，tab 多到超出时
+     *    会把 `<aside>` 撑高、进而把整页撑高，`overflow-y-auto` 就失效
+     *    （表现就是「tab 列表不自己滚，整个侧栏跟着内容走」）。
+     */
     <aside
-      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none text-head-txt border-r border-white/10 select-none"
+      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none"
       style={{ background: 'linear-gradient(180deg, #1c2130, #232c41)' }}
       aria-label="主导航"
     >
-      {/* 品牌 */}
+      {/* 品牌：固定左上角（⛔ 不要放进可滚动区） */}
       <div className="h-[46px] flex items-center gap-2 px-4 flex-none border-b border-white/10">
         <span
           className="w-7 h-7 rounded-md inline-flex items-center justify-center text-white text-[13px] font-extrabold"
@@ -99,8 +113,11 @@ export function Sidebar() {
         <span className="font-bold text-[15px] tracking-[0.02em]">狸猫终端</span>
       </div>
 
-      {/* 分组导航（可滚动） */}
-      <nav aria-label="主导航" className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
+      {/* 分组导航 —— 本侧栏唯一的滚动区 */}
+      <nav
+        aria-label="主导航"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-4"
+      >
         {grouped.map(([group, items]) => {
           const live = group === '实时'
           return (
@@ -130,6 +147,20 @@ export function Sidebar() {
                     key={t.to}
                     to={t.to}
                     end={t.end}
+                    /*
+                      悬停 / 键盘聚焦即预取：把「点击后才下载」提前到「鼠标移过去就开始」。
+                      移动鼠标到点击之间有 200–600ms，足够命中缓存；即使没命中，
+                      真正点击时也是同一个 promise（`lazyRoute` 按路径缓存），不会重复请求。
+                      预取失败静默 —— 点下去时 `load` 还会重试，不会给用户弹错误。
+                    */
+                    onMouseEnter={() => preloadPage(t.to)}
+                    onFocus={() => preloadPage(t.to)}
+                    /*
+                      显式导航：先确保模块到位再跳转。React Router 的 lazy 失败
+                      会**静默取消导航**（URL 回退、页面不动、只有控制台报错），
+                      必须在这里拦一手，失败时给出「重试」而不是无声无息。
+                    */
+                    onClick={(event) => nav.onClick(event, t.to, t.label)}
                     data-priority={t.priority ? 'true' : undefined}
                     className={({ isActive }) =>
                       cn(
@@ -169,6 +200,8 @@ export function Sidebar() {
         <span className="w-1.5 h-1.5 rounded-full bg-head-down" aria-hidden />
         <span>A股情绪核心 · 盘中实时终端</span>
       </div>
+
+      <NavErrorBanner failure={nav.failure} onRetry={nav.retry} onDismiss={nav.dismiss} />
     </aside>
   )
 }
@@ -176,6 +209,7 @@ export function Sidebar() {
 /** 窄屏（<lg）回退导航 —— 侧栏隐藏时退化为顶部横向 tab 条，避免移动端无导航。 */
 export function TopNavFallback() {
   const [dataOpen, setDataOpen] = useState(false)
+  const nav = usePageNav()
 
   return (
     <nav
@@ -219,6 +253,9 @@ export function TopNavFallback() {
               <NavLink
                 to={t.to}
                 end={t.end}
+                onMouseEnter={() => preloadPage(t.to)}
+                onFocus={() => preloadPage(t.to)}
+                onClick={(event) => nav.onClick(event, t.to, t.label)}
                 data-priority={t.priority ? 'true' : undefined}
                 className={({ isActive }) =>
                   [
@@ -239,6 +276,8 @@ export function TopNavFallback() {
           </Fragment>
         )
       })}
+
+      <NavErrorBanner failure={nav.failure} onRetry={nav.retry} onDismiss={nav.dismiss} />
     </nav>
   )
 }

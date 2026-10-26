@@ -21,6 +21,146 @@ export interface ApiError {
   message?: string
 }
 
+/** 数据底座受限查询的非法参数响应（仅代码与条数校验失败）。 */
+export interface ApiRequestError {
+  error: 'invalid_request'
+  route?: string
+  message: string
+}
+
+/** 盘中封单峰值档案：只记录观察事实，不表达任何交易结论。 */
+export interface ExitPeakStock {
+  name: string
+  current_seal_yi: number | null
+  current_sealed: boolean
+  current_observed_at: string | null
+  quote_at: string | null
+  seal_yi_peak?: number
+  seal_yi_peak_at?: string
+}
+
+export interface ExitPeakSector {
+  current_zt_count: number | null
+  zt_count_peak?: number
+  zt_count_peak_at?: string
+}
+
+export interface ExitPeaksFile {
+  schema: string
+  date: string
+  updated_at: string
+  stock_scope?: string
+  sector_scope?: string
+  stocks: Record<string, ExitPeakStock>
+  sectors: Record<string, ExitPeakSector>
+}
+
+/** 一个交易日冻结的题材映射。历史解释只能使用同交易日的这份档案。 */
+export interface ThemeSnapshotItem {
+  name?: string
+  theme?: string
+  logic?: string
+  plates?: string[]
+  desc?: string
+}
+
+export interface ThemeSnapshotFile {
+  schema: string
+  date: string
+  mapping: Record<string, ThemeSnapshotItem>
+}
+
+/** 每日Top5题材原始归档（非派生趋势结论）。 */
+export interface Top5HistoryTheme {
+  name: string
+  zt_count?: number | null
+  leader?: string | null
+  leader_code?: string | null
+  [key: string]: unknown
+}
+
+export interface Top5HistoryFile {
+  date: string
+  source?: string
+  archived_at?: string
+  themes: Top5HistoryTheme[]
+}
+
+/** 全市场近月日K的受限单票查询返回。价格为原始未复权OHLCV。 */
+export interface MarketDailyBar {
+  code: string
+  thscode: string | null
+  trade_date: string
+  open: number | null
+  high: number | null
+  low: number | null
+  close: number | null
+  volume: number | null
+  amount: number | null
+  currency: string | null
+  source: string | null
+  ingested_at: string | null
+}
+
+export interface MarketDailyResponse {
+  code: string
+  limit: number
+  bars: MarketDailyBar[]
+}
+
+/** 系统已经实际观测到的单票事实；未命中不等于该票不存在或未发生异动。 */
+export interface StockRegistryTechnical {
+  bar_date: string | null
+  source: string | null
+  status: string | null
+  close: number | null
+  high: number | null
+  low: number | null
+  ma5: number | null
+  ma10: number | null
+  ma20: number | null
+  ret_3d: number | null
+  ret_5d: number | null
+  ret_10d: number | null
+  high_20d: number | null
+  high_60d: number | null
+  new_high_20d: number | null
+  new_high_60d: number | null
+  ma_bullish: number | null
+  volume_ratio_5: number | null
+  data_quality: string[] | null
+}
+
+export interface StockRegistryProfile {
+  code: string
+  name: string | null
+  market: string | null
+  is_20cm: number | boolean | null
+  industry: string | null
+  themes: string[]
+  is_limit_up_today: number | null
+  is_limit_up_basis: string | null
+  limit_up_now: number | null
+  limit_up_touched: number | null
+  limit_up_close: number | null
+  boards: number | null
+  pct: number | null
+  price: number | null
+  daily_asof_date: string | null
+  daily_is_latest_trading_day: boolean
+  first_seen_date: string | null
+  last_seen_ts: string | null
+  source: string | null
+  data_quality_flags: string[]
+  technical: StockRegistryTechnical | null
+}
+
+export interface StockRegistryResponse {
+  code: string
+  found: boolean
+  stock: StockRegistryProfile | null
+}
+
 /** 计数 + 名单（跌停/炸板共用） */
 export interface CountNames {
   count: number

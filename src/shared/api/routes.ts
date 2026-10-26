@@ -443,7 +443,26 @@ export const ROUTES: Record<string, RouteDef> = {
   },
 
   // ══════════════════════════════════════════════════════════════
-  // 十九、推送审计
+  // 二十、数据底座（盘中核验优先）
+  //
+  // 静态事实档只允许白名单命名；市场日K和个股事实走专用受限查询，
+  // 不得把 DuckDB / SQLite / 原始目录暴露为文件路由。
+  // ══════════════════════════════════════════════════════════════
+  '/api/data/exit-peaks': {
+    dir: 'cache', pattern: '^intraday_exit_peaks_\\d{8}\\.json$', mode: 'latest', cadence: 'intraday',
+    desc: '昨日涨停池封单与Top5题材日内峰值（事实留存，不参与裁决）',
+  },
+  '/api/data/theme-snapshot': {
+    dir: 'cache/theme_snapshot', pattern: '^theme_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
+    desc: '题材冻结快照（按交易日保存的 code→题材映射）',
+  },
+  '/api/data/top5-history': {
+    dir: 'cache/top5_history', pattern: '^top5_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
+    desc: '每日Top5题材原始归档',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // 二十一、推送审计
   // ══════════════════════════════════════════════════════════════
   '/api/audit/log': {
     file: 'cache/audit.jsonl', format: 'jsonl', cadence: 'intraday',

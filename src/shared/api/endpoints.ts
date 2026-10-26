@@ -11,7 +11,7 @@
  * `MarketSnapshot`，路由字符串与类型**编译期绑定** —— 写错路由直接编译失败。
  */
 
-import { DataUnavailableError, getJson } from './client'
+import { DataUnavailableError, getJson, withQuery } from './client'
 import { SCHEMAS } from './schemas'
 import type {
   AccountNavEntry,
@@ -80,6 +80,11 @@ import type {
   ZtHistoryDay,
   ZtPoolSnapshot,
   IntradayTimelineEvent,
+  ExitPeaksFile,
+  MarketDailyResponse,
+  StockRegistryResponse,
+  ThemeSnapshotFile,
+  Top5HistoryFile,
 } from './types'
 
 /**
@@ -125,6 +130,10 @@ export interface RouteTypeMap {
   '/api/emotion/zt-history': DatedFile<ZtHistoryDay>[]
   '/api/emotion/memory': DatedFile<MarketMemory>[]
   '/api/zt/yesterday': ZtPoolSnapshot
+  // ── 数据底座：静态事实档 ──
+  '/api/data/exit-peaks': ExitPeaksFile
+  '/api/data/theme-snapshot': DatedFile<ThemeSnapshotFile>[]
+  '/api/data/top5-history': DatedFile<Top5HistoryFile>[]
   /** ⚠️ 目录型（近 5 个交易日）—— 原始响应是 `[{file, data}]`，
    *  `api.intradayTimeline()` 会摊平成事件数组再交给消费端。 */
   '/api/intraday/timeline': DatedFile<IntradayTimelineEvent>[]
@@ -296,6 +305,31 @@ export const api = {
   emotionMemory: () => fetchRoute('/api/emotion/memory'),
   /** 昨日涨停池（唯一涨停权威） */
   ztYesterday: () => fetchRoute('/api/zt/yesterday'),
+
+  // ── 数据底座（盘中核验优先）──
+  /** 昨日涨停池封单与Top5题材的日内峰值事实。 */
+  dataExitPeaks: () => fetchRoute('/api/data/exit-peaks'),
+  /** 按交易日冻结的题材映射。 */
+  dataThemeSnapshot: () => fetchRoute('/api/data/theme-snapshot'),
+  /** 每日Top5题材原始归档。 */
+  dataTop5History: () => fetchRoute('/api/data/top5-history'),
+  /**
+   * 单票近月原始未复权OHLCV。
+   *
+   * 代码格式和数量边界由服务端二次校验；页面与组件均不得自行拼接URL。
+   */
+  marketDaily: (code: string, limit = 20) =>
+    getJson<MarketDailyResponse>(
+      withQuery('/api/data/market-daily', { code, limit }),
+      { guard: SCHEMAS['/api/data/market-daily'] },
+    ),
+  /** 系统实际观测到的单票事实；未命中不等于市场中不存在。 */
+  stockRegistry: (code: string) =>
+    getJson<StockRegistryResponse>(
+      withQuery('/api/data/stock-registry', { code }),
+      { guard: SCHEMAS['/api/data/stock-registry'] },
+    ),
+
   /**
    * 盘中情绪时间轴（近 5 个交易日逐事件 · append-only · up/down 双向）。
    *
