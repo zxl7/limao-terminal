@@ -113,7 +113,8 @@ function KeyVals({ obj, depth = 0 }: { obj: Record<string, unknown>; depth?: num
 }
 
 export async function loader() {
-  await Promise.all([
+  // 单路失败不拖垮整页（与 /timeline 同口径）
+  await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.systemTasks()),
     queryClient.ensureQueryData(analyticsQueries.systemLearning()),
     queryClient.ensureQueryData(analyticsQueries.systemShortSpirit()),

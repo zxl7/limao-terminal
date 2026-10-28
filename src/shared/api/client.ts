@@ -138,7 +138,14 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
 
   try {
-    const res = await fetch(route, { cache: 'no-store', signal: ctrl.signal })
+    const res = await fetch(route, {
+      cache: 'no-store',
+      signal: ctrl.signal,
+      // ⚠️ 2026-10-26 实测：ngrok 免费隧道对**浏览器 UA**（含同源 XHR）会把
+      //   `/api/*` 换成 `200 text/html` 的访问警告页，页面因此报「渲染出错」。
+      //   带上此头即跳过警告页、拿回真 JSON；serve.py / vite 对未知头无副作用。
+      headers: { 'ngrok-skip-browser-warning': '1' },
+    })
 
     if (!res.ok) {
       let body: Record<string, unknown> = {}
@@ -151,6 +158,24 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
         route,
         typeof body.target === 'string' ? body.target : undefined,
         `HTTP ${res.status}`,
+      )
+    }
+
+    // ⚠️ 2026-10-26 实测：ngrok 免费隧道会给**未过警告页的浏览器**返回
+    //   `200 text/html`（中转警告页）。res.ok 为真却拿到 HTML，`res.json()` 抛错，
+    //   最终表现为「页面渲染出错」。分享链路的中转页不是数据，必须显式识别，
+    //   否则会把「通道被拦」误报成「后端没数据」。
+    //
+    // ⚠️ 只拦「**明确是页面**」的响应（html/xml）：中转警告页正是 HTML。
+    //   `text/plain` 与缺失头一律按 JSON 试解析 —— 轻量服务、测试桩、
+    //   甚至部分反向代理都会用 text/plain 回 JSON，一刀切会误杀正常数据。
+    //   真的是 HTML 却漏判时，下面的 `res.json()` 也会抛错并统一兜底。
+    const ctype = (res.headers.get('content-type') || '').toLowerCase()
+    if (ctype.includes('html') || ctype.includes('xml')) {
+      throw new DataUnavailableError(
+        route,
+        undefined,
+        `响应不是 JSON（${ctype}）——分享中转/警告页拦截了接口，请用正式域名或可信隧道`,
       )
     }
 

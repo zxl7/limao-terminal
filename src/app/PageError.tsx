@@ -1,4 +1,5 @@
 import { Link, useRouteError } from 'react-router'
+import { DataUnavailableError } from '@/shared/api'
 import { PageLoadError, isPageLoaded, loadPage } from './lazyRoute'
 import type { PagePath } from './pages'
 
@@ -27,13 +28,18 @@ export function PageError({ path }: { path: PagePath }) {
 
   const isLoadError = error instanceof PageLoadError
   const triedBefore = isPageLoaded(path)
+  // 数据层失败（接口 404/超时/被分享中转页拦成 HTML）也是一种「可解释原因」，
+  // 不该和「组件渲染 bug」共用同一句含糊的「代码执行时抛出了异常」。
+  const isDataError = error instanceof DataUnavailableError
 
-  const title = isLoadError ? '页面模块加载失败' : '页面渲染出错'
+  const title = isLoadError ? '页面模块加载失败' : isDataError ? '页面数据未取到' : '页面渲染出错'
   const hint = isLoadError
     ? triedBefore
       ? '这个页面之前在本次会话里加载成功过，说明是**瞬时中断**（网络抖动、版本更新或开发服务器重启）。重新加载即可恢复。'
       : '页面代码没能下载下来。通常是网络中断、开发服务器重启，或刚发布了新版本。'
-    : '页面代码执行时抛出了异常。其他页面不受影响。'
+    : isDataError
+      ? '页面代码正常，是取数那一步失败了。可能是该路数据当日尚未生成，或分享通道（中转/警告页）把接口响应换成了 HTML。'
+      : '页面代码执行时抛出了异常。其他页面不受影响。'
 
   const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
 

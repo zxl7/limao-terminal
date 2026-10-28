@@ -67,7 +67,10 @@ import { useNow } from '@/shared/hooks'
 /** 节点标记与语义色（已上移到分析域 barrel，统一来源） */
 
 export async function loader() {
-  await Promise.all([
+  // ⚠️ 2026-10-26：这里曾是 Promise.all，任一接口 404（如公开分享未放开
+  //   /api/decision/latest）都会让整页落到 PageError。时间轴的其余数据仍可用，
+  //   单路失败不该拖垮页面 ⇒ 改为 allSettled，缺哪块就缺哪块。
+  await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.emotionZtHistory()),
     queryClient.ensureQueryData(analyticsQueries.emotionMemory()),
     queryClient.ensureQueryData(analyticsQueries.ztYesterday()),

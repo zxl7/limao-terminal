@@ -233,3 +233,17 @@ export {
 } from './components/EffectCards'
 
 export { RelayEffectCard } from './components/RelayEffectCard'
+
+export {
+  boardHeightOf,
+  buildGeneIndex,
+  buildThemeCoreIndex,
+  tierOf,
+  type CoreTier,
+  type GeneFacts,
+  matchFundBoard,
+  type CoreRole,
+  type ThemeCoreFacts,
+  type ThemeCoreFund,
+  type ThemeCoreStock,
+} from './lib/theme-core'

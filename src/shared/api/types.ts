@@ -2193,6 +2193,27 @@ export interface HithinkLhbHotmoney {
   stocks: LhbHotmoneyStock[]
 }
 
+export interface HithinkLhbStock {
+  ticker: string
+  name: string
+  concept_list?: HithinkLhbConcept[] | null
+  /** 同花顺原始金额单位为元；缺失不能当作零。 */
+  net_value?: number | null
+  range_days: 1 | 3
+  /** 小数比例，展示百分比时需乘以100。 */
+  change?: number | null
+  org_net_value?: number | null
+  hot_money_net_value?: number | null
+  /** 以下字段实测存在于 `stocks[]`（2026-10-19 归档逐字段核对），全部按元计。 */
+  buy_value?: number | null
+  sell_value?: number | null
+  net_rate?: number | null
+  hot_rank?: number | null
+  thscode?: string | null
+  /** 涨停原因原文（只有当日涨停的上榜股才有）。 */
+  limit_reason?: string | null
+}
+
 export interface HithinkLhbFile {
   source: string
   date: string
@@ -2200,7 +2221,7 @@ export interface HithinkLhbFile {
   stock_count: number
   org_top5: HithinkLhbOrg[]
   hotmoney_top5: HithinkLhbHotmoney[]
-  stocks: Array<Record<string, unknown>>
+  stocks: HithinkLhbStock[]
 }
 
 // ── 同花顺专业数据（scripts/hithink_fetch.py · 盘前/盘后第二权威）──

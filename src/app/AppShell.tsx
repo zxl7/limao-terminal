@@ -71,7 +71,7 @@ interface TabDef {
 export const TABS: readonly TabDef[] = [
   // ── 段1 · 实时（cadence=intraday）· 按短线交易优先级 ──
   { to: '/', label: '盘中实时', end: true, group: '实时', priority: true },
-  { to: '/timeline', label: '日内时间轴', group: '实时' },
+  { to: '/timeline', label: '日内时间轴', group: '实时', priority: true },
   { to: '/mainline', label: '主线题材', group: '实时', priority: true },
   { to: '/effect', label: '赚钱效应', group: '实时' },
   { to: '/flow', label: '资金流向', group: '实时' },
@@ -100,7 +100,7 @@ export const TABS: readonly TabDef[] = [
   { to: '/risk', label: '风险监控', group: '题材' },
 
   // ── 段5 · 数据与运维（日频）──
-  { to: '/data', label: '数据底座', group: '数据' },
+  { to: '/data', label: '数据底座', group: '数据', priority: true },
   { to: '/record', label: '数据记录', group: '数据' },
   { to: '/ops', label: '运维审计', group: '数据' },
   { to: '/hithink', label: '同花顺数据', group: '数据' },

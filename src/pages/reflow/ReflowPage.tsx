@@ -31,7 +31,8 @@ import { cn } from '@/shared/lib'
  */
 
 export async function loader() {
-  await Promise.all([
+  // 单路失败不拖垮整页（与 /timeline 同口径）
+  await Promise.allSettled([
     queryClient.ensureQueryData(marketQueries.rotation()),
     queryClient.ensureQueryData(marketQueries.latest()),
   ])

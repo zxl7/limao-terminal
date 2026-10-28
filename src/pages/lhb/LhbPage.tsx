@@ -23,8 +23,7 @@ import { cn, tradableStocks } from '@/shared/lib'
  *
  * ## ⚠️ 披露时点
  *
- * 龙虎榜由交易所盘后披露（约 18:00+），因此**盘中本页永远显示上一交易日**，
- * 这是正常的，不是数据滞后。
+ * 龙虎榜盘后披露，本页按各源文件的实际业务日期展示；旧归档不可冒充当日榜单。
  */
 
 export async function loader() {
@@ -36,7 +35,7 @@ export async function loader() {
 export function Component() {
   const tx = useQuery(analyticsQueries.lhbTencent())
   const ths = useQuery(analyticsQueries.lhbHithink())
-  const [tab, setTab] = useState<'inst' | 'hot' | 'ths'>('inst')
+  const [tab, setTab] = useState<'inst' | 'hot' | 'stocks' | 'seatTop'>('inst')
 
   const txFiles = useMemo<LhbTencentFile[]>(
     () =>
@@ -64,6 +63,28 @@ export function Component() {
     [txLatest],
   )
 
+  /**
+   * 同花顺全量上榜个股（2026-10-26 补全）。
+   *
+   * 旧版只渲染 `org_top5` / `hotmoney_top5` 两组 Top5 —— 而源文件里
+   * `stocks` 有 72 行 / 67 只（单日 55 + 三日 17）。Top5 是「摘要」，
+   * 不是「全量」；想看某只票到底上没上榜、净额多少，Top5 根本查不到。
+   *
+   * ⚠️ 同一只票上「单日榜」与「三日榜」各一行，金额口径不同 ⇒ 不合并、不去重。
+   * ⚠️ 剔除科创板仍走 `tradableStocks`（用户无权限）。
+   */
+  const thsStocks = useMemo(() => {
+    const rows = tradableStocks(
+      (thsLatest?.stocks ?? []).map((s) => ({ ...s, code: s.ticker?.trim() })),
+    )
+    return [...rows].sort(
+      (a, b) =>
+        (b.net_value ?? Number.NEGATIVE_INFINITY) - (a.net_value ?? Number.NEGATIVE_INFINITY),
+    )
+  }, [thsLatest])
+
+  const thsStockCodes = useMemo(() => new Set(thsStocks.map((s) => s.ticker)).size, [thsStocks])
+
   return (
     <div className="flex flex-col gap-3">
       {/* 概览窄栏（口径与总览） + 明细宽栏（机构/游资榜单，多列需横向空间）。
@@ -85,15 +106,11 @@ export function Component() {
       >
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
           <StatPair label="腾讯源披露日" value={txLatest?.date ?? '—'} />
-          <StatPair label="机构上榜" value={txLatest?.institution.length ?? '—'} />
-          <StatPair label="游资席位数" value={txLatest?.hotmoney.length ?? '—'} />
+          <StatPair label="机构上榜" value={txLatest?.institution?.length ?? '—'} />
+          <StatPair label="游资席位数" value={txLatest?.hotmoney?.length ?? '—'} />
           <StatPair label="同花顺源日" value={thsLatest?.date ?? '—'} />
           <StatPair label="同花顺上榜股" value={thsLatest?.stock_count ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
-          交易所盘后（约 18:00+）披露，故盘中本页恒显示上一交易日 —— 这是披露时点，不是数据滞后。
-          机构净买为**正**表示加仓，为**负**表示减仓。
-        </p>
       </Card>
         </Zone>
 
@@ -105,7 +122,8 @@ export function Component() {
             items={[
               { key: 'inst', label: '机构买入' },
               { key: 'hot', label: '游资席位' },
-              { key: 'ths', label: '同花顺横截面' },
+              { key: 'stocks', label: '上榜个股·全量' },
+              { key: 'seatTop', label: '席位 Top5' },
             ]}
             value={tab}
             onChange={(k) => setTab(k as typeof tab)}
@@ -117,7 +135,7 @@ export function Component() {
             rows={tradableStocks(txLatest?.institution)}
             // ⚠️ 同一只票可能因多个上榜原因重复出现（实测 688835 出现两次），仅用 code 会 key 冲突
             rowKey={(r, i) => `${r.code}-${i}`}
-            empty="该日无机构上榜（或文件未生成）"
+            empty="暂无机构上榜数据"
             columns={[
               {
                 label: '标的',
@@ -187,10 +205,92 @@ export function Component() {
           />
         )}
 
-        {tab === 'ths' && (
+        {tab === 'stocks' && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[11.5px] text-sub">
+              <span>
+                共 <b className="text-txt">{thsStocks.length}</b> 行 · <b className="text-txt">{thsStockCodes}</b> 只
+                （同票上「单日榜」与「三日榜」各占一行，不合并金额）
+              </span>
+              <span>源：同花顺 · 披露日 {thsLatest?.date ?? '—'}</span>
+            </div>
+            <DataTable
+              rows={thsStocks}
+              // 同票同周期唯一；跨周期各一行，故 key 必须带 range_days
+              rowKey={(r) => `${r.ticker}-${r.range_days}`}
+              empty="该披露日无上榜个股"
+              columns={[
+                {
+                  label: '标的',
+                  cell: (r) => (
+                    <span className="whitespace-nowrap">
+                      <StockLink code={r.ticker} className="text-rec">{r.name}</StockLink>
+                      <span className="ml-1.5 text-sub text-[10.5px] num">{r.ticker}</span>
+                    </span>
+                  ),
+                },
+                {
+                  label: '周期',
+                  cell: (r) => (
+                    <Tag tone={r.range_days === 3 ? 'neutral' : 'rec'}>
+                      {r.range_days === 3 ? '三日' : '单日'}
+                    </Tag>
+                  ),
+                },
+                {
+                  label: '涨跌幅',
+                  num: true,
+                  cell: (r) => (
+                    <span className={cn('font-semibold', pctTone(r.change))}>
+                      {r.change == null ? '—' : `${r.change > 0 ? '+' : ''}${(r.change * 100).toFixed(2)}%`}
+                    </span>
+                  ),
+                },
+                {
+                  label: '净额',
+                  num: true,
+                  cell: (r) => (
+                    <span className={cn('font-semibold', yuanTone(r.net_value))}>{yuanYi(r.net_value, true)}</span>
+                  ),
+                },
+                { label: '买入', num: true, cell: (r) => <span className="text-sub">{yuanYi(r.buy_value)}</span> },
+                { label: '卖出', num: true, cell: (r) => <span className="text-sub">{yuanYi(r.sell_value)}</span> },
+                {
+                  label: '机构净额',
+                  num: true,
+                  cell: (r) => <span className={yuanTone(r.org_net_value)}>{yuanYi(r.org_net_value, true)}</span>,
+                },
+                {
+                  label: '游资净额',
+                  num: true,
+                  cell: (r) => <span className={yuanTone(r.hot_money_net_value)}>{yuanYi(r.hot_money_net_value, true)}</span>,
+                },
+                {
+                  label: '涨停原因 / 概念',
+                  className: 'whitespace-normal min-w-[240px]',
+                  cell: (r) => (
+                    <span className="flex flex-col gap-0.5">
+                      {r.limit_reason && <span className="text-[11.5px] text-warn">{r.limit_reason}</span>}
+                      {!!r.concept_list?.length && (
+                        <span className="flex flex-wrap gap-1">
+                          {r.concept_list.slice(0, 4).map((c) => (
+                            <Tag key={c.name}>{c.name}</Tag>
+                          ))}
+                        </span>
+                      )}
+                      {!r.limit_reason && !r.concept_list?.length && <span className="text-sub">—</span>}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        )}
+
+        {tab === 'seatTop' && (
           <div className="flex flex-col gap-3">
             <div>
-              <div className="text-[12px] text-sub mb-1">机构席位 Top5（带概念标签）</div>
+              <div className="text-[12px] text-sub mb-1">机构席位 Top5（同花顺口径）</div>
               <DataTable
                 rows={thsLatest?.org_top5 ?? []}
                 // ⚠️ 同花顺源同一只票可能因多个席位重复出现，仅用 code 会 key 冲突
@@ -245,7 +345,7 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] text-sub mb-1">游资席位 Top5</div>
+              <div className="text-[12px] text-sub mb-1">游资席位 Top5（同花顺口径）</div>
               <DataTable
                 rows={thsLatest?.hotmoney_top5 ?? []}
                 rowKey={(r, i) => `${r.seat}-${i}`}
@@ -281,7 +381,7 @@ export function Component() {
         )}
 
         {!tx.isLoading && !txLatest && !thsLatest && (
-          <EmptyState text="龙虎榜数据未生成" hint="cache/lhb_*.json 缺失" />
+          <EmptyState text="暂无龙虎榜数据" />
         )}
         {txLatest && (
           <p className="text-sub text-[11px] mt-2">
@@ -295,4 +395,21 @@ export function Component() {
       </ZoneRow>
     </div>
   )
+}
+
+/** 元 → 亿（同花顺 stocks[] 金额单位是元）。缺失一律「—」，⛔ 不回填 0。 */
+function yuanYi(value: number | null | undefined, signed = false): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  const yi = value / 1e8
+  return `${signed && yi > 0 ? '+' : ''}${n2(yi)} 亿`
+}
+
+function yuanTone(value: number | null | undefined): string {
+  if (typeof value !== 'number' || value === 0) return 'text-sub'
+  return value > 0 ? 'text-up' : 'text-down'
+}
+
+function pctTone(value: number | null | undefined): string {
+  if (typeof value !== 'number' || value === 0) return 'text-sub'
+  return value > 0 ? 'text-up' : 'text-down'
 }

@@ -113,10 +113,12 @@ describe('AppShell 导航渲染', () => {
     // 名称集合不变（去掉星标后对比），顺序即优先级
     expect(priority.map((a) => a.textContent?.replace('★', '').trim())).toEqual([
       '盘中实时',
+      '日内时间轴',
       '主线题材',
       '情绪周期',
       'AI竞价',
       'AI尾盘潜伏',
+      '数据底座',
     ])
     // 每个重点入口都必须带星标
     for (const a of priority) {

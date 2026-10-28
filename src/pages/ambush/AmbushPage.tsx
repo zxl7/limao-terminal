@@ -25,7 +25,8 @@ import { BarChart, Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
 export async function loader() {
-  await Promise.all([
+  // 单路失败不拖垮整页（与 /timeline 同口径）
+  await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.ambushPullbackSignals()),
     queryClient.ensureQueryData(analyticsQueries.ambushPullbackSettlements()),
     queryClient.ensureQueryData(analyticsQueries.ambushWeightedPnl()),
