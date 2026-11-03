@@ -86,6 +86,17 @@ export const PHASE_PLAIN: Readonly<Record<string, string>> = {
   're-entry-candidate': '待回流',
   'no-reentry': '无回流迹象',
   分歧: '分歧',
+  // ── 周期相位（theme_phase_v1 · 2026-11-03）──────────────────────────
+  // 来自 `candidate.phase_v2.phase`。与上面几项**语义不同**：上面是「跨周期回流候选」，
+  // 这七个是「这波线走到第几天」。同表登记的原因只有一个：白话层的职责是
+  // 「任何枚举都不许裸奔到屏幕」，谁来渲染都得有中文。
+  start: '启动',
+  ferment: '发酵',
+  climax: '高潮',
+  diverge: '分歧',
+  reflow: '回流',
+  ebb: '退潮',
+  dormant: '沉寂',
 }
 
 /** 涨停方向 `candidate.zt_dir`。取值源：`theme_rotation.py`（4 种） */

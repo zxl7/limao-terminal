@@ -231,7 +231,15 @@ describe('白话层 · 源扫描（⛔ 防「?? raw」回落复发）', () => {
    * 允许的例外：**源选择**而非展示回落 —— 两个来源都是同一枚举，最终统一走 `viewText`。
    * ⚠️ 例外条目必须**仍然存在**（下面的断言会校验），否则就是过期豁免 = 盲区。
    */
-  const SAFE = ['r.call?.view ?? r.view']
+  const SAFE = [
+    'r.call?.view ?? r.view',
+    // AiPage#finalViewOf：`call.view`（09:25 裁决）优先，缺失回落 `judge.view`；
+    // 终极缺省 `'pending'` 只进 finalCounts 计数与比较，⛔ 从不上屏。
+    'row.call?.view ?? row.view',
+    // RotationPage#themeLifecycle：candidate.phase 与 confidence_factors.phase 同枚举，
+    // 只参与 if 分支比较，再映射成中文 label 上屏，⛔ 不直出原 token。
+    'c.phase || f.phase',
+  ]
 
   function walk(dir: string, out: string[] = []) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

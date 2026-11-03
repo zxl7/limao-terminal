@@ -5,7 +5,7 @@ import type { MarketSnapshot, RotationCandidate } from '@/shared/api'
 import { DataTable, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
 import { BarChart, BarList, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { cn, phaseText } from '@/shared/lib'
 
 /**
  * 题材回流 —— 数据源 `cache/rotation.json` 的 `candidates` 子集。
@@ -64,6 +64,100 @@ type LiveReflow = {
   evidence: string
 }
 
+/**
+ * 周期相位 → 展示口径（theme_phase_v1 · 2026-11-03）。
+ *
+ * ## 为什么这一列比置信度更重要
+ *
+ * `confidence` 回答「这题材像不像要回流」，但它不知道**这波线已经走到第几天**。
+ * 同一个 9 家涨停：出现在第 1 天叫「新线冒头」（最值钱），出现在第 5 天
+ * 叫「高位分歧」（最危险）。旧页面把两者按同一个置信度分值平铺，等于没分。
+ *
+ * ## order 就是操作建议的顺序
+ *
+ * 启动/发酵 → 有位置；回流 → 资金回来了但要防反抽不过前高；
+ * 高潮 → 家数最多、质量最差，不追；分歧 → 2/3 会回流，方向等次日竞价；
+ * 退潮/沉寂 → 出局。⛔ 这里只排「先看谁」，不是买卖指令。
+ */
+type PhaseTone = 'up' | 'rec' | 'warn' | 'mid' | 'down' | 'sub'
+/**
+ * 只登记「色调 + 排序」，**中文名一律走 `plain.ts` 的 `phaseText`**。
+ * 两处各写一份中文迟早漂移 —— 白话层是单一源。
+ */
+const PHASE_META: Record<string, { tone: PhaseTone; order: number }> = {
+  start: { tone: 'up', order: 0 },
+  ferment: { tone: 'up', order: 1 },
+  reflow: { tone: 'rec', order: 2 },
+  climax: { tone: 'warn', order: 3 },
+  diverge: { tone: 'mid', order: 4 },
+  ebb: { tone: 'down', order: 5 },
+  dormant: { tone: 'sub', order: 6 },
+}
+
+/** 相位色调 → 字面量类名（Tailwind 只认字面量，⛔ 不可写成 `text-${tone}`） */
+const PHASE_TEXT: Record<PhaseTone, string> = {
+  up: 'text-up',
+  rec: 'text-rec',
+  warn: 'text-warn',
+  mid: 'text-mid',
+  down: 'text-down',
+  sub: 'text-sub',
+}
+
+/** 相位取值；null/未知一律返回 null（⛔ 不许默认成任何一档） */
+function phaseOf(c: RotationCandidate) {
+  const p = c.phase_v2
+  if (!p?.phase) return null
+  const meta = PHASE_META[p.phase]
+  if (!meta) return null
+  return { ...meta, label: phaseText(p.phase), raw: p }
+}
+
+/** Tag 组件只认 5 档语义色：mid/sub 归中性，⛔ 不许把分歧染成涨或跌 */
+function tagTone(t: PhaseTone): 'neutral' | 'up' | 'down' | 'rec' | 'warn' {
+  if (t === 'mid' || t === 'sub') return 'neutral'
+  return t
+}
+
+/** 表格里的周期格：主标签 + 第 N 天，title 带上判定依据 */
+function PhaseCell({ c }: { c: RotationCandidate }) {
+  const p = phaseOf(c)
+  if (!p) {
+    return (
+      <span className="text-sub text-12" title="今日家数未取到 —— 不猜，等明早数据">
+        未取到
+      </span>
+    )
+  }
+  const d = p.raw
+  return (
+    <span className="flex flex-wrap items-baseline gap-1">
+      <Tag tone={tagTone(p.tone)} title={d.reason}>
+        {p.label}
+        {d.day_n ? ` ${d.day_n}天` : ''}
+      </Tag>
+      {d.cur != null && d.peak != null && (
+        <span className="text-sub text-11 num" title="今日家数 / 窗口峰值家数（按选股宝题材归属算）">
+          {d.cur}/{d.peak}
+        </span>
+      )}
+      {d.src === 'pool_codes' && (
+        <span
+          className="text-sub text-10"
+          title="选股宝题材快照里没对上这条线，退回按「历史成员今天有几只涨停」估算 —— 会偏高，只作参考"
+        >
+          估算
+        </span>
+      )}
+      {d.quality === 'weak' && (
+        <span className="text-sub text-10" title="有效数据不足 8 天，只作方向参考">
+          数据不足
+        </span>
+      )}
+    </span>
+  )
+}
+
 /** 与上游回流监控同口径：名称先精确匹配，避免泛行业名误配具体题材。 */
 function themeHit(theme: string, sector: string): boolean {
   const t = theme.trim()
@@ -109,6 +203,34 @@ export function Component() {
     probing: [...liveByTheme.values()].filter((x) => x.label === '资金试探').length,
   }), [liveByTheme])
 
+  /** 周期相位分组 —— null 单独计「未取到」，⛔ 不许并进任何相位 */
+  const phaseGroups = useMemo(() => {
+    const groups: Record<string, RotationCandidate[]> = {}
+    let unknown = 0
+    for (const c of all) {
+      const p = phaseOf(c)
+      if (!p) {
+        unknown += 1
+        continue
+      }
+      ;(groups[p.raw.phase] ||= []).push(c)
+    }
+    return { groups, unknown }
+  }, [all])
+
+  /** 相位分布（只画有题材的档，空档不占位） */
+  const phaseBars = useMemo(
+    () =>
+      Object.entries(PHASE_META)
+        .map(([key, m]) => ({
+          label: phaseText(key),
+          value: (phaseGroups.groups[key] ?? []).length,
+          tone: m.tone as PhaseTone,
+        }))
+        .filter((b) => b.value > 0),
+    [phaseGroups],
+  )
+
   /**
    * 回流信号排序条 —— 本页的核心交付物「可排序的介入清单」的视觉版。
    *
@@ -117,12 +239,22 @@ export function Component() {
    * 未启动的题材排在前面（可低吸），已启动的置后并整体压在下方 —— 顺序本身就是建议。
    */
   const signalItems = useMemo(() => {
-    const ordered = [...calm, ...moved]
-    return ordered.slice(0, 15).map((c) => ({
-      label: c.theme,
-      value: c.confidence,
-      note: `${liveByTheme.get(c.theme)?.label ?? '—'} · ${confTier(c).label} · 冷却 ${c.cooled_days} 日`,
-    }))
+    // 未启动区内部按**周期相位**排（启动→发酵→回流→高潮→分歧→退潮→沉寂），
+    // 而不是按 confidence 平铺：同一个置信度，第 1 天和第 5 天的操作价值完全不同。
+    // ⚠️ 已启动的仍整体压后 —— 「今天已动」意味着低吸位置已经没了。
+    const calmByPhase = [...calm].sort(
+      (a, b) => (phaseOf(a)?.order ?? 9) - (phaseOf(b)?.order ?? 9),
+    )
+    const ordered = [...calmByPhase, ...moved]
+    return ordered.slice(0, 15).map((c) => {
+      const p = phaseOf(c)
+      const ph = p ? `${p.label}${p.raw.day_n ? ` ${p.raw.day_n}天` : ''}` : '未取到'
+      return {
+        label: c.theme,
+        value: c.confidence,
+        note: `${ph} · ${liveByTheme.get(c.theme)?.label ?? '—'} · ${confTier(c).label} · 冷却 ${c.cooled_days} 日`,
+      }
+    })
   }, [calm, moved, liveByTheme])
 
   /**
@@ -165,6 +297,42 @@ export function Component() {
           <StatPair label="新催化" value={all.filter((c) => c.catalyst_fresh).length} />
           <StatPair label="窗口" value={d?.data_meta?.window ?? '—'} />
         </div>
+
+        {/* ── 周期位置：本页的第一等重要信息 ─────────────────────────────
+            同一组家数出现在第 1 天和第 5 天是完全相反的两件事，
+            而 `confidence` 对这两者给的分可能一样 —— 所以它必须单独成块，
+            不能只当表格里的一列。 */}
+        <div className="border-l-2 border-up pl-2.5 mb-2">
+          <div className="text-12 font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
+            <span>周期位置 · 这波线走到第几天</span>
+            {phaseGroups.unknown > 0 && (
+              <span className="text-sub text-11 font-normal">
+                {phaseGroups.unknown} 个数据未到（不猜，等明早）
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            {phaseBars.map((b) => (
+              <span key={b.label} className={cn('text-12', PHASE_TEXT[b.tone])}>
+                {b.label} <b className="num">{b.value}</b>
+              </span>
+            ))}
+            {phaseBars.length === 0 && <span className="text-sub text-12">相位数据未生成</span>}
+          </div>
+          <p className="text-sub text-11 mt-1 leading-relaxed">
+            启动 = 首次成线，位置最低；发酵 = 还在高位；<b className="text-txt">高潮</b> = 家数最多但
+            质量最差（不追）；<b className="text-txt">分歧</b> = 掉 30% 以上，历史上 2/3 会回流，
+            但方向只能等次日竞价定；<b className="text-txt">退潮</b> = 反抽没过前高，线走完了。
+          </p>
+          {/* ⚠️ 口径必须写明：相位用的是「该题材历史成分股今日涨停数」，
+              和涨停家数图（选股宝官方归属家数）不是同一个口径，一票可能被归到别的题材，
+              所以这里的数会偏大。不写清楚，用户会看到两个不一样的数字。 */}
+          <p className="text-sub text-11 mt-0.5 leading-relaxed">
+            家数口径：按<b className="text-txt">该题材历史成分股今日涨停数</b>计，
+            可能高于官方归属家数（同一只票可能被划到别的题材）。
+          </p>
+        </div>
+
         <p className="text-sub text-12 leading-relaxed">
           置信度是**五因子**（催化 / 大盘 / 资金 / 相位 / **K线止跌**）加权后的**排序分值**，
           不是成功率 —— 本页按它排序，但不把它当概率解读。「K线止跌」看的是**该题材龙头个股**
@@ -230,6 +398,7 @@ export function Component() {
           empty="无未启动候选"
           columns={[
             { label: '题材', cell: (c) => <span className="text-txt font-semibold">{c.theme}</span> },
+            { label: '周期', cell: (c) => <PhaseCell c={c} /> },
             {
               label: '置信度',
               num: true,
@@ -282,6 +451,7 @@ export function Component() {
           empty="今日无题材启动回流"
           columns={[
             { label: '题材', cell: (c) => <span className="text-txt">{c.theme}</span> },
+            { label: '周期', cell: (c) => <PhaseCell c={c} /> },
             { label: '置信度', num: true, cell: (c) => n1(c.confidence) },
             {
               label: '盘中状态',

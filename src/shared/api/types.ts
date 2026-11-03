@@ -1286,6 +1286,54 @@ export interface RotationCandidate {
   zt_filled: Record<string, number>
   zt_valid_days: number
   today_hot: boolean
+  /**
+   * 周期相位（theme_phase_v1 · 2026-11-03）。
+   *
+   * 与上面的 `phase` 是**两个不同问题**：
+   *   · `phase` = 跨周期回流候选（这题材冷了很久，现在资金可能回来）
+   *   · `phase_v2` = **这波线走到第几天**（启动/发酵/高潮/分歧/回流/退潮/沉寂）
+   *
+   * ⚠️ null = 数据不足（今日家数缺失或成分股为空）。⛔ 前端不得把 null
+   * 渲染成任一相位 —— 那是「不知道」，不是「没线」。
+   */
+  phase_v2?: ThemePhase | null
+}
+
+/** 题材周期相位判定结果（后端 `wealth_code/core/theme_phase.py` · schema=theme_phase_v1） */
+export interface ThemePhase {
+  schema: string
+  /** start / ferment / climax / diverge / reflow / ebb / dormant */
+  phase: string
+  phase_cn: string
+  /** 这波线走到第几天（从峰值所在那一波的起点算） */
+  day_n: number | null
+  /** 窗口内峰值家数 */
+  peak: number | null
+  peak_idx: number | null
+  /** 前一日家数 */
+  prev: number | null
+  /** 今日家数 */
+  cur: number | null
+  /** 有效天数 */
+  days: number | null
+  /** full = 有效数据 ≥8 天；weak = 样本不足，只作方向参考 */
+  quality: string | null
+  /** 判定依据（人话，可直接展示） */
+  reason: string
+  /** 该相位默认允许做什么 —— ⛔ 不是买卖建议 */
+  action: string
+  /** 弱回流：回到前高六成以下，别当第二轮 */
+  is_retrace_fail?: boolean
+  /**
+   * 家数口径来源（2026-11-03 起可追溯）：
+   * - `snapshot_plates` = 选股宝题材快照的当日归属 ∩ 涨停池（**主口径**，准）
+   * - `pool_codes`      = 对不上快照时退回「历史成员今天有几只涨停」（偏高，只作参考）
+   */
+  src?: string | null
+  /** 判定依据的家数序列（升序，末项=今日；null = 那天没数据，⛔ 不是 0） */
+  series?: (number | null)[]
+  /** 实际匹配到的选股宝板块名（如 `['机器人']`），便于人工复核 */
+  plates?: string[]
 }
 
 export interface SectorZtTrend {
