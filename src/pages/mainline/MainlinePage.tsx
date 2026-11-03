@@ -190,19 +190,19 @@ export function Component() {
                       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                         <span
                           className={cn(
-                            'num text-[13px] font-semibold w-[18px]',
+                            'num text-13 font-semibold w-[18px]',
                             t.rank === 1 ? 'text-lead' : 'text-sub',
                           )}
                         >
                           {t.rank}
                         </span>
-                        <span className="text-[13.5px] font-semibold text-txt">{t.name}</span>
+                        <span className="text-14 font-semibold text-txt">{t.name}</span>
                         <StatPair label="涨停" value={t.zt_count} tone="up" />
                         <StatPair label="环比" value={deltaText(t.zt_count, t.zt_prev)} tone={deltaTone(t.zt_count, t.zt_prev)} />
                         <StatPair label="昨日" value={t.zt_prev} />
                         <StatPair label="均换手" value={n1(t.turn_avg)} />
                         <StatPair label="涨停/家数" value={`${t.zt_count}/${t.total_stocks}`} />
-                        <span className="text-[12px] text-sub flex items-center gap-1">
+                        <span className="text-12 text-sub flex items-center gap-1">
                           <Icon name="trophy" size={12} className="text-lead" />
                           龙头 {t.leader?.name ?? '—'}
                         </span>
@@ -221,7 +221,7 @@ export function Component() {
                           }}
                         />
                       </span>
-                      {t.desc && <div className="text-[12px] text-sub mt-0.5 leading-relaxed">{t.desc}</div>}
+                      {t.desc && <div className="text-12 text-sub mt-0.5 leading-relaxed">{t.desc}</div>}
                     </button>
 
                     {/* 龙虎榜明细就地展开在**本题材行下面**：左栏看完“几条线”，
@@ -252,7 +252,7 @@ export function Component() {
               maxBarWidth={44}
               showValue
             />
-            <p className="text-sub text-[11.5px] mt-2">
+            <p className="text-sub text-12 mt-2">
               <b className="text-up">红</b> = 较昨增加 · <b className="text-down">绿</b> = 较昨减少 · 灰色虚线 = 昨日无样本。
             </p>
           </>
@@ -269,16 +269,16 @@ export function Component() {
           {/* 龙头逻辑为实时快照原文；题材催化已随左侧每张强度卡展示。 */}
           {expanded.leader?.desc && (
             <div className="rounded-sm border border-lead/35 bg-lead/[0.035] px-3 py-2.5 mb-3">
-              <div className="text-[11.5px] text-lead font-semibold mb-1">龙头炒作逻辑</div>
-              <div className="text-[12.5px] leading-relaxed text-txt">{expanded.leader.desc}</div>
+              <div className="text-12 text-lead font-semibold mb-1">龙头炒作逻辑</div>
+              <div className="text-13 leading-relaxed text-txt">{expanded.leader.desc}</div>
             </div>
           )}
 
           {/* ── 龙头详况 ── */}
           <div className="border border-line rounded-sm px-2.5 py-2 mb-3">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
-              <span className="text-lead text-[12.5px] font-semibold">龙头</span>
-              <StockLink code={expanded.leader?.code} className="text-[14px] font-semibold text-rec">{expanded.leader?.name ?? '—'}</StockLink>
+              <span className="text-lead text-13 font-semibold">龙头</span>
+              <StockLink code={expanded.leader?.code} className="text-14 font-semibold text-txt">{expanded.leader?.name ?? '—'}</StockLink>
               {expanded.leader?.boards && <Tag tone="up">{expanded.leader.boards}</Tag>}
               <StatPair
                 label="涨幅"
@@ -288,21 +288,21 @@ export function Component() {
               <StatPair label="价" value={expanded.leader?.price ?? '—'} />
               <StatPair label="换手" value={expanded.leader?.turn != null ? `${n1(expanded.leader.turn)}%` : '—'} />
               <StatPair label="市值" value={expanded.leader?.cap_yi != null ? `${n1(expanded.leader.cap_yi)}亿` : '—'} />
-              {expanded.leader?.seal && <span className="text-[12px]">{expanded.leader.seal}</span>}
+              {expanded.leader?.seal && <span className="text-12">{expanded.leader.seal}</span>}
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-3">
             {/* ── 跟风股 ── */}
             <div>
-              <div className="text-[12px] text-sub mb-1">跟风股（换手越高 = 接力意愿越强）</div>
+              <div className="text-12 text-sub mb-1">跟风股（换手越高 = 接力意愿越强）</div>
               <DataTable
                 rows={expanded.followers ?? []}
                 rowKey={(r, i) => `${r.name}-${i}`}
                 dense
                 empty="无跟风股"
                 columns={[
-                  { label: '个股', cell: (r) => <span className="text-rec">{r.name}</span> },
+                  { label: '个股', cell: (r) => <span className="text-txt">{r.name}</span> },
                   {
                     label: '涨幅',
                     num: true,
@@ -317,7 +317,7 @@ export function Component() {
 
             {/* ── 涨停股清单 ── */}
             <div>
-              <div className="text-[12px] text-sub mb-1">当日涨停股（{expanded.zt_stocks?.length ?? 0}）</div>
+              <div className="text-12 text-sub mb-1">当日涨停股（{expanded.zt_stocks?.length ?? 0}）</div>
               <DataTable
                 rows={tradableStocks(expanded.zt_stocks)}
                 rowKey={(r) => r.code}
@@ -328,7 +328,7 @@ export function Component() {
                     label: '个股',
                     cell: (r) => (
                       <span>
-                        <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                        <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -346,14 +346,14 @@ export function Component() {
           <div className="mt-3 grid md:grid-cols-3 gap-3">
             {expanded.diffusion && (
               <div className="border border-line rounded-sm px-2.5 py-2 md:col-span-3">
-                <div className="text-[12px] text-sub mb-0.5">扩散路径</div>
-                <div className="text-[12.5px] leading-relaxed">{expanded.diffusion}</div>
+                <div className="text-12 text-sub mb-0.5">扩散路径</div>
+                <div className="text-13 leading-relaxed">{expanded.diffusion}</div>
               </div>
             )}
             {!!expanded.positives?.length && (
               <div className="border border-line rounded-sm px-2.5 py-2">
-                <div className="text-[12px] text-up mb-0.5">正向因素</div>
-                <ul className="text-[12.5px] leading-relaxed">
+                <div className="text-12 text-up mb-0.5">正向因素</div>
+                <ul className="text-13 leading-relaxed">
                   {expanded.positives.map((p, i) => (
                     // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                     <li key={i}>{p}</li>
@@ -363,8 +363,8 @@ export function Component() {
             )}
             {!!expanded.risks?.length && (
               <div className="border border-line rounded-sm px-2.5 py-2">
-                <div className="text-[12px] text-warn mb-0.5">风险因素</div>
-                <ul className="text-[12.5px] leading-relaxed">
+                <div className="text-12 text-warn mb-0.5">风险因素</div>
+                <ul className="text-13 leading-relaxed">
                   {expanded.risks.map((p, i) => (
                     // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                     <li key={i}>{p}</li>
@@ -373,7 +373,7 @@ export function Component() {
               </div>
             )}
           </div>
-          <p className="text-sub text-[11px] mt-2 leading-relaxed">
+          <p className="text-sub text-11 mt-2 leading-relaxed">
             扩散路径 / 正向因素 / 风险因素由原系统脚本生成，本页原样呈现不做改写 ——
             改写会掩盖当时的判断依据。
           </p>
@@ -440,7 +440,7 @@ function CorePanel({ facts, genes, fundMaxAbs }: {
     <div className="border-t border-line px-2.5 py-2 flex flex-col gap-2">
       {tiers.length > 0 ? tiers.map((tier) => (
         <section key={tier.label} aria-label={`核心个股·${tier.label}`} className="flex flex-col gap-1">
-          <div className="flex items-baseline gap-2 text-[10.5px] text-sub">
+          <div className="flex items-baseline gap-2 text-11 text-sub">
             <span>{tier.label}</span>
             <span className="num">{tier.stocks.length}</span>
           </div>
@@ -448,17 +448,25 @@ function CorePanel({ facts, genes, fundMaxAbs }: {
             {tier.stocks.map((s) => {
               const g = genes.get(s.code)
               return (
-                <li key={s.code} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[12px]">
-                  <StockLink code={s.code} className={cn('text-rec', s.role === 'theme-leader' && 'font-semibold')}>{s.name}</StockLink>
-                  {s.boards && <span className="text-[10.5px] text-up">{s.boards}</span>}
-                  <span className={cn('num text-[11px] font-semibold', netTone(s.pct))}>
+                <li key={s.code} className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-12">
+                  <StockLink code={s.code} className={cn('text-txt', s.role === 'theme-leader' && 'font-semibold')}>{s.name}</StockLink>
+                  {g?.strictDragon && (
+                    <span
+                      className="text-10 text-up border border-up/40 rounded-sm px-1 leading-tight"
+                      title={`严格连板龙：晋级率 ${n1(g.promoRate ?? 0)}%（≥40%）且近一年涨停 ${g.zt250} 次高于自身历史年均 ${n1(g.annualAvg ?? 0)} 次`}
+                    >
+                      严龙
+                    </span>
+                  )}
+                  {s.boards && <span className="text-11 text-up">{s.boards}</span>}
+                  <span className={cn('num text-11 font-semibold', netTone(s.pct))}>
                     {s.pct === null ? '—' : `${s.pct > 0 ? '+' : ''}${n1(s.pct)}%`}
                   </span>
-                  {s.turn !== null && <span className={cn('num text-[10.5px]', s.turn >= 20 ? 'text-warn' : 'text-sub')}>换 {n1(s.turn)}%</span>}
-                  {s.is20cm && <span className="text-[10px] text-warn">20cm</span>}
-                  {s.buyable === false && <span className="text-[10px] text-sub">封死</span>}
+                  {s.turn !== null && <span className={cn('num text-11', s.turn >= 20 ? 'text-warn' : 'text-sub')}>换 {n1(s.turn)}%</span>}
+                  {s.is20cm && <span className="text-10 text-warn">20cm</span>}
+                  {s.buyable === false && <span className="text-10 text-sub">封死</span>}
                   {g && (
-                    <span className="text-[10px] text-sub" title={`近250日涨停 ${g.zt250} 次 · 历史最高 ${g.maxBoards} 板${g.promoRate === null ? '' : ` · 晋级率 ${n1(g.promoRate)}%`}`}>
+                    <span className="text-10 text-sub" title={`近250日涨停 ${g.zt250} 次 · 历史最高 ${g.maxBoards} 板${g.promoRate === null ? '' : ` · 晋级率 ${n1(g.promoRate)}%`}`}>
                       年涨停 <b className={cn('num font-normal', g.zt250 >= 15 ? 'text-txt' : 'text-sub')}>{g.zt250}</b>
                       {g.promoRate !== null && <> · 晋级 <b className={cn('num font-normal', g.promoRate >= 40 ? 'text-up' : 'text-sub')}>{n1(g.promoRate)}%</b></>}
                     </span>
@@ -469,10 +477,10 @@ function CorePanel({ facts, genes, fundMaxAbs }: {
           </ul>
         </section>
       )) : (
-        <p className="text-[12px] text-sub m-0">该题材暂无核心辨识度标的</p>
+        <p className="text-12 text-sub m-0">该题材暂无核心辨识度标的</p>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-faint pt-1.5 text-[11.5px] text-sub">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-faint pt-1.5 text-12 text-sub">
         <span className="flex-none">资金流</span>
         {fund ? (
           <>
@@ -488,7 +496,7 @@ function CorePanel({ facts, genes, fundMaxAbs }: {
                   style={{ width: `${fundPct}%`, background: (fund.flowYi ?? 0) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }}
                 />
               </span>
-              <span className="text-[10px] text-sub flex-none" title="仅在本页题材之间相对比较">页内相对</span>
+              <span className="text-10 text-sub flex-none" title="仅在本页题材之间相对比较">页内相对</span>
             </span>
           </>
         ) : (

@@ -72,7 +72,7 @@ export function SignalRail({ className }: { className?: string }) {
       {/* 栏头：色条 + 标题 + 延伸线 */}
       <div className="flex items-center gap-2 px-0.5 pt-0.5">
         <span className="w-[3px] h-3.5 rounded-[2px] bg-rec flex-none" aria-hidden />
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
+        <span className="text-11 font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
           信号
         </span>
         <span className="flex-1 h-px bg-line min-w-2" aria-hidden />
@@ -80,16 +80,16 @@ export function SignalRail({ className }: { className?: string }) {
 
       {/* 短线精灵紧凑列表（按 type 着色） */}
       <div className="flex items-center gap-1.5 px-0.5">
-        <span className="text-[10.5px] font-semibold text-sub">⚡ 短线精灵</span>
-        {sig && <span className="text-[10.5px] text-sub">{visible.length} 条</span>}
+        <span className="text-11 font-semibold text-sub">⚡ 短线精灵</span>
+        {sig && <span className="text-11 text-sub">{visible.length} 条</span>}
       </div>
 
-      <div className="px-0.5 text-[10px] text-sub leading-relaxed">
+      <div className="px-0.5 text-10 text-sub leading-relaxed">
         <div>{isHistory ? '当日信号记录' : '本轮信号'} · {sig?.date ?? '日期未提供'}</div>
         {sig?.ts && <div className="num">数据时间 {sig.ts}</div>}
         {isHistory && <div>类型与涨幅为触发时记录，不代表当前状态。</div>}
       </div>
-      {isError && <p role="status" className="m-0 text-[11px] text-warn">{sig ? '信号更新失败，保留上次数据' : '信号加载失败'}</p>}
+      {isError && <p role="status" className="m-0 text-11 text-warn">{sig ? '信号更新失败，保留上次数据' : '信号加载失败'}</p>}
 
       {/*
         ⛔ 2026-10-18 用户硬要求：短线精灵**固定高度 + 内部滚动，不得超屏**。
@@ -114,28 +114,28 @@ export function SignalRail({ className }: { className?: string }) {
                 className="py-[4px] border-b border-line last:border-b-0 min-w-0 overflow-hidden"
               >
                 <div className="flex items-baseline gap-1.5">
-                  <StockLink code={s.code} className="text-[12px] font-semibold truncate min-w-0">{s.name ?? s.code}</StockLink>
+                  <StockLink code={s.code} className="text-12 font-semibold truncate min-w-0">{s.name ?? s.code}</StockLink>
                   {s.pct != null ? (
-                    <span className={cn('num text-[12px] font-semibold ml-auto flex-none', pctTone(s.pct))}>
+                    <span className={cn('num text-12 font-semibold ml-auto flex-none', pctTone(s.pct))}>
                       {fmtPct(s.pct)}
                     </span>
                   ) : (
-                    <span className="num text-[12px] text-sub ml-auto flex-none">—</span>
+                    <span className="num text-12 text-sub ml-auto flex-none">—</span>
                   )}
                 </div>
                 {isHistory && (
-                  <div className="num flex flex-wrap gap-x-2 text-[10px] text-sub mt-0.5">
+                  <div className="num flex flex-wrap gap-x-2 text-10 text-sub mt-0.5">
                     <span>首 {s.first_seen?.slice(0, 5) ?? '—'}</span>
                     <span>末 {s.last_seen?.slice(0, 5) ?? '—'}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 mt-[2px]">
                   <span className={cn('inline-block w-1.5 h-1.5 rounded-full flex-none', st.dot)} aria-hidden />
-                  <span className={cn('text-[10.5px] font-medium flex-none truncate', st.text)}>
+                  <span className={cn('text-11 font-medium flex-none truncate', st.text)}>
                     {s.type || '信号'}
                   </span>
                   {s.seen_count != null && s.seen_count > 1 && (
-                    <span className="text-[10px] text-sub flex-none ml-auto">{s.seen_count}轮</span>
+                    <span className="text-10 text-sub flex-none ml-auto">{s.seen_count}轮</span>
                   )}
                 </div>
               </div>
@@ -143,7 +143,7 @@ export function SignalRail({ className }: { className?: string }) {
           }}
         />
       ) : (
-        <p className="text-[12px] text-sub px-0.5 py-1">{isPending ? '正在加载短线信号…' : isError ? '暂无法确认信号状态' : !hasRows ? '信号列表未提供' : '暂无短线信号'}</p>
+        <p className="text-12 text-sub px-0.5 py-1">{isPending ? '正在加载短线信号…' : isError ? '暂无法确认信号状态' : !hasRows ? '信号列表未提供' : '暂无短线信号'}</p>
       )}
     </section>
   )

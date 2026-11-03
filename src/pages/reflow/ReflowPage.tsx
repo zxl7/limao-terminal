@@ -165,7 +165,7 @@ export function Component() {
           <StatPair label="新催化" value={all.filter((c) => c.catalyst_fresh).length} />
           <StatPair label="窗口" value={d?.data_meta?.window ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           置信度是**五因子**（催化 / 大盘 / 资金 / 相位 / **K线止跌**）加权后的**排序分值**，
           不是成功率 —— 本页按它排序，但不把它当概率解读。「K线止跌」看的是**该题材龙头个股**
           的日K（站上MA5 / 近2日不创新低 / 跌幅收窄 / 缩量，四条命中≥2 成立）。
@@ -187,7 +187,7 @@ export function Component() {
         >
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="target" size={13} className="text-rec" />
                 置信度 Top {signalItems.length}（未启动优先）
               </div>
@@ -197,7 +197,7 @@ export function Component() {
                 labelWidth={96}
                 emptyText="无回流候选"
               />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 条长按<b className="text-txt">本批最高置信度</b>归一，仅表批内相对强弱。
                 附注里的因子结构必须一并读：同样的分值，来自
                 <b className="text-txt"> 四因子齐备</b> 与 <b className="text-txt">仅形态回流</b>
@@ -207,12 +207,12 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="dna" size={13} className="text-sub" />
                 五因子与盘中确认结构
               </div>
               <BarChart bars={factorBars} height={175} format={(v) => `${v} 个`} maxBarWidth={38} showValue />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 柱高 = <b className="text-txt">命中该因子的题材数</b>（不是分值），
                 故统一用中性蓝着色 —— 计数没有好坏语义，染红染绿都是过度解读。
                 <br />
@@ -264,12 +264,12 @@ export function Component() {
                 </span>
               ),
             },
-            { label: '资金趋势', cell: (c) => <span className="text-sub text-[11.5px]">{c.flow_trend || '—'}</span> },
-            { label: '板块构成', cell: (c) => <span className="text-sub text-[11.5px]">主板 {c.board_mix?.main ?? '—'} / 创业 {c.board_mix?.cyb ?? '—'}</span> },
+            { label: '资金趋势', cell: (c) => <span className="text-sub text-12">{c.flow_trend || '—'}</span> },
+            { label: '板块构成', cell: (c) => <span className="text-sub text-12">主板 {c.board_mix?.main ?? '—'} / 创业 {c.board_mix?.cyb ?? '—'}</span> },
             {
               label: '触发条件',
               className: 'whitespace-normal min-w-[280px]',
-              cell: (c) => <span className="text-[12px] leading-relaxed">{c.trigger || '—'}</span>,
+              cell: (c) => <span className="text-12 leading-relaxed">{c.trigger || '—'}</span>,
             },
           ]}
         />
@@ -294,7 +294,7 @@ export function Component() {
             {
               label: '爆发参照',
               cell: (c) => (
-                <span className="text-sub text-[11.5px]">
+                <span className="text-sub text-12">
                   {c.boom_day || '—'} · 涨停 {c.boom_zt ?? '—'} · {c.boom_pct != null ? pct(c.boom_pct) : '—'}
                 </span>
               ),
@@ -308,7 +308,7 @@ export function Component() {
                 </span>
               ),
             },
-            { label: '涨停方向', cell: (c) => <span className="text-sub text-[11.5px]">{c.zt_dir || '—'}</span> },
+            { label: '涨停方向', cell: (c) => <span className="text-sub text-12">{c.zt_dir || '—'}</span> },
           ]}
         />
       </Card>
@@ -317,7 +317,7 @@ export function Component() {
         <Zone label="池全量底表" dot="bg-mid" className="xl:w-[38%]">
       {all.length > 0 && (
         <Card title="观察池与主板池全量" extra={<CardBadge>按题材归属核对</CardBadge>}>
-          <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5 mb-2">
+          <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5 mb-2">
             铁律：池内题材标签不可直接采信 —— 须按个股真实主轴核对。下表按题材分组列出标的，
             涨幅只显示当日实时行情；取不到即为「—」，距「可操作」还差一步人工确认。
           </p>
@@ -325,9 +325,9 @@ export function Component() {
             {sorted.map((c) => (
               <div key={c.theme} className="border border-line rounded-sm px-2.5 py-2">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-1.5">
-                  <span className="text-[13px] font-semibold text-txt">{c.theme}</span>
+                  <span className="text-13 font-semibold text-txt">{c.theme}</span>
                   <Tag tone={confTier(c).tone}>{confTier(c).label}</Tag>
-                  <span className="text-sub text-[11.5px]">
+                  <span className="text-sub text-12">
                     观察池 {c.watch_pool?.length ?? 0} · 主板池 {c.main_board_pool?.length ?? 0}
                   </span>
                 </div>
@@ -345,12 +345,12 @@ export function Component() {
                       <StockLink code={s.code}>
                         {s.dragon ? '龙 ' : ''}
                         {s.name}
-                        <span className="text-sub text-[10px] ml-1">实时</span>
+                        <span className="text-sub text-10 ml-1">实时</span>
                         <span className="num ml-1">{s.live_pct != null ? pct(s.live_pct, 1) : '—'}</span>
                       </StockLink>
                     </span>
                   ))}
-                  {(c.watch_pool?.length ?? 0) === 0 && <span className="text-sub text-[11.5px]">观察池为空</span>}
+                  {(c.watch_pool?.length ?? 0) === 0 && <span className="text-sub text-12">观察池为空</span>}
                 </div>
               </div>
             ))}

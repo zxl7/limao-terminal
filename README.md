@@ -138,7 +138,7 @@ Skyroc UI 自带 `primary` / `destructive`(红) / `success`(绿) —— 服务�
 **同语义的两个执行者**：开发期由 `vite.config.ts` 中间件提供，生产期由 `serve.py` 提供，
 两者共用 `scripts/lib/read-route.mjs` 的读取实现，避免漂移。前端代码无需区分环境。
 
-## 页面加载稳定性（29 个懒加载页面）
+## 页面加载稳定性（31 个懒加载页面）
 
 每个页面都是 `lazy: () => import(...)`，好处是首屏轻；代价是**模块下载失败时整页进不去**。
 浏览器的原生报错长这样（同一件事，三个内核三种文案）：
@@ -172,7 +172,7 @@ Skyroc UI 自带 `primary` / `destructive`(红) / `success`(绿) —— 服务�
   所以「重试」不是万能药，**整页刷新才是终极手段**（`autoReloadOnce`，同页 60s 节流防死循环）。
 - **React Router 的 `lazy` 失败会静默取消导航** —— URL 回退、页面不动、目标路由的 `errorElement` 根本不会渲染，
   只在控制台留一行报错。用户看到的是「点了没反应」。所以导航必须自己拦（`usePageNav`）。
-- **预取绝不允许触发整页刷新**。否则鼠标沿侧栏划一趟（29 个 tab）就可能连刷十几次，
+- **预取绝不允许触发整页刷新**。否则鼠标沿侧栏划一趟（31 个页面）就可能连刷十几次，
   比报错本身更难受。`preload()` 内部固定 `autoReload: false`，并由单测锁住。
 
 ## 迁移进度
@@ -182,17 +182,21 @@ Skyroc UI 自带 `primary` / `destructive`(红) / `success`(绿) —— 服务�
 - ✅ 情绪条 `MoodBar` — 对应原 dashboard `render()`
 - ✅ 昨日涨停反馈 `FeedbackCard` — 改善红 / 恶化绿
 - ✅ 连板天梯 `LadderCard` — 对应 `render_ladder()`
-- ✅ 核心标的 `LeadersCard` — 三态语义（可买紫 / 涨停红 / 常规）
+- ✅ 今天最强题材 `TopThemeCard` — 题材当行、个股当详情，点行折叠（2026-10-30 由 `ThemeTopCard` + `LeadersCard` 合并）
 - ✅ 短线精灵 `SignalsCard` — 对应原 watch.html `renderWatch()`
 - ✅ 顶栏 `TopBar` — 指数 / 情绪 / 时序 / 契约健康度
 
 **待迁**
 
-- ⬜ ECharts 趋势追踪
-- ⬜ 盘前竞价定调
-- ⬜ 核按钮分级预警
-- ⬜ 主线题材 Top / 题材轮动 / 回流预测
-- ⬜ 资金流向、交易战绩、数据记录、数据堆叠（4 页现为占位）
+> 截至 2026-10-30：下列能力**已全部迁移完成**，对应页面均已上线。完整能力以 `npm run data` 输出的 **83 条 `/api/*` 路由清单**为准（实测 83/83 缺失 0），本文档不再逐条维护待迁清单。
+
+| 原待迁项 | 已迁页面 | 路由 |
+| --- | --- | --- |
+| 趋势追踪（含图表） | `FlowPage` / `RotationPage` / `EmotionPage` | `/api/flow/*` `/api/theme/*` `/api/emotion/*` |
+| 盘前竞价定调 | `AuctionPage` | `/api/market/auction` `/api/decision/auction-history` |
+| 核按钮分级预警 | `RiskPage`（ExtremeCard） | `/api/risk/watch` |
+| 主线题材 Top / 题材轮动 / 回流预测 | `MainlinePage` / `BoardCorePage` / `RotationPage` / `ReflowPage` / `EruptionPage` | `/api/theme/*` `/api/board/*` `/api/eruption/*` |
+| 资金流向 / 交易战绩 / 数据记录 / 数据堆叠 | `FlowPage` / `BacktestPage` / `RecordPage` / `StackPage` / `DataPage` | `/api/flow/*` `/api/backtest/*` `/api/data/*` |
 
 ## 已知限制
 

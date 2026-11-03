@@ -235,9 +235,11 @@ export {
 export { RelayEffectCard } from './components/RelayEffectCard'
 
 export {
+  bareCode,
   boardHeightOf,
   buildGeneIndex,
   buildThemeCoreIndex,
+  STRICT_DRAGON_PROMO_MIN,
   tierOf,
   type CoreTier,
   type GeneFacts,

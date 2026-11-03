@@ -138,15 +138,15 @@ export function Component() {
                 <div className="flex items-baseline justify-between gap-2">
                   <span
                     className={cn(
-                      'text-[12.5px]',
+                      'text-13',
                       k.key === kind ? 'font-semibold text-txt' : 'text-sub',
                     )}
                   >
                     {k.label}
                   </span>
-                  <span className="num text-[12px] text-sub">{l.length} 份</span>
+                  <span className="num text-12 text-sub">{l.length} 份</span>
                 </div>
-                <div className="text-[11px] text-sub mt-0.5 truncate">
+                <div className="text-11 text-sub mt-0.5 truncate">
                   {latest ? `最新 ${fileDate(latest.file)}` : '—'}
                   {latest && staleLabel(fileDate(latest.file), 7) && (
                     <span className="badge bg-warn-soft text-warn ml-1">
@@ -161,12 +161,12 @@ export function Component() {
 
         {/* 最新一份的标题 —— 卡的原生措辞，比任何重述都更接近当时的判断 */}
         <div className="mt-2.5 pt-2 border-t border-line-faint">
-          <div className="text-[10.5px] text-sub leading-tight">最新一份卡标题</div>
-          <div className="text-[13px] text-txt leading-snug mt-0.5">
+          <div className="text-11 text-sub leading-tight">最新一份卡标题</div>
+          <div className="text-13 text-txt leading-snug mt-0.5">
             {current?.data?.title ?? '—'}
           </div>
           {current && (
-            <div className="num text-[11px] text-sub mt-0.5">{fileDate(current.file)}</div>
+            <div className="num text-11 text-sub mt-0.5">{fileDate(current.file)}</div>
           )}
         </div>
       </Card>
@@ -197,7 +197,7 @@ export function Component() {
             }
           >
             {loading ? (
-              <div className="text-sub text-[12.5px] py-3">加载中…</div>
+              <div className="text-sub text-13 py-3">加载中…</div>
             ) : current?.data ? (
               <CardArchiveView card={current.data} />
             ) : (
@@ -229,21 +229,21 @@ export function Component() {
                         <div className="flex items-baseline justify-between gap-2">
                           <span
                             className={cn(
-                              'num text-[12px]',
+                              'num text-12',
                               on ? 'font-semibold text-txt' : 'text-sub',
                             )}
                           >
                             {fileDate(f.file)}
                           </span>
-                          <span className="text-[11px] text-sub truncate">
+                          <span className="text-11 text-sub truncate">
                             {cardDate(f.data, '') }
                           </span>
                         </div>
-                        <div className="text-[11.5px] text-txt truncate mt-0.5">
+                        <div className="text-12 text-txt truncate mt-0.5">
                           {f.data?.title ?? '—'}
                         </div>
                         {mk && mk !== 'other' && (
-                          <div className="text-[10.5px] text-sub mt-0.5">
+                          <div className="text-11 text-sub mt-0.5">
                             {mk === 'verify' ? '竞价验证卡' : '盘后候选卡'}
                           </div>
                         )}

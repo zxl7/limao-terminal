@@ -50,6 +50,25 @@ afterEach(() => {
 })
 
 describe('数据底座页', () => {
+  it('读取后端统一RSI证据并显示来源口径', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).includes('/api/data/market-daily')) return fetchSpy(input)
+      return new Response(JSON.stringify({ code: '002724', limit: 20,
+        bars: [{ code: '002724', trade_date: '2026-10-22', close: 10 }],
+        rsi_evidence: { schema: 'rsi_evidence_v1', code: '002724', asof: '2026-10-22',
+          dates: ['2026-10-22'], sample_count: 1,
+          readings: { '6': { series: [61] }, '12': { series: [52] }, '24': { series: [null] } } },
+      }), { status: 200 })
+    }))
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText('输入股票代码，例如 002724'), {
+      target: { value: '002724' },
+    })
+    expect(await screen.findByText(/统一研究证据 · 截至2026-10-22/)).toBeTruthy()
+    const chart = screen.getByRole('img', { name: '折线图：RSI6、RSI12、RSI24' })
+    expect(chart.querySelectorAll('circle')).toHaveLength(2)
+  })
+
   it('未输入合法代码时不请求单票接口', async () => {
     vi.stubGlobal('fetch', fetchSpy)
     renderPage()
@@ -145,6 +164,27 @@ describe('数据底座页', () => {
     expect(within(row).getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
       '2026-10-22', '10.23', '10.89', '10.12', '10.56', '123', '2.3',
     ])
+  })
+
+  it('日K区显示RSI训练曲线，并按正序计算短中长周期', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).includes('/api/data/market-daily')) return fetchSpy(input)
+      const closes = [10, 11, 10, 12, 11, 13, 12, 14, 13, 15, 14, 16, 15, 17, 16, 18, 17, 19, 18, 20]
+      return new Response(JSON.stringify({
+        code: '002724', limit: 20,
+        bars: closes.map((close, index) => ({
+          code: '002724', thscode: null, trade_date: `2026-10-${String(index + 1).padStart(2, '0')}`,
+          open: close, high: close, low: close, close, volume: null, amount: null,
+          currency: 'CNY', source: 'fixture', ingested_at: null,
+        })).reverse(),
+      }), { status: 200 })
+    }))
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText('输入股票代码，例如 002724'), { target: { value: '002724' } })
+    expect(await screen.findByRole('img', { name: '折线图：RSI6、RSI12、RSI24' })).toBeTruthy()
+    expect(screen.getByText('RSI6')).toBeTruthy()
+    expect(screen.getByText('RSI12')).toBeTruthy()
+    expect(screen.getByText('RSI24')).toBeTruthy()
   })
 
   it('切换代码后不保留上一只股票的查询结论', async () => {

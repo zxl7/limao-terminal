@@ -90,7 +90,7 @@ export function HeatMatrix({
   const wrapRef = useRef<HTMLDivElement>(null)
 
   if (!rows.length || !cols.length) {
-    return <div className="text-sub text-[12px] py-3 text-center">无矩阵数据</div>
+    return <div className="text-sub text-12 py-3 text-center">无矩阵数据</div>
   }
 
   const flatMax = Math.max(
@@ -113,7 +113,7 @@ export function HeatMatrix({
               <span
                 // oxlint-disable-next-line react/no-array-index-key -- 同一日期轴可能出现重复列标签，索引即身份
                 key={`${c}-${i}`}
-                className={`${cellClass} text-center text-[10.5px] text-sub num`}
+                className={`${cellClass} text-center text-11 text-sub num`}
                 style={fit ? undefined : { width: cellW }}
               >
                 {c}
@@ -127,12 +127,12 @@ export function HeatMatrix({
             // oxlint-disable-next-line react/no-array-index-key -- 同名题材去重：原系统题材名可重复出现（同一题材多口径），索引是唯一稳定身份
             <div key={`${r.label}-${ri}`} className="flex items-center">
               <span
-                className="shrink-0 truncate text-[12px] text-txt pr-2"
+                className="shrink-0 truncate text-12 text-txt pr-2"
                 style={{ width: labelWidth }}
                 title={r.label}
               >
                 {r.label}
-                {r.sub && <span className="num text-sub text-[11px] ml-1">{r.sub}</span>}
+                {r.sub && <span className="num text-sub text-11 ml-1">{r.sub}</span>}
               </span>
 
               {cols.map((c, ci) => {
@@ -160,7 +160,7 @@ export function HeatMatrix({
                         ? `${r.label} · ${c}：${text || String(v)}`
                         : `${r.label} · ${c}：无样本`
                     }
-                    className={`${cellClass} flex items-center justify-center num text-[10.5px]`}
+                    className={`${cellClass} flex items-center justify-center num text-11`}
                     style={{
                       width: fit ? undefined : cellW,
                       height: cellH,
@@ -199,7 +199,7 @@ export function HeatMatrix({
               })}
 
               {hasNotes && (
-                <span className="shrink-0 ml-2 text-sub text-[11px]" style={{ width: noteWidth }}>
+                <span className="shrink-0 ml-2 text-sub text-11" style={{ width: noteWidth }}>
                   {r.note}
                 </span>
               )}
@@ -209,7 +209,7 @@ export function HeatMatrix({
       </div>
 
       {legend && (
-        <div className="flex items-center gap-2 text-[10.5px] text-sub">
+        <div className="flex items-center gap-2 text-11 text-sub">
           {signed ? (
             <>
               <span>净流入</span>

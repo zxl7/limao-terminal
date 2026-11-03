@@ -43,9 +43,9 @@ export function KpiStrip({
 }
 
 const VALUE_SIZE = {
-  lg: 'text-[30px]',
-  md: 'text-[21px]',
-  sm: 'text-[15px]',
+  lg: 'text-30',
+  md: 'text-20',
+  sm: 'text-15',
 } as const
 
 /**
@@ -79,15 +79,15 @@ export function Kpi({
 }) {
   return (
     <div className={cn('min-w-0', className)}>
-      <div className="text-[10.5px] text-sub leading-tight truncate">{label}</div>
+      <div className="text-11 text-sub leading-tight truncate">{label}</div>
       <div className="flex items-baseline gap-1 mt-0.5">
         <span className={cn('num font-semibold leading-none', VALUE_SIZE[size], toneClass(tone))}>
           {value}
         </span>
-        {unit !== undefined && <span className="text-[11px] text-sub">{unit}</span>}
+        {unit !== undefined && <span className="text-11 text-sub">{unit}</span>}
       </div>
       {sub !== undefined && (
-        <div className="text-[11px] text-sub mt-0.5 truncate">{sub}</div>
+        <div className="text-11 text-sub mt-0.5 truncate">{sub}</div>
       )}
     </div>
   )

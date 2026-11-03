@@ -50,6 +50,7 @@ export const PAGE_LOADERS = {
   // ── 盘面定性（日频）──
   '/emotion': () => import('@/pages/emotion/EmotionPage'),
   '/board-core': () => import('@/pages/board-core/BoardCorePage'),
+  '/leader-daily': () => import('@/pages/leader-daily/LeaderDailyPage'),
   '/promotion': () => import('@/pages/promotion/PromotionPage'),
   '/gene': () => import('@/pages/gene/GenePage'),
 

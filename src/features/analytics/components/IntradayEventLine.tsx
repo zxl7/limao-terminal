@@ -55,7 +55,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
   switch (e.kind) {
     case 'zt_total':
       return (
-        <div className="flex flex-col gap-1 text-[11.5px] text-txt">
+        <div className="flex flex-col gap-1 text-12 text-txt">
           <span>
             涨停总数 <span className="num font-semibold">{e.total ?? '—'}</span>
             {e.delta != null && e.delta !== 0 && (
@@ -71,7 +71,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       )
     case 'sector_up':
       return (
-        <span className="text-[11.5px] text-up">
+        <span className="text-12 text-up">
           <span className="font-medium">{e.name}</span>
           <span className="num text-sub ml-1">{e.zt_count == null ? '—' : `${e.zt_count}只`}</span>
           {e.delta != null && <span className="num text-up ml-1">新增 {e.delta} 只</span>}
@@ -79,7 +79,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       )
     case 'stock_up':
       return (
-        <span className="text-[11.5px] text-up">
+        <span className="text-12 text-up">
           <StockLink code={e.code} className="font-medium">{e.name}</StockLink>
           {e.sector && <span className="text-sub ml-1">{e.sector}</span>}
           {e.pct != null && <span className="num ml-1">+{Number(e.pct).toFixed(2)}%</span>}
@@ -87,7 +87,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       )
     case 'sector_down':
       return (
-        <span className="text-[11.5px] text-down">
+        <span className="text-12 text-down">
           <span className="font-medium">{e.name}</span>
           {e.pct != null && <span className="num ml-1">{Number(e.pct).toFixed(2)}%</span>}
           {e.inflow != null && (
@@ -96,7 +96,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
         </span>
       )
     case 'limit_down_new':
-      return <span className="text-[11.5px] text-down">{e.name} 跌停</span>
+      return <span className="text-12 text-down">{e.name} 跌停</span>
     case 'broken_new':
       /**
        * ⛔ 2026-10-20 自查：这里原来用 `text-warn`（青绿 #0d9488），
@@ -104,7 +104,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
        * 同一个事实「炸板」在两个地方两种颜色，读者会以为是两类事件。
        * 统一到琥珀（warn 是「退潮预警」的青绿，另有归属）。
        */
-      return <span className="text-[11.5px] text-break">{e.name} 炸板</span>
+      return <span className="text-12 text-break">{e.name} 炸板</span>
     /**
      * 短线精灵个股异动（2026-10-20 用户：「消息面呢？这边是否介入快讯
      * 【短线精灵 + 终端！！】」）。
@@ -124,13 +124,13 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       const plates = Array.isArray(e.plates) ? (e.plates as string[]) : []
       const stocks = Array.isArray(e.stocks) ? (e.stocks as string[]) : []
       return (
-        <div className="flex flex-col gap-0.5 text-[11.5px] text-txt">
+        <div className="flex flex-col gap-0.5 text-12 text-txt">
           <span>
-            <span className="mr-1 rounded-sm bg-line-faint px-1 text-[10px] text-txt/70">快讯</span>
+            <span className="mr-1 rounded-sm bg-line-faint px-1 text-10 text-txt/70">快讯</span>
             {title}
           </span>
           {(plates.length > 0 || stocks.length > 0) && (
-            <span className="pl-1.5 text-[10.5px] text-sub">
+            <span className="pl-1.5 text-11 text-sub">
               {plates.length > 0 && <>板块 {plates.join('、')}</>}
               {plates.length > 0 && stocks.length > 0 && ' · '}
               {stocks.length > 0 && <>点名 {stocks.join('、')}</>}
@@ -143,8 +143,8 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
       // 索引签名是 `unknown`（事件是开放结构）→ 先收窄，⛔ 不直接把 unknown 塞进 JSX
       const sigType = typeof e.type === 'string' ? e.type : ''
       return (
-        <span className="text-[11.5px] text-rec">
-          <span className="mr-1 rounded-sm bg-rec-soft px-1 text-[10px] text-rec">异动</span>
+        <span className="text-12 text-rec">
+          <span className="mr-1 rounded-sm bg-rec-soft px-1 text-10 text-rec">异动</span>
           <StockLink code={e.code} className="font-medium">{e.name}</StockLink>
           {sigType && <span className="text-sub ml-1">{sigType}</span>}
           {e.pct != null && <span className="num ml-1">+{Number(e.pct).toFixed(2)}%</span>}
@@ -153,7 +153,7 @@ export function IntradayEventLine({ e }: { e: IntradayTimelineEvent }) {
     }
     default:
       return (
-        <span className="text-[11.5px] text-sub">
+        <span className="text-12 text-sub">
           {String(e.kind)}
           {e.name ? ` ${e.name}` : ''}
         </span>
@@ -174,9 +174,9 @@ function LimitUpStocks({
   if (!stocks?.length) return null
   return (
     <div className="flex flex-wrap gap-x-2 gap-y-0.5 pl-1.5">
-      <span className={cn('text-[10.5px] font-medium', tone === 'up' ? 'text-up' : 'text-down')}>{label}</span>
+      <span className={cn('text-11 font-medium', tone === 'up' ? 'text-up' : 'text-down')}>{label}</span>
       {stocks.map((stock) => (
-        <span key={stock.code} className="text-[11px] text-txt">
+        <span key={stock.code} className="text-11 text-txt">
           <StockLink code={stock.code} className="font-medium">{stock.name || stock.code}</StockLink>
           {stock.sector && <span className="ml-1 text-sub">{stock.sector}</span>}
           {stock.boards != null && stock.boards !== '' && <span className="num ml-1 text-sub">{stock.boards}</span>}
@@ -244,7 +244,7 @@ function DirectionSection({
 
       {rest.length > 0 && (
         <>
-          <div className={cn('text-[10px] text-sub', !flat && 'pl-1.5')}>
+          <div className={cn('text-10 text-sub', !flat && 'pl-1.5')}>
             ↓ 其余 {rest.length} 个板块
           </div>
           <div className={cn('flex flex-col gap-0.5 min-w-0', !flat && 'pl-1.5')}>
@@ -281,7 +281,7 @@ function DirectionSection({
           divider && 'border-t border-line-faint pt-1.5',
         )}
       >
-        <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
+        <span className={cn('text-11 font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
           {label}
           {sectors.length > 0 && (
             <span className="ml-1.5 font-normal text-sub">板块 {sectors.length} 个</span>
@@ -294,7 +294,7 @@ function DirectionSection({
 
   return (
     <div className={cn("flex flex-col gap-1 min-w-0 rounded-sm border-l-2 px-2 py-1.5", dir === "up" ? "bg-up-soft/40 border-up/40" : "bg-down-soft/40 border-down/40")}>
-      <span className={cn('text-[10.5px] font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
+      <span className={cn('text-11 font-semibold', dir === 'up' ? 'text-up' : 'text-down')}>
         {label}
         {sectors.length > 0 && (
           <span className="text-sub font-normal ml-1.5">板块 {sectors.length} 个</span>
@@ -397,7 +397,7 @@ function NewsSection({
           divider && 'border-t border-line-faint pt-1.5',
         )}
       >
-        <span className="text-[10.5px] font-semibold text-txt/75">{head}</span>
+        <span className="text-11 font-semibold text-txt/75">{head}</span>
         <div className="flex flex-col gap-0.5 min-w-0">{body}</div>
       </div>
     )
@@ -405,7 +405,7 @@ function NewsSection({
 
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-sm border-l-2 border-line-strong bg-line-faint/70 px-2 py-1.5">
-      <span className="text-[10.5px] font-semibold text-txt/75">{head}</span>
+      <span className="text-11 font-semibold text-txt/75">{head}</span>
       <div className="flex min-w-0 flex-col gap-0.5 pl-1.5">{body}</div>
     </div>
   )

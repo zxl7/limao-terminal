@@ -133,7 +133,7 @@ export function Component() {
           <StatPair label="竞价归档" value={auctionFiles.length} />
           <StatPair label="存档时间" value={m?.archived_at?.slice(0, 19).replace('T', ' ') ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           黑匣子的意义：把决策**当时**的输入冻结，避免复盘时用今天的信息评判当时的决策。
           存档缺口本身就是结论 —— 来源缺失的日子，决策质量天然受限，复盘需打折看待。
         </p>
@@ -145,7 +145,7 @@ export function Component() {
         <Zone label="存档缺口" dot="bg-warn" className="xl:w-[32%]">
           {gaps.length > 0 && (
             <Card title="存档缺口（该日缺失的来源）" extra={<CardBadge tone="warn">{gaps.length}</CardBadge>}>
-          <ul className="text-[12.5px] leading-relaxed text-warn">
+          <ul className="text-13 leading-relaxed text-warn">
             {gaps.map((g, i) => (
               // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
               <li key={i}>
@@ -182,8 +182,8 @@ export function Component() {
             empty="无来源清单"
             columns={[
               { label: '角色', cell: (s) => <Tag tone="up">{roleText(s.role)}</Tag> },
-              { label: '源路径', cell: (s) => <span className="num text-[11.5px]">{s.src || '—'}</span> },
-              { label: '存档路径', cell: (s) => <span className="num text-[11.5px] text-sub">{s.dst || '—'}</span> },
+              { label: '源路径', cell: (s) => <span className="num text-12">{s.src || '—'}</span> },
+              { label: '存档路径', cell: (s) => <span className="num text-12 text-sub">{s.dst || '—'}</span> },
               {
                 label: '体积',
                 num: true,
@@ -192,7 +192,7 @@ export function Component() {
               {
                 label: 'sha256',
                 cell: (s) => (
-                  <span className="num text-[10.5px] text-sub" title={s.sha256}>
+                  <span className="num text-11 text-sub" title={s.sha256}>
                     {s.sha256?.slice(0, 12) ?? '—'}…
                   </span>
                 ),
@@ -208,7 +208,7 @@ export function Component() {
                 <select
                   value={candFiles.find((f) => f.data === activeCand)?.file ?? ''}
                   onChange={(e) => setCandFile(e.target.value)}
-                  className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                  className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                 >
                   {candFiles.map((f) => (
                     <option key={f.file} value={f.file}>
@@ -236,7 +236,7 @@ export function Component() {
                 <select
                   value={frozenFiles.find((f) => f.data === activeFrozen)?.file ?? ''}
                   onChange={(e) => setFrozenFile(e.target.value)}
-                  className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                  className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                 >
                   {frozenFiles.map((f) => (
                     <option key={f.file} value={f.file}>
@@ -248,7 +248,7 @@ export function Component() {
             )}
             {activeFrozen ? (
               <>
-                <div className="text-sub text-[11.5px] mb-2 leading-relaxed">
+                <div className="text-sub text-12 mb-2 leading-relaxed">
                   以下是**决策时点冻结的原件**（`cache/decision_log/&lt;日期&gt;/candidates.json`）。
                   与「候选」tab 的原卷逐字段对不上时，说明归档之后脚本又写过该日数据 ——
                   这正是黑匣子存在的意义。
@@ -289,7 +289,7 @@ export function Component() {
                       label: '标的',
                       cell: (s) => (
                         <span>
-                          <StockLink code={s.code} className="text-rec">{s.name}</StockLink>
+                          <StockLink code={s.code} className="text-txt">{s.name}</StockLink>
                         </span>
                       ),
                     },
@@ -323,14 +323,14 @@ export function Component() {
 
             {pool?.top_codes?.length ? (
               <div className="mt-3">
-                <div className="text-[12px] text-sub mb-1">决策时点高位股（top_codes）</div>
+                <div className="text-12 text-sub mb-1">决策时点高位股（top_codes）</div>
                 <DataTable
                   rows={pool.top_codes}
                   rowKey={(t) => t.code}
                   dense
                   empty="无"
                   columns={[
-                    { label: '标的', cell: (t) => <StockLink code={t.code} className="text-rec">{t.name}</StockLink> },
+                    { label: '标的', cell: (t) => <StockLink code={t.code} className="text-txt">{t.name}</StockLink> },
                     { label: '板数', num: true, cell: (t) => <span className="text-up font-semibold">{t.boards}</span> },
                   ]}
                 />
@@ -349,7 +349,7 @@ export function Component() {
                   <select
                     value={activeAuction?.file ?? ''}
                     onChange={(e) => setAuctionFile(e.target.value)}
-                    className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                    className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                   >
                     {auctionFiles.map((f) => (
                       <option key={f.file} value={f.file}>
@@ -396,7 +396,7 @@ export function Component() {
                     },
                   ]}
                 />
-                <p className="text-warn text-[11.5px] mt-2 leading-relaxed border-l-2 border-warn pl-2.5">
+                <p className="text-warn text-12 mt-2 leading-relaxed border-l-2 border-warn pl-2.5">
                   口径提示：竞价报价文件在当天后续运行中会被**覆盖重写**，因此此刻看到的报价可能
                   与 09:26 决策时点的快照不完全一致（原系统已知问题，未修）。判定「能否买到」应以
                   决策时点的快照为准。

@@ -107,7 +107,7 @@ function Chip({ children, tone }: { children: ReactNode; tone?: 'rec' | 'sub' })
   return (
     <span
       className={cn(
-        'inline-block text-[10.5px] px-1 rounded-sm border whitespace-nowrap',
+        'inline-block text-11 px-1 rounded-sm border whitespace-nowrap',
         tone === 'rec' ? 'text-rec border-rec/40 bg-rec-soft' : 'text-sub border-line',
       )}
     >
@@ -119,7 +119,7 @@ function Chip({ children, tone }: { children: ReactNode; tone?: 'rec' | 'sub' })
 /** 一行「标签 + 内容」——标签固定宽，内容可折行 */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-2 text-[11.5px] leading-relaxed min-w-0">
+    <div className="flex items-baseline gap-2 text-12 leading-relaxed min-w-0">
       <span className="text-sub flex-none w-[52px] text-right">{label}</span>
       <span className="min-w-0 break-all">{children}</span>
     </div>
@@ -187,7 +187,7 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
   const [filter, setFilter] = useState('all')
   const needle = search.trim().toLowerCase()
   if (!rows.length) {
-    return <div className="text-sub text-[12px] py-2">该日无 AI 判断记录</div>
+    return <div className="text-sub text-12 py-2">该日无 AI 判断记录</div>
   }
   const ordered = [...rows].sort(compareJudgeRows)
   const visible = ordered.filter((r) =>
@@ -199,15 +199,15 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
       <div className="flex flex-wrap items-center gap-2 border-b border-line pb-2">
         <input aria-label="查找标的" placeholder="名称 / 代码 / 题材" value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="min-w-0 w-48 rounded-sm border border-line bg-card px-2 py-1.5 text-[12px] text-txt focus-visible:outline-2 focus-visible:outline-rec" />
+          className="min-w-0 w-48 rounded-sm border border-line bg-card px-2 py-1.5 text-12 text-txt focus-visible:outline-2 focus-visible:outline-rec" />
         <select aria-label="筛选裁决" value={filter} onChange={(event) => setFilter(event.target.value)}
-          className="rounded-sm border border-line bg-card px-2 py-1.5 text-[12px] text-txt">
+          className="rounded-sm border border-line bg-card px-2 py-1.5 text-12 text-txt">
           <option value="all">全部裁决</option><option value="participate">参与</option>
           <option value="watch">观察</option><option value="skip">放弃</option><option value="pending">待裁决</option>
         </select>
-        <span className="ml-auto text-[11px] text-sub num" aria-live="polite">{visible.length} / {rows.length} 只</span>
+        <span className="ml-auto text-11 text-sub num" aria-live="polite">{visible.length} / {rows.length} 只</span>
       </div>
-      {!visible.length && <div className="py-8 text-center text-sub text-[12px]">没有匹配的标的</div>}
+      {!visible.length && <div className="py-8 text-center text-sub text-12">没有匹配的标的</div>}
       {visible.map((r) => {
         const s = r.stock
         const e = s?.expectation
@@ -232,24 +232,24 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
           >
             {/* ── 标题行：名称 + 冻结排序评分 + 判断 + 池别 + 标签 ── */}
             <div className="flex items-baseline gap-2 flex-wrap mb-1.5 min-w-0">
-              <StockLink code={r.code} className="text-[13.5px] font-semibold text-txt">
+              <StockLink code={r.code} className="text-14 font-semibold text-txt">
                 {s?.name || r.code}
               </StockLink>
               <span
-                className={cn('num text-[15px] font-semibold flex-none', (s?.score ?? 0) >= 80 ? 'text-up' : 'text-sub')}
+                className={cn('num text-15 font-semibold flex-none', (s?.score ?? 0) >= 80 ? 'text-up' : 'text-sub')}
               >
                 {s?.score == null ? '—' : n1(s.score)}
               </span>
               <span
                 className={cn(
-                  'text-[11px] font-semibold px-1.5 rounded-sm border flex-none',
+                  'text-11 font-semibold px-1.5 rounded-sm border flex-none',
                   m.cls,
                 )}
               >
                 {m.label}
               </span>
               {/* 来源标注：有终态 = 今晨 09:25 定音；无 = 仍在看昨日预案（今晨裁决未落盘） */}
-              <span className="text-[10.5px] text-sub flex-none">
+              <span className="text-11 text-sub flex-none">
                 {c ? '今晨 09:25 裁决' : '昨日预案·今晨裁决未落盘'}
               </span>
               {c?.quotaRank != null && <Chip tone="rec">买入名额 #{c.quotaRank}</Chip>}
@@ -271,7 +271,7 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
 
             {/* ── ⛔ 越权兜底留痕（bias 与机械证据冲突 / 已被降级）—— 必须显眼，否则等于没兜住 ── */}
             {warning && (
-              <div className="mb-1.5 rounded-sm border border-warn/40 bg-warn-soft px-2 py-1 text-[11px] leading-relaxed text-warn break-all">
+              <div className="mb-1.5 rounded-sm border border-warn/40 bg-warn-soft px-2 py-1 text-11 leading-relaxed text-warn break-all">
                 ⚠️ {warning}
               </div>
             )}
@@ -401,8 +401,8 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
                 ⚠️ 与上面的「今晨裁决」是两个时点、两套结论 —— 必须标清来源，否则会被误读 */}
             {(r.reason || s?.leader_evidence?.note) && (
               <div className="mt-1.5 border-t border-line-faint pt-1.5">
-                <div className="text-[10.5px] text-sub mb-0.5">🤖 AI 盘后理由（{decisionDate ?? '昨日'} 15:30 写）</div>
-                <div className="text-[12px] leading-relaxed text-txt whitespace-pre-wrap break-all">
+                <div className="text-11 text-sub mb-0.5">🤖 AI 盘后理由（{decisionDate ?? '昨日'} 15:30 写）</div>
+                <div className="text-12 leading-relaxed text-txt whitespace-pre-wrap break-all">
                   {[r.reason, !c && s?.leader_evidence?.note].filter(Boolean).join('\n')}
                 </div>
               </div>
@@ -410,7 +410,7 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
 
             {/* ── 脚本计划原文（接力卡 `expected_text`，即「尾盘卡怎么写就怎么显示」）── */}
             {e?.expected_text && (
-              <div className="mt-1 text-[11px] leading-relaxed text-sub break-all">
+              <div className="mt-1 text-11 leading-relaxed text-sub break-all">
                 📋 {e.expected_text}
               </div>
             )}

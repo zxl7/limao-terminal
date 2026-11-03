@@ -98,19 +98,17 @@ export function Sidebar() {
      *    （表现就是「tab 列表不自己滚，整个侧栏跟着内容走」）。
      */
     <aside
-      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none"
-      style={{ background: 'linear-gradient(180deg, #1c2130, #232c41)' }}
+      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none bg-head-bg"
       aria-label="主导航"
     >
       {/* 品牌：固定左上角（⛔ 不要放进可滚动区） */}
       <div className="h-[46px] flex items-center gap-2 px-4 flex-none border-b border-white/10">
         <span
-          className="w-7 h-7 rounded-md inline-flex items-center justify-center text-white text-[13px] font-extrabold"
-          style={{ background: 'linear-gradient(135deg, #ee2500, #ff7a3d)' }}
+          className="w-7 h-7 rounded-md inline-flex items-center justify-center text-white text-13 font-semibold bg-up"
         >
           狸
         </span>
-        <span className="font-bold text-[15px] tracking-[0.02em]">狸猫终端</span>
+        <span className="font-bold text-15 tracking-[0.02em]">狸猫终端</span>
       </div>
 
       {/* 分组导航 —— 本侧栏唯一的滚动区 */}
@@ -134,7 +132,7 @@ export function Sidebar() {
                     深底上 --color-up 对比度不足），与历史段拉开层级 */}
                 <span
                   className={cn(
-                    'text-[10.5px] font-semibold tracking-[0.12em] uppercase',
+                    'text-11 font-semibold tracking-[0.12em] uppercase',
                     live ? 'text-head-up' : 'text-head-soft',
                   )}
                 >
@@ -164,7 +162,7 @@ export function Sidebar() {
                     data-priority={t.priority ? 'true' : undefined}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-2 px-2.5 py-[7px] rounded-md text-[13px] no-underline transition-colors',
+                        'flex items-center gap-2 px-2.5 py-[7px] rounded-md text-13 no-underline transition-colors',
                         isActive
                           ? 'bg-white/10 text-white shadow-[inset_2px_0_0_var(--color-up)]'
                           : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
@@ -180,7 +178,7 @@ export function Sidebar() {
                     */}
                     {t.priority && (
                       <span
-                        className="ml-auto flex-none text-[11px] leading-none text-head-up"
+                        className="ml-auto flex-none text-11 leading-none text-head-up"
                         aria-label="重点盯盘"
                         title="重点盯盘"
                       >
@@ -196,7 +194,7 @@ export function Sidebar() {
       </nav>
 
       {/* 页脚状态 */}
-      <div className="px-4 py-2.5 border-t border-white/10 flex items-center gap-2 text-[11px] text-head-soft flex-none">
+      <div className="px-4 py-2.5 border-t border-white/10 flex items-center gap-2 text-11 text-head-soft flex-none">
         <span className="w-1.5 h-1.5 rounded-full bg-head-down" aria-hidden />
         <span>A股情绪核心 · 盘中实时终端</span>
       </div>
@@ -232,7 +230,7 @@ export function TopNavFallback() {
                     type="button"
                     aria-expanded={dataOpen}
                     onClick={() => setDataOpen((open) => !open)}
-                    className="text-[10.5px] text-sub whitespace-nowrap cursor-pointer hover:text-txt"
+                    className="text-11 text-sub whitespace-nowrap cursor-pointer hover:text-txt"
                   >
                     数据 {dataOpen ? '⌃' : '⌄'}
                   </button>
@@ -240,8 +238,8 @@ export function TopNavFallback() {
                   <span
                     className={
                       live
-                        ? 'text-[10.5px] font-semibold text-up whitespace-nowrap'
-                        : 'text-[10.5px] text-sub whitespace-nowrap'
+                        ? 'text-11 font-semibold text-up whitespace-nowrap'
+                        : 'text-11 text-sub whitespace-nowrap'
                     }
                   >
                     {t.group}
@@ -260,7 +258,7 @@ export function TopNavFallback() {
                 className={({ isActive }) =>
                   [
                     'border border-b-0 border-line bg-card text-sub px-3 py-1.5',
-                    'rounded-t-[var(--radius-sm)] text-[13px] whitespace-nowrap no-underline',
+                    'rounded-t-[var(--radius-sm)] text-13 whitespace-nowrap no-underline',
                     'hover:text-txt transition-colors flex-none',
                     isActive
                       ? 'text-txt font-semibold border-line-strong shadow-[inset_0_-2px_0_var(--color-up)]'

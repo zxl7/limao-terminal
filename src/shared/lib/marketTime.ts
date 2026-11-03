@@ -77,6 +77,31 @@ export function bjDateString(d: Date = new Date()): string {
   return `${bj.getFullYear()}-${p(bj.getMonth() + 1)}-${p(bj.getDate())}`
 }
 
+/**
+ * 快照是否「定格」—— 页面展示的是**已收盘定稿的历史数据**，不是当下在跑的盘。
+ *
+ * 两个条件任一成立即算定格：
+ *   ① 基准日不是今天（周末、节假日、盘前都能落到这里）
+ *   ② 同一天但已过收盘且 1 小时没再更新（15:00 收盘后到深夜）
+ *
+ * ## 为什么不能只判「非交易时段」
+ *
+ * 盘中数据断流（抓取挂了）也发生在交易时段，那时**必须**报警；
+ * 而周末的「落后 66000 秒」是正常态，报警只会训练用户忽略告警。
+ * 分界线不是「现在开不开盘」，而是「这份数据还该不该变」。
+ *
+ * ⛔ 不判 weekday / 交易日历：只比「数据日 vs 今天」，
+ *    节假日、临时休市都自然正确，无需维护日历。
+ */
+export function isFrozenSnapshot(snapIsoish: string | null | undefined, d: Date = new Date()): boolean {
+  const raw = String(snapIsoish ?? '').trim()
+  if (!raw) return false
+  if (raw.slice(0, 10) !== bjDateString(d)) return true
+  const t = Date.parse(raw)
+  if (Number.isNaN(t)) return false
+  return !inTrading(undefined, d) && d.getTime() - t > 3_600_000
+}
+
 /** 距离某时间戳的秒数（正 = 过去） */
 export function ageSeconds(isoish: string | number | null | undefined): number | null {
   if (isoish == null) return null

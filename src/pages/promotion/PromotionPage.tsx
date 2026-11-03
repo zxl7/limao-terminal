@@ -121,7 +121,7 @@ export function Component() {
           <span>连板晋级 <b className="num text-up">{feedback.data?.lb_promote_count ?? '—'}</b></span>
           <span>核按钮 <b className={feedback.data?.nuke_count ? 'num text-down' : 'num text-sub'}>{feedback.data?.nuke_count ?? '—'}</b></span>
         </div>
-        <p className="mt-1.5 text-[11px] text-sub">本卡随反馈矩阵刷新；下方统计仍是已收盘交易日的结果，不将盘中浮动状态混入历史晋级率。</p>
+        <p className="mt-1.5 text-11 text-sub">本卡随反馈矩阵刷新；下方统计仍是已收盘交易日的结果，不将盘中浮动状态混入历史晋级率。</p>
       </Card>
       {/* ── 趋势层：先看周期位置，再看分段统计 ── */}
       {/* 两卡都是内容主体（趋势图 + 分档量化表），PC 下并排而非上下铺满。
@@ -156,7 +156,7 @@ export function Component() {
                 },
               ]}
             />
-            <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
+            <p className="text-sub text-12 mt-2 leading-relaxed">
               晋级率 = 当日晋级家数 ÷ 当日接力样本。读的是<b className="text-txt">方向与水平</b>，不是单日绝对值：
               连续跌破 <b className="text-warn">冰点基准 {ICE_BASE}%</b> = 退潮期，接力期望为负。
               <br />
@@ -179,7 +179,7 @@ export function Component() {
         extra={
           <span className="flex items-center gap-2">
             {summary.data?.ts && (
-              <span className="text-sub text-[11px] num">{summary.data.ts.slice(0, 10)}</span>
+              <span className="text-sub text-11 num">{summary.data.ts.slice(0, 10)}</span>
             )}
             <SegTabs
               value={tab}
@@ -236,7 +236,7 @@ function SummaryView({
 
   return (
     <>
-      <p className="text-sub text-[11.5px] mb-2 leading-relaxed">
+      <p className="text-sub text-12 mb-2 leading-relaxed">
         胜率与赔率必须同屏读：<span className="text-txt">成功率</span>决定「多少次能成」，
         <span className="text-txt">晋级次日溢价</span>决定「成了赚多少」。
         失败组开盘均值用于衡量「不成时亏多少」。{dateRange && <span className="ml-1">区间：{dateRange}</span>}
@@ -244,7 +244,7 @@ function SummaryView({
 
       {/* ── 分段成功率条：条长即成功率，同屏附注赔率 ── */}
       <div className="mb-3">
-        <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+        <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
           <Icon name="stairs" size={13} className="text-sub" />
           分阶段胜率（附注 = 晋级次日收盘溢价均值）
         </div>
@@ -259,7 +259,7 @@ function SummaryView({
           max={rateMax}
           labelWidth={96}
         />
-        <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+        <p className="text-sub text-11 mt-1.5 leading-relaxed">
           条长按各段成功率的<b className="text-txt">本批最大值</b>归一（不是按 100%），
           目的是让段间差异可见；因此<b className="text-txt">绝对水平请看右侧数字</b>，不要凭条长估量级。
         </p>
@@ -267,7 +267,7 @@ function SummaryView({
 
       {/* ── 赔率对照：成功组溢价 vs 失败组开盘（同一零轴）── */}
       <div className="mb-3">
-        <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+        <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
           <Icon name="scale" size={13} className="text-sub" />
           赔率对照：成功组次日收盘溢价（实心） vs 失败组次日开盘均值（空心）
         </div>
@@ -282,7 +282,7 @@ function SummaryView({
           format={(v) => `${n1(v)}%`}
           maxBarWidth={30}
         />
-        <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+        <p className="text-sub text-11 mt-1.5 leading-relaxed">
           零基线双向：<b className="text-up">零线上方 = 赚钱</b> / <b className="text-down">零线下方 = 亏钱</b>。
           实心柱为<b className="text-txt">成功组</b>次日收盘溢价均值，空心柱为<b className="text-txt">失败组</b>次日开盘均值 ——
           前者衡量「成了赚多少」，后者衡量「不成亏多少」，两者都在零线以下说明该段位接力期望为负。
@@ -291,7 +291,7 @@ function SummaryView({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[12.5px]">
+        <table className="w-full border-collapse text-13">
           <thead>
             <tr className="border-b border-line text-sub">
               <th className="text-left font-normal py-1.5 px-2 whitespace-nowrap">阶段</th>
@@ -335,7 +335,7 @@ function SummaryView({
         </table>
       </div>
 
-      <p className="text-sub text-[11px] mt-2 leading-relaxed">
+      <p className="text-sub text-11 mt-2 leading-relaxed">
         注：溢价样本数（n_prem）是「有竞价溢价数据」的子样本，可能小于成功数 ——
         2026-09-14 起账本口径切换后部分历史日缺竞价快照。
       </p>
@@ -391,7 +391,7 @@ function DailyView({
         <select
           value={activeDay?.date ?? ''}
           onChange={(e) => onDay(e.target.value)}
-          className="px-2 py-1 text-[12.5px] rounded-sm bg-transparent border border-line text-txt focus:outline-none focus:border-line-strong"
+          className="px-2 py-1 text-13 rounded-sm bg-transparent border border-line text-txt focus:outline-none focus:border-line-strong"
         >
           {days.map((d) => (
             <option key={d.date} value={d.date} className="bg-card text-txt">
@@ -410,7 +410,7 @@ function DailyView({
           ]}
         />
 
-        <span className="text-sub text-[11.5px]">
+        <span className="text-sub text-12">
           前一交易日 {activeDay?.prev_date ?? '—'}
         </span>
       </div>
@@ -418,12 +418,12 @@ function DailyView({
       {/* ── 当日结果分布：比逐票表格更快看出「这批接力的人赚没赚」── */}
       {premier.length > 0 && (
         <div className="mb-3">
-          <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+          <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
             <Icon name="trendUp" size={13} className="text-sub" />
             次日收盘溢价分布（按溢价倒序）
           </div>
           <BarList items={premier} format={(v) => (v == null ? '—' : pct(v))} labelWidth={88} />
-          <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+          <p className="text-sub text-11 mt-1.5 leading-relaxed">
             条色按正负自动判定（<b className="text-up">正=红</b> / <b className="text-down">负=绿</b>）；
             <b className="text-txt">断板票以中性灰呈现</b>并在附注标出结果 ——
             断板不等于亏钱（有断板高开的情形），把断板一律染绿会让「结果」与「收益」两个维度互相污染。
@@ -436,7 +436,7 @@ function DailyView({
         <EmptyState text="该日无符合条件的事件" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
+          <table className="w-full border-collapse text-13">
             <thead>
               <tr className="border-b border-line text-sub">
                 <th className="text-left font-normal py-1.5 px-2 whitespace-nowrap">个股</th>
@@ -458,7 +458,7 @@ function DailyView({
                   key={`${e.code}-${i}`}
                   className={cn('border-b border-line-faint', e.ok && 'bg-up-soft')}
                 >
-                  <td className="py-1.5 px-2 whitespace-nowrap text-rec">
+                  <td className="py-1.5 px-2 whitespace-nowrap text-txt">
                   <StockLink code={e.code}>{e.name}</StockLink>
                   </td>
                   <td className="py-1.5 px-2 whitespace-nowrap text-sub">{stageText(e.stage)}</td>

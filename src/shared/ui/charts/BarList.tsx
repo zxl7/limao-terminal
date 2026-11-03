@@ -69,7 +69,7 @@ export function BarList({
   const wrapRef = useRef<HTMLDivElement>(null)
 
   if (!items.length) {
-    return <div className="text-sub text-[12px] py-2 text-center">{emptyText}</div>
+    return <div className="text-sub text-12 py-2 text-center">{emptyText}</div>
   }
 
   const autoMax = Math.max(
@@ -93,7 +93,7 @@ export function BarList({
             // oxlint-disable-next-line react/no-array-index-key -- 同名条目去重：榜单可能含同名（如 ST 摘帽前后同名），索引是唯一稳定身份
             key={`${it.label}-${i}`}
             className={cn(
-              'flex items-center gap-2 text-[12px] rounded-sm transition-colors',
+              'flex items-center gap-2 text-12 rounded-sm transition-colors',
               active && 'bg-line-faint',
             )}
             style={{ minHeight: barHeight + 2 }}
@@ -106,7 +106,7 @@ export function BarList({
           >
             <span className="shrink-0 truncate text-txt" style={{ width: labelWidth }}>
               {it.label}
-              {it.sub && <span className="num text-sub text-[11px] ml-1">{it.sub}</span>}
+              {it.sub && <span className="num text-sub text-11 ml-1">{it.sub}</span>}
             </span>
 
             {bipolar ? (
@@ -130,7 +130,7 @@ export function BarList({
                 )}
                 {!isNum(v) && (
                   <span
-                    className="absolute text-sub text-[10px]"
+                    className="absolute text-sub text-10"
                     style={{ left: '50%', top: 0, transform: 'translateX(4px)' }}
                   >
                     无样本
@@ -149,7 +149,7 @@ export function BarList({
                   />
                 )}
                 {!isNum(v) && (
-                  <span className="absolute inset-0 flex items-center pl-1.5 text-sub text-[10px]">无样本</span>
+                  <span className="absolute inset-0 flex items-center pl-1.5 text-sub text-10">无样本</span>
                 )}
               </span>
             )}
@@ -161,7 +161,7 @@ export function BarList({
               {format(v)}
             </span>
 
-            {it.note && <span className="shrink-0 text-sub text-[11px] max-w-[120px] truncate">{it.note}</span>}
+            {it.note && <span className="shrink-0 text-sub text-11 max-w-[120px] truncate">{it.note}</span>}
           </div>
         )
       })}

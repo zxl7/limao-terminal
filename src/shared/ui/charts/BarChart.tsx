@@ -88,7 +88,7 @@ export function BarChart({
 
   if (!hasData || !scaleInfo) {
     return (
-      <div className={cn('flex items-center justify-center text-sub text-[12px]', className)} style={{ height }}>
+      <div className={cn('flex items-center justify-center text-sub text-12', className)} style={{ height }}>
         无可用柱状数据
       </div>
     )
@@ -259,7 +259,7 @@ export function BarChart({
 
       {/* ── 图例（对比柱的含义说明）── */}
       {hasCompare && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-sub">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-12 text-sub">
           <span className="inline-flex items-center gap-1">
             <span className="inline-block w-3 h-2.5 rounded-sm" style={{ background: 'var(--color-sub)' }} />
             {bars.find((b) => b.compareLabel)?.compareLabel ?? '对比值'}

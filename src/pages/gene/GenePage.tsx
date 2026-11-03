@@ -159,12 +159,12 @@ export function Component() {
         {rows.length ? (
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="dna" size={13} className="text-up" />
                 股性分 Top 15
               </div>
               <BarList items={top} format={(v) => (v == null ? '—' : n1(v))} labelWidth={72} />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 条长按<b className="text-txt">本批最高股性分</b>归一，故仅表批内相对强弱；
                 绝对水平请读右侧数字。附注的「近 250 日涨停次数」来自长周期档 ——
                 <b className="text-txt">股性分高但长周期平淡 = 近期偶发</b>，不宜按老牌强势股对待。
@@ -173,12 +173,12 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="layers" size={13} className="text-sub" />
                 股性分分布
               </div>
               <BarChart bars={dist.bars} height={170} format={(v) => `${v} 只`} maxBarWidth={34} showValue />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 柱高 = 只数，颜色 = 股性档位（<b className="text-up">红 ≥50</b> /
                 <b className="text-mid"> 蓝 30~50</b> / <b className="text-txt">灰 &lt;30</b>）。
                 分桶边界按<b className="text-txt">本批实测值域</b>切（
@@ -204,7 +204,7 @@ export function Component() {
         </CardBadge>
       }
     >
-      <p className="text-sub text-[11.5px] mb-2 leading-relaxed">
+      <p className="text-sub text-12 mb-2 leading-relaxed">
         股性分来自近期涨停行为，<span className="text-txt">长周期列</span>（近 250 日）来自 1500 根不复权日K ——
         两者同看：股性分高但长周期平淡 = 近期偶发，不宜按「老牌强势股」对待。
       </p>
@@ -215,7 +215,7 @@ export function Component() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="搜个股名 / 代码 / 行业…"
           className={cn(
-            'flex-1 min-w-[200px] px-2.5 py-1.5 text-[12.5px] rounded-sm',
+            'flex-1 min-w-[200px] px-2.5 py-1.5 text-13 rounded-sm',
             'bg-transparent border border-line text-txt placeholder:text-sub',
             'focus:outline-none focus:border-line-strong',
           )}
@@ -233,7 +233,7 @@ export function Component() {
               type="button"
               onClick={() => setSort(k)}
               className={cn(
-                'px-2.5 py-1 text-[12px] rounded-sm border cursor-pointer bg-transparent transition-colors',
+                'px-2.5 py-1 text-12 rounded-sm border cursor-pointer bg-transparent transition-colors',
                 sort === k
                   ? 'border-line-strong text-txt font-semibold'
                   : 'border-line text-sub hover:text-txt',
@@ -259,7 +259,7 @@ export function Component() {
           onScroll={win.onScroll}
           className="overflow-x-auto max-h-[var(--panel-max-h)] overflow-y-auto"
         >
-          <table className="w-full border-collapse text-[12.5px]">
+          <table className="w-full border-collapse text-13">
             <thead className="sticky top-0 bg-card">
               <tr className="border-b border-line text-sub">
                 <th className="text-left font-normal py-1.5 px-2 whitespace-nowrap">个股</th>
@@ -285,7 +285,7 @@ export function Component() {
               )}
               {filtered.slice(win.start, win.end).map(({ profile: p, hist: h }) => (
                 <tr key={p.code} style={{ height: 32 }} className="border-b border-line-faint">
-                  <td className="py-1.5 px-2 whitespace-nowrap text-rec">
+                  <td className="py-1.5 px-2 whitespace-nowrap text-txt">
                     <StockLink code={p.code}>{p.name}</StockLink>
                   </td>
                   <td className="py-1.5 px-2 whitespace-nowrap text-sub">{p.industry ?? '—'}</td>

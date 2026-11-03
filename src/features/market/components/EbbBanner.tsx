@@ -55,29 +55,29 @@ export function EbbBanner({ header = false }: { header?: boolean } = {}) {
   return (
     <section className={cn(cardCls, shell)}>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <span className={cn('flex items-center gap-1.5 text-[15px] font-semibold', ink)}>
+        <span className={cn('flex items-center gap-1.5 text-15 font-semibold', ink)}>
           <Icon name="alert" size={17} />
           {ebb.severity}
         </span>
 
-        <span className="text-[11px] text-sub">
-          最高板 <b className="num text-[13px] text-txt">{ebb.max_board ?? '—'}</b>
+        <span className="text-11 text-sub">
+          最高板 <b className="num text-13 text-txt">{ebb.max_board ?? '—'}</b>
         </span>
-        <span className="text-[11px] text-sub">
-          涨停 <b className="num text-[13px] text-up">{ebb.total_zt ?? '—'}</b>
+        <span className="text-11 text-sub">
+          涨停 <b className="num text-13 text-up">{ebb.total_zt ?? '—'}</b>
         </span>
         {/* ⚠️ 这是反馈矩阵的 0–10 情绪分（不是快照的加权和）；脚本在情绪分 ≥7 时会
             主动跳过晋级率信号，此处并列展示正是为了让人一眼看出「指标 vs 情绪分」
             是否互相印证 —— 两者背离本身就是一条信息。 */}
-        <span className="text-[11px] text-sub">
+        <span className="text-11 text-sub">
           反馈情绪分
-          <b className="num text-[13px] text-txt ml-1">
+          <b className="num text-13 text-txt ml-1">
             {ebb.sentiment_score ?? '—'}
-            {ebb.sentiment_score != null && <span className="text-[10px] text-sub">/10</span>}
+            {ebb.sentiment_score != null && <span className="text-10 text-sub">/10</span>}
           </b>
         </span>
 
-        <span className="text-[10.5px] text-sub ml-auto">
+        <span className="text-11 text-sub ml-auto">
           共 {ebb.signals?.length ?? 0} 条负反馈
         </span>
       </div>
@@ -85,7 +85,7 @@ export function EbbBanner({ header = false }: { header?: boolean } = {}) {
       {ebb.signals && ebb.signals.length > 0 && (
         <ul className="flex flex-wrap gap-x-5 gap-y-1 mt-2 pt-2 border-t border-current/10 list-none p-0">
           {ebb.signals.map((s) => (
-            <li key={s} className="flex items-start gap-1.5 text-[12px] text-txt">
+            <li key={s} className="flex items-start gap-1.5 text-12 text-txt">
               <span className={cn('mt-[6px] w-1 h-1 rounded-full flex-none', ink)} aria-hidden />
               {s}
             </li>

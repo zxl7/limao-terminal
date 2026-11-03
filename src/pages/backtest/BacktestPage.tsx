@@ -114,7 +114,7 @@ export function Component() {
           <StatPair label="归档期数" value={reports.length} />
           <StatPair label="schema" value={latest?.schema ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           三个指标衡量的是不同环节 —— 候选命中看**选股**，区间命中看**预期定价**，
           情绪对齐看**盘面定性**。其中一项低不代表策略整体失效，要先定位是哪一环。
           样本不足时原系统拒绝计算并给出原因，本页原样展示，不把不可用当作 0%。
@@ -154,17 +154,17 @@ export function Component() {
             />
           </div>
 
-          <p className="text-sub text-[12px] mb-2">{METRIC_META[tab].desc}</p>
+          <p className="text-sub text-12 mb-2">{METRIC_META[tab].desc}</p>
 
           {!block?.available && (
             <div className="border border-warn rounded-sm px-2.5 py-2 mb-2">
               <div className="flex items-center gap-2 mb-0.5">
                 <Tag tone="warn">不可用</Tag>
               </div>
-              <p className="text-[12.5px] leading-relaxed">
+              <p className="text-13 leading-relaxed">
                 原因：{block?.reason || '未说明（该指标本期未产出）'}
               </p>
-              <p className="text-sub text-[11.5px] mt-1">
+              <p className="text-sub text-12 mt-1">
                 原系统对样本不足的指标拒绝计算，而非给出小样本百分比 —— 这是刻意的保守口径。
               </p>
             </div>
@@ -192,7 +192,7 @@ export function Component() {
         >
           <div className="flex flex-col gap-4">
             <div>
-              <div className="text-[12px] font-semibold mb-1.5">命中率（同量纲共轴：%）</div>
+              <div className="text-12 font-semibold mb-1.5">命中率（同量纲共轴：%）</div>
               <LineChart
                 labels={trend.labels}
                 series={[
@@ -204,7 +204,7 @@ export function Component() {
                 yTickCount={5}
                 refLines={[{ value: 50, label: '掷硬币基准 50%', tone: 'sub', dashed: true }]}
               />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 两条线都是 0~100 的百分数，故可共轴。低于 <b className="text-txt">50% 基准线</b>
                 说明当期表现不如随机 —— 单期如此属正常波动，<b className="text-txt">连续多期低于基准</b>才是策略失效的信号。
                 缺该期数据的点为 <b className="text-txt">断口</b>（不连线、不补 0）：原系统对样本不足的期次拒绝计算，
@@ -213,7 +213,7 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] font-semibold mb-1.5">情绪对齐偏差（预测情绪分 − 实际情绪分）</div>
+              <div className="text-12 font-semibold mb-1.5">情绪对齐偏差（预测情绪分 − 实际情绪分）</div>
               <BarChart
                 bars={trend.labels.map((label, i) => ({
                   label,
@@ -225,7 +225,7 @@ export function Component() {
                 format={(v) => (v > 0 ? `+${n1(v)}` : n1(v))}
                 maxBarWidth={26}
               />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 零轴居中：<b className="text-up">正值 = 预测偏乐观</b>（实际没有预期那么热）/
                 <b className="text-down"> 负值 = 预测偏悲观</b>。
                 <b className="text-mid">蓝色柱 = 绝对偏差 ≤1</b>，落在体系容忍带内；
@@ -326,8 +326,8 @@ export function Component() {
             ) : (
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <span className="text-[13px] font-semibold text-txt">{activePromo.title}</span>
-                  <span className="num text-[11px] text-sub">{activePromo.ts?.slice(0, 16) || '—'}</span>
+                  <span className="text-13 font-semibold text-txt">{activePromo.title}</span>
+                  <span className="num text-11 text-sub">{activePromo.ts?.slice(0, 16) || '—'}</span>
                 </div>
                 <div className="max-h-[420px] overflow-y-auto">
                   <DataTable
@@ -387,7 +387,7 @@ export function Component() {
                     ]}
                   />
                 </div>
-                <div className="text-sub text-[11px] leading-relaxed">
+                <div className="text-sub text-11 leading-relaxed">
                   成功率 = 晋级成功数 / 样本数；溢价为**平均**值。分组键的含义随报告不同
                   （`1to2_board` = 按板块，`_day_` = 按交易日）。样本小的分组（n ≤ 3）波动极大，
                   不可单看成功率定论。
@@ -399,7 +399,7 @@ export function Component() {
 
         <Zone label="读法提示 · 与候选回测的分工" dot="bg-sub" className="xl:w-[36%]">
           <Card title="🧭 这两块回测各管什么">
-            <div className="flex flex-col gap-2 text-[12px] leading-relaxed">
+            <div className="flex flex-col gap-2 text-12 leading-relaxed">
               <div>
                 <span className="font-semibold text-txt">候选命中率回测（上方）</span>
                 <div className="text-sub mt-0.5">
@@ -440,8 +440,8 @@ function pickColumns(sample: Record<string, unknown>) {
       if (v == null) return <span className="text-sub">—</span>
       if (typeof v === 'boolean') return v ? <span className="text-up">是</span> : <span className="text-sub">否</span>
       if (typeof v === 'number') return Number.isInteger(v) ? String(v) : n1(v)
-      if (Array.isArray(v)) return <span className="text-sub text-[11.5px]">{v.join(', ') || '—'}</span>
-      return <span className="text-[11.5px]">{String(v)}</span>
+      if (Array.isArray(v)) return <span className="text-sub text-12">{v.join(', ') || '—'}</span>
+      return <span className="text-12">{String(v)}</span>
     },
   }))
 }

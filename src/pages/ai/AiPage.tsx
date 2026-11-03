@@ -105,11 +105,11 @@ function ChangeBlock({
   const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : []
   return (
     <section className="min-w-0 rounded-sm border border-line bg-card px-2.5 py-2">
-      <div className={cn('mb-1.5 text-[12px] font-semibold', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-sub')}>
+      <div className={cn('mb-1.5 text-12 font-semibold', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-sub')}>
         {label}
       </div>
-      {summary && <div className="mb-1.5 text-[10.5px] text-sub">{summary}</div>}
-      {items.length ? <div className="flex flex-col gap-1.5">{children}</div> : <div className="text-[11px] text-sub">{empty}</div>}
+      {summary && <div className="mb-1.5 text-11 text-sub">{summary}</div>}
+      {items.length ? <div className="flex flex-col gap-1.5">{children}</div> : <div className="text-11 text-sub">{empty}</div>}
     </section>
   )
 }
@@ -132,7 +132,7 @@ function ChangeRow({
     <div className="min-w-0 border-l-2 border-line pl-2">
       <div className="flex items-baseline gap-1.5 min-w-0">
         <span
-          className={cn('truncate text-[11.5px] font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')}
+          className={cn('truncate text-12 font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')}
           title={titleText}
         >
           {title}
@@ -140,7 +140,7 @@ function ChangeRow({
         {pctVal != null && (
           <span
             className={cn(
-              'num flex-none text-[11px] font-semibold',
+              'num flex-none text-11 font-semibold',
               pctVal > 0 ? 'text-up' : pctVal < 0 ? 'text-down' : 'text-sub',
             )}
           >
@@ -149,7 +149,7 @@ function ChangeRow({
           </span>
         )}
       </div>
-      <div className="line-clamp-2 text-[10.5px] leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>
+      <div className="line-clamp-2 text-11 leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>
         {children}
       </div>
     </div>
@@ -469,7 +469,7 @@ export function Component() {
           <StatPair label="判断日数" value={viewFiles.length} />
         </div>
         <div className="border border-line rounded-sm p-2.5 mb-2.5">
-          <div className="text-[12.5px] font-semibold mb-2">🤖 AI 轨净值走势</div>
+          <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
           {navRows.length ? (
             <LineChart
               series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
@@ -479,7 +479,7 @@ export function Component() {
               refLines={NAV_BASELINE}
             />
           ) : (
-            <div className="text-sub text-[12px] py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
+            <div className="text-sub text-12 py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
           )}
         </div>
       </Card>
@@ -494,7 +494,7 @@ export function Component() {
               <select
                 value={activeView?.date ?? ''}
                 onChange={(e) => setViewDate(e.target.value)}
-                className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
               >
                 {viewFiles.map((f) => (
                   <option key={f.date} value={f.date}>
@@ -518,7 +518,7 @@ export function Component() {
         {tab === 'view' && (
           <>
             {activeView && (
-              <div className="text-sub text-[12px] mb-2 flex flex-col gap-0.5">
+              <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">
                 <div className="flex items-baseline gap-1.5 flex-wrap">
                   <span>预案</span>
                   <span className="num text-txt">{activeView.decision_date}</span>
@@ -579,7 +579,7 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <StockLink code={r.code} className="text-rec">{r.name || r.code}</StockLink>
+                    <StockLink code={r.code} className="text-txt">{r.name || r.code}</StockLink>
                   </span>
                 ),
               },
@@ -610,11 +610,11 @@ export function Component() {
                   <Tag tone={r.settled ? 'up' : 'neutral'}>{r.settled ? '已结算' : '未结算'}</Tag>
                 ),
               },
-              { label: '来源', cell: (r) => <span className="text-sub text-[11.5px]">{r.source || '—'}</span> },
+              { label: '来源', cell: (r) => <span className="text-sub text-12">{r.source || '—'}</span> },
               {
                 label: '理由',
                 className: 'whitespace-normal min-w-[300px]',
-                cell: (r) => <span className="text-[12px] leading-relaxed">{r.reason || '—'}</span>,
+                cell: (r) => <span className="text-12 leading-relaxed">{r.reason || '—'}</span>,
               },
             ]}
           />
@@ -623,7 +623,7 @@ export function Component() {
         {tab === 'nav' && (
           <>
           <div className="border border-line rounded-sm p-2.5 mb-3">
-            <div className="text-[12.5px] font-semibold mb-2">🤖 AI 轨净值走势</div>
+            <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
             <LineChart
               series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
               labels={navRows.map((r) => r.trade_date)}
@@ -631,7 +631,7 @@ export function Component() {
               format={(v) => n2(v)}
               refLines={NAV_BASELINE}
             />
-            <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+            <p className="text-sub text-11 mt-1.5 leading-relaxed">
               净值起点 1.0，由每日 15:30 结算落盘；当前 {navRows.length} 个结算日，点数增多后趋势更清晰。虚线为盈亏分界。
             </p>
           </div>

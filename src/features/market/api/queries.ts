@@ -31,6 +31,18 @@ export const marketQueries = {
     refetchInterval: pollMs,
     staleTime: 20_000,
   }),
+  /**
+   * 决策时点涨停池（含每只票的首封时间 `fbt`）。
+   *
+   * 用途单一：给「今天最强题材」卡回填**首封时间**，让题材内个股按涨停先后排序。
+   * 盘中优先用主快照自带的 `limit_up_stocks[].fbt`（30s 更新），这份是盘后归档兜底。
+   */
+  ztPool: () =>
+    queryOptions({
+      queryKey: ['market', 'zt-pool'] as const,
+      queryFn: api.decisionZtPool,
+      staleTime: 60_000,
+    }),
   /** 主快照（实时） */
   latest: () =>
     queryOptions({

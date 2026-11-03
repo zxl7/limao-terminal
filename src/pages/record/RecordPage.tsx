@@ -119,7 +119,7 @@ export function Component() {
           <StatPair label="环比变化字段" value={`${changed} / ${diffRows.length}`} />
           <StatPair label="数据根" value={health.data?.data_root ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           三层诊断合看才能定性：涨停数骤降可能是真冰点，也可能是**数据没刷进来** ——
           后者会同时体现在「文件龄期偏大」与「契约异常」上。契约异常不阻断渲染（数据照用），
           它的作用是提示该字段可能不可信。
@@ -193,8 +193,8 @@ export function Component() {
           <div className="flex flex-col gap-2">
             {[...issues.entries()].map(([route, list]) => (
               <div key={route} className="border border-line rounded-sm px-2.5 py-1.5">
-                <div className="num text-[12px] text-txt mb-0.5">{route}</div>
-                <ul className="text-[11.5px] text-warn leading-relaxed">
+                <div className="num text-12 text-txt mb-0.5">{route}</div>
+                <ul className="text-12 text-warn leading-relaxed">
                   {list.map((it, i) => (
                     // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                     <li key={i}>
@@ -233,11 +233,11 @@ export function Component() {
           }}
           empty="无健康数据"
           columns={[
-            { label: '路由', cell: (f) => <span className="num text-[11.5px]">{f.route}</span> },
+            { label: '路由', cell: (f) => <span className="num text-12">{f.route}</span> },
             {
               label: '说明',
               cell: (f) => (
-                <span className="text-sub text-[11.5px]">
+                <span className="text-sub text-12">
                   {f.retired && <span className="badge bg-warn-soft text-warn mr-1">已停更</span>}
                   {!f.exists && <span className="badge bg-down-soft text-down mr-1">缺失</span>}
                   {f.desc || '—'}
@@ -247,15 +247,15 @@ export function Component() {
             {
               label: '业务日期',
               cell: (f) => (
-                <span className="num text-[11.5px] text-sub">{f.asof ?? '—'}</span>
+                <span className="num text-12 text-sub">{f.asof ?? '—'}</span>
               ),
             },
             {
               label: '节拍',
               cell: (f) => (
-                <span className="text-[11.5px] text-sub">
+                <span className="text-12 text-sub">
                   {f.cadence === 'intraday' ? '盘中' : f.cadence === 'manual' ? '手动' : '日频'}
-                  {f.kind === 'dir' && <span className="text-[10.5px] text-sub"> · 目录</span>}
+                  {f.kind === 'dir' && <span className="text-11 text-sub"> · 目录</span>}
                 </span>
               ),
             },
@@ -280,7 +280,7 @@ export function Component() {
             },
             {
               label: '更新时间',
-              cell: (f) => <span className="num text-sub text-[11px]">{f.mtime?.slice(5, 19).replace('T', ' ') ?? '—'}</span>,
+              cell: (f) => <span className="num text-sub text-11">{f.mtime?.slice(5, 19).replace('T', ' ') ?? '—'}</span>,
             },
           ]}
         />

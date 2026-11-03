@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { sentimentClass } from '@/shared/lib'
+import { fmtPct, sentimentClass } from '@/shared/lib'
+import type { PoolNameItem } from '@/shared/api'
 import { Card, Kpi, KpiStrip, StockLink } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { defenseTone, feedbackTone } from '../model/labels'
@@ -44,18 +45,18 @@ export function ExtremeCard() {
     <Card
       title="🧊 极值名单"
       extra={
-        <span className="text-[11px] font-normal text-sub">
-          跌停 <b className="num text-[12px] text-down">{ld?.count ?? '—'}</b> · 炸板{' '}
-          <b className="num text-[12px] text-down">{broken?.count ?? '—'}</b>
+        <span className="text-11 font-normal text-sub">
+          跌停 <b className="num text-12 text-down">{ld?.count ?? '—'}</b> · 炸板{' '}
+          <b className="num text-12 text-down">{broken?.count ?? '—'}</b>
         </span>
       }
     >
-      {isError && <p role="status" className="text-[11px] text-warn">{data ? '极值数据更新失败，保留上次数据' : '极值数据加载失败'}</p>}
-      {feedbackError && <p role="status" className="text-[11px] text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
-      {fb?.market_missing && <p role="status" className="text-[11px] text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
+      {isError && <p role="status" className="text-11 text-warn">{data ? '极值数据更新失败，保留上次数据' : '极值数据加载失败'}</p>}
+      {feedbackError && <p role="status" className="text-11 text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
+      {fb?.market_missing && <p role="status" className="text-11 text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
       {fb && !fb.error && (
         <div className="mb-2.5 pb-2 border-b border-line-faint">
-          <div className="num text-[10.5px] text-sub mb-1.5">负反馈 {fb.generated_ts}</div>
+          <div className="num text-11 text-sub mb-1.5">负反馈 {fb.generated_ts}</div>
           <KpiStrip min={96}>
             <Kpi label="核按钮" value={nukeCount ?? '—'} unit="只"
               tone={nukeCount == null ? 'sub' : feedbackTone(nukeCount >= 3)} sub="≥3 视为恶化" size="sm" />
@@ -71,14 +72,14 @@ export function ExtremeCard() {
       )}
       <div className="flex flex-col gap-2">
         <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-1 text-[10.5px] text-sub">
+          <div className="flex flex-wrap items-baseline justify-between gap-1 text-11 text-sub">
             <span>核按钮 · 昨涨停负反馈</span>
             <span className="num">{nukeCount == null ? '—' : `${nukes.length}/${nukeCount} 只已列出`}</span>
           </div>
           {nukes.length > 0 ? (
             <div className="mt-1 flex flex-col gap-1 max-h-[240px] overflow-y-auto overscroll-contain">
               {nukes.map((n) => (
-                <div key={n.code ?? n.name} className="rounded-sm bg-down-soft/50 px-2 py-1.5 text-[11px]">
+                <div key={n.code ?? n.name} className="rounded-sm bg-down-soft/50 px-2 py-1.5 text-11">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 flex items-baseline gap-1.5">
                       <StockLink code={n.code} className="text-txt truncate font-bold">{n.name}</StockLink>
@@ -102,22 +103,22 @@ export function ExtremeCard() {
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-sub mt-1">
+            <div className="text-11 text-sub mt-1">
               {feedbackPending ? '正在加载核按钮数据…' : feedbackError && !fb ? '暂无法确认核按钮状态' : fb?.error ? `反馈矩阵异常：${fb.error}` : nukeCount === 0 ? '当前快照无核按钮' : nukeCount != null ? '核按钮明细未提供' : '核按钮数据未提供'}
             </div>
           )}
         </div>
         <NameGroup
           label="跌停"
-          hint="按封单额排序 · 无代码详情"
-          names={ldNames}
+          hint={hasPct(ld?.items) ? '按跌幅 · 首封时点排序' : '按封单额排序 · 无代码详情'}
+          rows={toRows(ldNames, ld?.items)}
           chipClass="bg-down-soft text-down"
           emptyText={isPending ? '正在加载跌停数据…' : isError && !data ? '暂无法确认跌停状态' : ld?.count === 0 ? '当前快照无跌停' : ld?.count != null ? '跌停名单未提供' : '跌停数据未提供'}
         />
         <NameGroup
           label="炸板"
           hint="曾涨停后打开 · 承接不足"
-          names={brokenNames}
+          rows={toRows(brokenNames, broken?.items)}
           chipClass="bg-line-faint text-down"
           emptyText={isPending ? '正在加载炸板数据…' : isError && !data ? '暂无法确认炸板状态' : broken?.count === 0 ? '当前快照无炸板' : broken?.count != null ? '炸板名单未提供' : '炸板数据未提供'}
         />
@@ -126,35 +127,62 @@ export function ExtremeCard() {
   )
 }
 
+/**
+ * 名单 → 可渲染行。
+ *
+ * 上游历史快照只有 `names`（纯名字），2026-10-31 起 `items` 才带跌幅。
+ * 两者都要能渲染，且**只用真值**：`pct` 缺失或不像百分比（|pct| < 1，
+ * 说明上游给的是小数比例而我们没把握换算）一律不显示 —— 宁缺不错。
+ */
+function toRows(names: string[], items?: PoolNameItem[]): PoolNameRow[] {
+  if (items && items.length > 0) return items.map((i) => ({ name: i.name, pct: showPct(i.pct) }))
+  return names.map((n) => ({ name: n, pct: null }))
+}
+
+function hasPct(items?: PoolNameItem[]): boolean {
+  return !!items?.some((i) => showPct(i.pct) !== null)
+}
+
+function showPct(pct: number | null | undefined): number | null {
+  if (pct == null || !Number.isFinite(pct)) return null
+  return Math.abs(pct) >= 1 ? pct : null
+}
+
+interface PoolNameRow {
+  name: string
+  pct: number | null
+}
+
 function NameGroup({
   label,
   hint,
-  names,
+  rows,
   chipClass,
   emptyText,
 }: {
   label: string
   hint: string
-  names: string[]
+  rows: PoolNameRow[]
   chipClass: string
   emptyText: string
 }) {
   return (
     <div>
       <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] text-sub">{label}</span>
-        <span className="text-[10.5px] text-sub">· {hint}</span>
+        <span className="text-11 text-sub">{label}</span>
+        <span className="text-11 text-sub">· {hint}</span>
       </div>
-      {names.length > 0 ? (
-        <div className="flex flex-wrap gap-1 mt-1 max-h-[104px] overflow-y-auto">
-          {names.map((n) => (
-            <span key={n} className={`badge ${chipClass}`}>
-              {n}
+      {rows.length > 0 ? (
+        <div className="flex flex-wrap gap-1 mt-1 max-h-[120px] overflow-y-auto">
+          {rows.map((r) => (
+            <span key={r.name} className={`badge ${chipClass} inline-flex items-baseline gap-1`}>
+              {r.name}
+              {r.pct !== null && <b className="num font-normal">{fmtPct(r.pct, 2)}</b>}
             </span>
           ))}
         </div>
       ) : (
-        <div className="text-[11px] text-sub mt-1">{emptyText}</div>
+        <div className="text-11 text-sub mt-1">{emptyText}</div>
       )}
     </div>
   )

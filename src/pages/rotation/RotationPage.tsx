@@ -247,8 +247,8 @@ export function Component() {
           <StatPair label="窗口" value={d?.data_meta?.window ?? '—'} />
           <StatPair label="涨停源" value={d?.data_meta?.zt_source ?? '—'} />
         </div>
-        {d?.note && <p className="text-sub text-[11.5px] leading-relaxed">{d.note}</p>}
-        {d?.generated_ts && <p className="text-warn text-[11.5px] leading-relaxed">本页轮动候选与资金榜取自 {d.generated_ts.replace('T', ' ').slice(0, 19)} 的快照，盘中变化以“盘中实时”页的当前快照为准。</p>}
+        {d?.note && <p className="text-sub text-12 leading-relaxed">{d.note}</p>}
+        {d?.generated_ts && <p className="text-warn text-12 leading-relaxed">本页轮动候选与资金榜取自 {d.generated_ts.replace('T', ' ').slice(0, 19)} 的快照，盘中变化以“盘中实时”页的当前快照为准。</p>}
         {!rot.isLoading && !d && (
           <EmptyState text="题材轮动数据未生成" hint="cache/rotation.json 缺失" />
         )}
@@ -282,7 +282,7 @@ export function Component() {
             )}
             {lifecycleGroups.map(({ lifecycle, rows }) => (
               <div key={lifecycle.key} className="flex flex-col gap-1.5">
-                <div className="flex flex-wrap items-baseline gap-x-2 text-[12px] pt-1.5 border-t border-line-faint first:border-t-0 first:pt-0">
+                <div className="flex flex-wrap items-baseline gap-x-2 text-12 pt-1.5 border-t border-line-faint first:border-t-0 first:pt-0">
                   <Tag tone={lifecycle.tone}>{lifecycle.label}</Tag>
                   <span className="text-sub">{lifecycle.description}</span>
                   <span className="num text-sub">{rows.length} 个</span>
@@ -293,7 +293,7 @@ export function Component() {
               </div>
             ))}
             {sorted.length > 0 && (
-              <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5">
+              <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5">
                 铁律：观察池的题材标签不可直接采信 —— 须按个股**真实主轴**核对（如通信 / CPO 算力票
                 通常不会被题材名准确覆盖）。板块归属已并列展示供核对。
               </p>
@@ -305,7 +305,7 @@ export function Component() {
           <>
             {trendRows.length > 0 && (
               <div className="mb-3">
-                <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+                <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
                   <Icon name="trendUp" size={13} className="text-sub" />
                   涨停趋势形状（当日涨停数 Top {trendRows.length}）
                 </div>
@@ -313,7 +313,7 @@ export function Component() {
                   {trendRows.map((r) => (
                     <div
                       key={r.theme}
-                      className="flex items-center gap-2 text-[12px] py-0.5 border-b border-line/40 last:border-0"
+                      className="flex items-center gap-2 text-12 py-0.5 border-b border-line/40 last:border-0"
                     >
                       <span className="w-[104px] shrink-0 truncate text-txt" title={r.theme}>
                         {r.theme}
@@ -337,13 +337,13 @@ export function Component() {
                       >
                         {r.delta > 0 ? `+${r.delta}` : r.delta}
                       </span>
-                      <span className="w-[38px] shrink-0 text-right text-[11px] text-sub">
+                      <span className="w-[38px] shrink-0 text-right text-11 text-sub">
                         {r.dir === 'rising' ? '升温' : r.dir === 'falling' ? '降温' : '走平'}
                       </span>
                     </div>
                   ))}
                 </div>
-                <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+                <p className="text-sub text-11 mt-1.5 leading-relaxed">
                   折线着色按方向（<b className="text-up">红=升温</b> / <b className="text-down">绿=降温</b> /
                   <b className="text-txt"> 灰=走平</b>），与表格「方向」列同源。
                   形状比数字更易辨：<b className="text-txt">持续爬升</b>=题材在扩散，
@@ -388,7 +388,7 @@ export function Component() {
                         // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                         key={i}
                         className={cn(
-                          'num text-[11.5px] px-1.5 border border-line-faint rounded-sm min-w-[26px] text-center',
+                          'num text-12 px-1.5 border border-line-faint rounded-sm min-w-[26px] text-center',
                           v == null ? 'text-sub' : v > 0 ? 'text-up' : 'text-txt',
                         )}
                       >
@@ -411,7 +411,7 @@ export function Component() {
         {tab === 'flow' && (
           <div className="flex flex-col gap-3">
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="flow" size={13} className="text-sub" />
                 5 日累计净额双向榜
               </div>
@@ -422,7 +422,7 @@ export function Component() {
                 labelWidth={104}
                 emptyText="无 5 日资金数据"
               />
-              <p className="text-sub text-[11px] mt-1.5 leading-relaxed">
+              <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 零线居中：右侧红条为累计净流入、左侧绿条为净流出，附注是<b className="text-txt">流入天数</b>——
                 金额大但天数少 = 单日脉冲，<b className="text-txt">金额与天数同时占优才是持续吸金</b>。
               </p>
@@ -454,12 +454,12 @@ export function Component() {
               },
               { label: '流入天数', num: true, cell: (r) => r.inflow_days },
               { label: '档位', cell: (r) => <Tag tone={r.tier === 'high' ? 'down' : 'neutral'}>{r.tier || '—'}</Tag> },
-              { label: '立场', cell: (r) => <span className="text-[12px]">{r.stance || '—'}</span> },
-              { label: '触发条件', cell: (r) => <span className="text-sub text-[11.5px]">{r.trigger || '—'}</span> },
+              { label: '立场', cell: (r) => <span className="text-12">{r.stance || '—'}</span> },
+              { label: '触发条件', cell: (r) => <span className="text-sub text-12">{r.trigger || '—'}</span> },
               {
                 label: '升级提示',
                 className: 'whitespace-normal min-w-[200px]',
-                cell: (r) => <span className="text-[12px]">{r.upgrade_hint || '—'}</span>,
+                cell: (r) => <span className="text-12">{r.upgrade_hint || '—'}</span>,
               },
             ]}
           />
@@ -472,7 +472,7 @@ export function Component() {
           <Card title="快照板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
         {todayDuel.length > 0 && (
           <div className="mb-3">
-            <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+            <div className="text-12 font-semibold mb-1 flex items-center gap-1">
               <Icon name="compass" size={13} className="text-sub" />
               当日资金对决（零线居中）
             </div>
@@ -510,19 +510,19 @@ function ThemeLifecycleFunnel({ counts }: { counts: Record<ThemeLifecycle['key']
 
   return (
     <div className="border border-line rounded-sm px-2.5 py-2">
-      <div className="text-[12px] font-semibold mb-1.5">题材生命周期</div>
+      <div className="text-12 font-semibold mb-1.5">题材生命周期</div>
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
         {steps.map((step, index) => (
           <span key={step.key} className="inline-flex items-center gap-1">
-            {index > 0 && <span className="text-sub text-[11px]">→</span>}
-            <span className={cn('inline-flex items-baseline gap-1 px-1.5 py-0.5 border rounded-sm text-[11.5px]',
+            {index > 0 && <span className="text-sub text-11">→</span>}
+            <span className={cn('inline-flex items-baseline gap-1 px-1.5 py-0.5 border rounded-sm text-12',
               step.tone === 'up' ? 'text-up border-up' : step.tone === 'down' ? 'text-down border-down' : step.tone === 'rec' ? 'text-rec border-rec' : step.tone === 'warn' ? 'text-warn border-warn' : 'text-sub border-line')}>
               {step.label}<b className="num">{counts[step.key]}</b>
             </span>
           </span>
         ))}
       </div>
-      <p className="text-sub text-[11px] leading-relaxed mt-1.5">
+      <p className="text-sub text-11 leading-relaxed mt-1.5">
         “回流埋伏”需同时满足资金转入、K线止跌、催化新鲜、大盘配合且尚未启动；“回流确认”已有价格响应，等待扩散验证。
       </p>
     </div>
@@ -540,13 +540,13 @@ function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: Rotat
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="text-[13.5px] font-semibold text-txt bg-transparent border-0 cursor-pointer p-0"
+          className="text-14 font-semibold text-txt bg-transparent border-0 cursor-pointer p-0"
         >
           {open ? '▾' : '▸'} {c.theme}
         </button>
         <Tag tone={lifecycle.tone}>{lifecycle.label}</Tag>
         <Tag tone={stage.tone}>{stage.label}</Tag>
-        <span className={cn('text-[11.5px] font-semibold', stage.tone === 'up' ? 'text-up' : stage.tone === 'down' ? 'text-down' : 'text-sub')}>
+        <span className={cn('text-12 font-semibold', stage.tone === 'up' ? 'text-up' : stage.tone === 'down' ? 'text-down' : 'text-sub')}>
           {stage.action}
         </span>
         <Tag tone={c.catalyst_fresh ? 'up' : 'neutral'}>{c.catalyst_fresh ? '新催化' : '催化已旧'}</Tag>
@@ -568,7 +568,7 @@ function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: Rotat
         />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-sub">
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-12 text-sub">
         <span>
           因子：
           <span className={f.catalyst ? 'text-up' : 'text-sub'}>催化 {f.catalyst ? '✓' : '✗'}</span>
@@ -594,7 +594,7 @@ function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: Rotat
         <span>有效日 {c.zt_valid_days}</span>
       </div>
 
-      <div className="mt-1 text-[12px] leading-relaxed">
+      <div className="mt-1 text-12 leading-relaxed">
         <span className={stage.tone === 'up' ? 'text-up' : stage.tone === 'down' ? 'text-down' : 'text-sub'}>
           {stage.label}：
         </span>
@@ -602,19 +602,19 @@ function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: Rotat
       </div>
 
       {c.trigger && (
-        <div className="mt-1 text-[12px] leading-relaxed">
+        <div className="mt-1 text-12 leading-relaxed">
           <span className="text-warn">触发条件：</span>
           {c.trigger}
         </div>
       )}
-      {c.catalyst && <div className="mt-0.5 text-[12px] leading-relaxed text-sub">催化：{c.catalyst}</div>}
+      {c.catalyst && <div className="mt-0.5 text-12 leading-relaxed text-sub">催化：{c.catalyst}</div>}
 
       {open && (
         <div className="mt-2 pt-2 border-t border-line-faint grid md:grid-cols-2 gap-3">
           <PoolTable title="观察池" rows={c.watch_pool ?? []} />
           <PoolTable title="主板池" rows={c.main_board_pool ?? []} />
           {c.pool_note && (
-            <p className="md:col-span-2 text-sub text-[11.5px] leading-relaxed">池备注：{c.pool_note}</p>
+            <p className="md:col-span-2 text-sub text-12 leading-relaxed">池备注：{c.pool_note}</p>
           )}
         </div>
       )}
@@ -626,7 +626,7 @@ function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: Rotat
 function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
   return (
     <div>
-      <div className="text-[12px] text-sub mb-1">
+      <div className="text-12 text-sub mb-1">
         {title}（{rows.length}）
       </div>
       <DataTable
@@ -640,7 +640,7 @@ function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
             cell: (r) => (
               <span>
                 {r.dragon && <span className="text-lead mr-1">龙</span>}
-                <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
               </span>
             ),
           },
@@ -652,7 +652,7 @@ function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
             ),
           },
           { label: '市值', num: true, cell: (r) => `${n1(r.cap_yi)}亿` },
-          { label: '板块', cell: (r) => <span className="text-sub text-[11.5px]">{r.board || '—'}</span> },
+          { label: '板块', cell: (r) => <span className="text-sub text-12">{r.board || '—'}</span> },
           {
             label: '来源',
             cell: (r) => (r.from_zt ? <Tag tone="up">涨停池</Tag> : <span className="text-sub">—</span>),
@@ -660,7 +660,7 @@ function PoolTable({ title, rows }: { title: string; rows: PoolStock[] }) {
           {
             label: '风险',
             cell: (r) =>
-              r.risk ? <span className="text-warn text-[11.5px]">{r.risk}</span> : <span className="text-sub">—</span>,
+              r.risk ? <span className="text-warn text-12">{r.risk}</span> : <span className="text-sub">—</span>,
           },
         ]}
       />
@@ -679,7 +679,7 @@ function Flow5DTable({
 }) {
   return (
     <div>
-      <div className="text-[12px] text-sub mb-1">
+      <div className="text-12 text-sub mb-1">
         {title}
         {days?.length ? ` · 窗口 ${days[0]} ~ ${days.at(-1)}` : ''}
       </div>
@@ -702,7 +702,7 @@ function Flow5DTable({
           },
           { label: '最近一日', num: true, cell: (r) => (r.last_yi > 0 ? `+${n2(r.last_yi)}` : n2(r.last_yi)) },
           { label: '流入天数', num: true, cell: (r) => `${r.inflow_days}/${r.days}` },
-          { label: '趋势', cell: (r) => <span className="text-sub text-[11.5px]">{r.trend || '—'}</span> },
+          { label: '趋势', cell: (r) => <span className="text-sub text-12">{r.trend || '—'}</span> },
         ]}
       />
     </div>
@@ -712,7 +712,7 @@ function Flow5DTable({
 function FlowSide({ title, rows }: { title: string; rows: SectorFlowFull[] }) {
   return (
     <div>
-      <div className="text-[12px] text-sub mb-1">{title}</div>
+      <div className="text-12 text-sub mb-1">{title}</div>
       <DataTable
         rows={rows}
         rowKey={(r) => r.name}
@@ -724,7 +724,7 @@ function FlowSide({ title, rows }: { title: string; rows: SectorFlowFull[] }) {
             cell: (r) => (
               <span className={r.is_focus ? 'text-up font-semibold' : 'text-txt'}>
                 {r.name}
-                {r.is_focus && <span className="text-[11px] ml-1">关注</span>}
+                {r.is_focus && <span className="text-11 ml-1">关注</span>}
               </span>
             ),
           },

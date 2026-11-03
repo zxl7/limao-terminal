@@ -73,19 +73,19 @@ export function LadderCard() {
       title="🪜 连板天梯"
       extra={
         groups.length > 0 && (
-          <span className="text-[11px] font-normal text-sub">
+          <span className="text-11 font-normal text-sub">
             {basisDate} 梯队{sameBasis ? ` · 封单上移 ${movedCount} 只` : ""}
           </span>
         )
       }>
       {feedbackError && (
-        <p role="status" className="text-[11px] text-warn mb-2">
+        <p role="status" className="text-11 text-warn mb-2">
           {fb ? "反馈更新失败，保留上次数据" : "反馈加载失败"}
         </p>
       )}
       {sameBasis && fb ? (
         <div className="mb-2.5 pb-2 border-b border-line-faint">
-          <div className="num text-[10.5px] text-sub mb-1.5">反馈时间 {fb.generated_ts}</div>
+          <div className="num text-11 text-sub mb-1.5">反馈时间 {fb.generated_ts}</div>
           {/* 晋级指标沿用反馈矩阵口径；与昨日梯队日期一致后才展示。 */}
           <KpiStrip min={96}>
             <Kpi
@@ -120,11 +120,11 @@ export function LadderCard() {
       )}
       {groups.length > 0 ? (
         /* 上限 300px + 内部滚动：梯队档数与每档票数随盘面变化。 */
-        <div className="flex flex-col gap-[3px] max-h-[300px] overflow-auto">
+        <div className="flex flex-col gap-1 max-h-[300px] overflow-auto">
           {groups.map((g) => {
             const isTop = g.boards === maxBoards
             return (
-              <div key={g.boards} className={cn("flex items-baseline gap-2.5 px-1.5 py-[3px] rounded", isTop && "bg-up-soft")}>
+              <div key={g.boards} className={cn("flex items-baseline gap-2.5 px-1.5 py-1 rounded", isTop && "bg-up-soft")}>
                 <span className="num flex-none w-10 text-xs font-bold text-up">{g.boards}板</span>
                 <span className="flex flex-wrap gap-x-3 gap-y-1">
                   {g.stocks.map((s) => {
@@ -138,10 +138,10 @@ export function LadderCard() {
                         <StockLink code={s.code} className={cn("text-xs", s.moved ? "text-up font-semibold" : "text-txt")}>
                           {s.name}
                         </StockLink>
-                        <span className={cn("num text-[10.5px]", pctTone(displayPct))}>{displayPct != null ? fmtPct(displayPct) : "—"}</span>
-                        {displaySeal != null && <span className="num text-[10px] text-lead">封{displaySeal}亿</span>}
+                        <span className={cn("num text-11", pctTone(displayPct))}>{displayPct != null ? fmtPct(displayPct) : "—"}</span>
+                        {displaySeal != null && <span className="num text-10 text-lead">封{displaySeal}亿</span>}
                         {displayFbt && (
-                          <span className="num text-[10px] text-sub">
+                          <span className="num text-10 text-sub">
                             {displayFbt.slice(0, 2)}:{displayFbt.slice(2, 4)}:{displayFbt.slice(4, 6)}
                           </span>
                         )}

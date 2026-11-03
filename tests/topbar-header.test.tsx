@@ -25,6 +25,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ComponentType, ReactNode } from 'react'
 import path from 'node:path'
 import { ROUTES, FILE_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from '@/shared/api'
+import { isFrozenSnapshot } from '@/shared/lib'
 // eslint-disable-next-line
 import { readRoute, healthPayload, resolveDataRoot, type RouteDefLike } from '../scripts/lib/read-route.mjs'
 
@@ -181,6 +182,33 @@ describe('顶栏 header · 盘中情绪维度承载（原盘中页指挥条迁�
       expect(text, '缺失数据未显示 — 占位').toContain('—')
     } finally {
       globalThis.fetch = original
+    }
+  })
+})
+
+describe('顶栏 · 定格态（周末/节假日/盘后不报延迟）', () => {
+  /**
+   * 用户 2026-10-31（周六）：「今天休息日的嘛，数据定格」。
+   *
+   * 不变量：**数据基准日不是今天** ⇒ 显示「定格」，且**不得**出现 `+N s` 的延迟告警。
+   * 反之，同日数据（盘中）必须仍然显示延迟秒数 —— 那是真监控。
+   * 断言按真实数据推导，不写死日期（否则换一天就红）。
+   */
+  it('非当日快照 → 显示「定格」且没有 +Ns；同日快照 → 仍有延迟秒数', async () => {
+    const c = await renderTopBar()
+    const snap = readSnapshot()
+    const asof = String((snap?.data_scope as { asof?: string } | undefined)?.asof ?? snap?.ts ?? '')
+    // ⚠️ 不能只比日期：收盘后 >1h 也算定格（11-02 22:29 实测把这条测红了）。
+    //    直接复用生产判定，测的就是「页面与规则一致」。
+    const frozen = isFrozenSnapshot(asof, new Date())
+    const text = c.textContent ?? ''
+
+    if (frozen) {
+      expect(text, '非当日数据应标「定格」').toContain('定格')
+      expect(text, '⛔ 定格态不该再报「落后 N 秒」').not.toMatch(/\+\d+s/)
+    } else {
+      expect(text, '同日数据不该被误标定格').not.toContain('定格')
+      expect(text, '同日数据必须显示延迟秒数').toMatch(/\+\d+s/)
     }
   })
 })

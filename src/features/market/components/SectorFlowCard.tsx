@@ -28,16 +28,16 @@ export function SectorFlowCard() {
     .slice(0, 10)
 
   return (
-    <Card title="💰 板块资金与弱势板块" extra={<span className="text-[10.5px] font-normal text-sub">主力净额 · 亿元</span>}>
+    <Card title="💰 板块资金与弱势板块" extra={<span className="text-11 font-normal text-sub">主力净额 · 亿元</span>}>
       {risk?.stale ? (
-        <p role="status" className="m-0 mb-2 text-[11px] text-warn">本轮采集不完整，展示 {risk.asof?.slice(11, 19) ?? '上次'} 的完整板块快照。</p>
+        <p role="status" className="m-0 mb-2 text-11 text-warn">本轮采集不完整，展示 {risk.asof?.slice(11, 19) ?? '上次'} 的完整板块快照。</p>
       ) : risk?.ok === false ? (
-        <p role="status" className="m-0 mb-2 text-[11px] text-warn">板块数据采集不完整，以下仅为已取得的部分数据。</p>
+        <p role="status" className="m-0 mb-2 text-11 text-warn">板块数据采集不完整，以下仅为已取得的部分数据。</p>
       ) : null}
       <div className="space-y-2.5">
         {flowGroups.map((group) => (
           <div key={group.label} role="group" aria-label={group.label}>
-            <div className="mb-1.5 flex items-center justify-between text-[10.5px]">
+            <div className="mb-1.5 flex items-center justify-between text-11">
               <span className={cn('font-medium', group.tone)}>{group.label}</span>
               <span className="text-sub">{risk?.ok || risk?.stale ? `前 ${group.items.length} 项` : '数据未齐'}</span>
             </div>
@@ -56,8 +56,8 @@ export function SectorFlowCard() {
 
       <div className="mt-3 pt-2 border-t border-line">
         <div className="mb-1.5 flex items-baseline justify-between gap-2 flex-wrap">
-          <span className="text-[11px] font-medium text-txt">弱势板块 · 跌幅榜</span>
-          <span className="text-[10.5px] text-sub">
+          <span className="text-11 font-medium text-txt">弱势板块 · 跌幅榜</span>
+          <span className="text-11 text-sub">
             阈值 {risk?.threshold != null ? `${risk.threshold}%` : '—'}
             {risk?.count != null && ` · ${risk.count} 个`}
           </span>
@@ -66,7 +66,7 @@ export function SectorFlowCard() {
           <div className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-2">
             {declining.map((s) => (
               <div key={s.name} className={cn(
-                'flex min-w-0 items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-[11px]',
+                'flex min-w-0 items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-11',
                 s.is_focus ? 'bg-warn-soft' : 'bg-line-faint',
               )}>
                 <span className="min-w-0 truncate text-txt" title={s.name}>{s.name}</span>
@@ -77,7 +77,7 @@ export function SectorFlowCard() {
             ))}
           </div>
         ) : (
-          <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-[11px] text-sub">
+          <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-11 text-sub">
             {risk?.stale ? '上次完整快照暂无达到阈值的弱势板块' : risk?.ok ? '当前快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
           </p>
         )}

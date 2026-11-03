@@ -81,6 +81,7 @@ export const TABS: readonly TabDef[] = [
   // ── 段2 · 盘面定性（日频）──
   { to: '/emotion', label: '情绪周期', group: '盘面', priority: true },
   { to: '/board-core', label: '板块核心', group: '盘面' },
+  { to: '/leader-daily', label: '连板日观察', group: '盘面', priority: true },
   { to: '/promotion', label: '连板晋级', group: '盘面' },
   { to: '/gene', label: '股性基因', group: '盘面' },
 

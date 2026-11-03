@@ -14,10 +14,9 @@ export { marketQueries } from './api/queries'
 export { EbbBanner } from './components/EbbBanner'
 export { FeedbackCard } from './components/FeedbackCard'
 export { LadderCard } from './components/LadderCard'
-export { LeadersCard } from './components/LeadersCard'
 export { SignalsCard } from './components/SignalsCard'
 export { SignalRail } from './components/SignalRail'
-export { ThemeTopCard } from './components/ThemeTopCard'
+export { TopThemeCard } from './components/TopThemeCard'
 export { AmbushCard } from './components/AmbushCard'
 export { SectorFlowCard } from './components/SectorFlowCard'
 export { SectorDeltaCard } from './components/SectorDeltaCard'
@@ -27,6 +26,7 @@ export { TideCard } from './components/TideCard'
 export { TideAlgorithmStrip } from './components/TideAlgorithmStrip'
 
 // 情绪周期之潮汐算法（候选链路环境门控的终端唯一映射）
+export { buildThemeRows, boardHeightOf, type ThemeRow, type ThemeRowStock } from './model/theme-rows'
 export { buildTideState, type TidePhase, type TideRegime, type TideState, type TideWindowDay } from './lib/tide'
 
 // 域内标签工具（页面组装时可能用到）

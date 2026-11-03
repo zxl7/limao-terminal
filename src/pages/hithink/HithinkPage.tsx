@@ -128,7 +128,7 @@ export function Component() {
           />
           <StatPair label="异动条数" value={anomalyData?.filtered ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed mt-2">
+        <p className="text-sub text-12 leading-relaxed mt-2">
           涨停池以必盈为权威、同花顺做交叉校验 —— 两者差异本身就是**数据质量证据**，
           而不是待修正的错误（下方「双源校验」逐票列出）。
         </p>
@@ -172,7 +172,7 @@ export function Component() {
                     label: '涨停原因',
                     className: 'whitespace-normal min-w-[240px]',
                     cell: (r) => (
-                      <span className="text-sub text-[11.5px]">{r.reason || '—'}</span>
+                      <span className="text-sub text-12">{r.reason || '—'}</span>
                     ),
                   },
                 ]}
@@ -196,14 +196,14 @@ export function Component() {
                     className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[13px] text-txt truncate">{b.name}</span>
+                      <span className="text-13 text-txt truncate">{b.name}</span>
                       {(b.tags ?? []).slice(0, 2).map((t) => (
                         <Tag key={t}>{t}</Tag>
                       ))}
                     </span>
                     <span
                       className={cn(
-                        'num text-[13px] font-medium',
+                        'num text-13 font-medium',
                         b.auction_pct > 0
                           ? 'text-up'
                           : b.auction_pct < 0
@@ -238,18 +238,18 @@ export function Component() {
                   <StatPair label="一致" value={diffData.both} tone="up" />
                 </div>
                 {diffData.only_biying.length > 0 && (
-                  <div className="text-[11.5px] text-sub">
+                  <div className="text-12 text-sub">
                     仅必盈有：
                     <span className="num text-warn">{diffData.only_biying.join(' · ')}</span>
                   </div>
                 )}
                 {diffData.only_hithink.length > 0 && (
-                  <div className="text-[11.5px] text-sub">
+                  <div className="text-12 text-sub">
                     仅同花顺有：
                     <span className="num text-warn">{diffData.only_hithink.join(' · ')}</span>
                   </div>
                 )}
-                {diffCount === 0 && <div className="text-[11.5px] text-sub">两源完全一致</div>}
+                {diffCount === 0 && <div className="text-12 text-sub">两源完全一致</div>}
               </div>
             ) : (
               <EmptyState text="双源校验未生成" hint="hithink_fetch.py limitup --check 未跑" />
@@ -312,7 +312,7 @@ export function Component() {
                   return (
                     <div key={t.key} className="flex items-start gap-2">
                       <span className="badge bg-up-soft text-up flex-none mt-0.5">{t.label}</span>
-                      <span className="flex flex-wrap gap-x-2.5 gap-y-1 text-[12.5px] text-txt">
+                      <span className="flex flex-wrap gap-x-2.5 gap-y-1 text-13 text-txt">
                         {list.map((s) => (
                           <span key={s.ticker}>{s.name}</span>
                         ))}
@@ -327,7 +327,7 @@ export function Component() {
             ) : (
               <EmptyState text="天梯未生成" hint="cache/hithink_ladder.json 缺失" />
             )}
-            <p className="text-sub text-[11px] leading-relaxed mt-2">
+            <p className="text-sub text-11 leading-relaxed mt-2">
               天梯仅收 2 板以上（无首板），用途是**板数校验**与 12 日窗口外兜底，不作涨停池主源。
             </p>
           </Card>
@@ -354,9 +354,9 @@ export function Component() {
                   >
                     <div className="flex items-center gap-1.5 mb-0.5">
                       <Tag tone={ANOMALY_TONE[it.tag] ?? 'neutral'}>{it.tag}</Tag>
-                      <StockLink code={it.code} className="text-[12.5px] text-txt font-medium">{it.name || it.code}</StockLink>
+                      <StockLink code={it.code} className="text-13 text-txt font-medium">{it.name || it.code}</StockLink>
                     </div>
-                    <p className="text-sub text-[11.5px] leading-relaxed">{it.content}</p>
+                    <p className="text-sub text-12 leading-relaxed">{it.content}</p>
                   </li>
                 ))}
               </ul>

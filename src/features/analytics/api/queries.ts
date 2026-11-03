@@ -41,6 +41,18 @@ export const analyticsQueries = {
       staleTime: DAILY_STALE,
     }),
 
+  // ══════════════ 连板日观察 ══════════════
+  /**
+   * 板块 × 交易日 → 当天龙一 / 板数 / 换人 / 熄火（近 30 个交易日）。
+   * 日频：盘后 `scripts/board_leader_daily.py` 落一份，盘中不轮询。
+   */
+  boardLeaderDaily: () =>
+    queryOptions({
+      queryKey: ['board', 'leader-daily'] as const,
+      queryFn: api.boardLeaderDaily,
+      staleTime: DAILY_STALE,
+    }),
+
   // ══════════════ 连板晋级量化 ══════════════
   /** 晋级率汇总（分段成功率 + 晋级次日溢价） */
   promotionSummary: () =>

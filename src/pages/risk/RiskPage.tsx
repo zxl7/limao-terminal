@@ -72,8 +72,8 @@ export function Component() {
           <StatPair label="未核查" value={unchecked} tone={unchecked ? 'warn' : 'sub'} />
           <StatPair label="归档期数" value={files.length} />
         </div>
-        {latest?.scope && <p className="text-sub text-[11.5px] leading-relaxed">口径：{latest.scope}</p>}
-        <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5 mt-1.5">
+        {latest?.scope && <p className="text-sub text-12 leading-relaxed">口径：{latest.scope}</p>}
+        <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5 mt-1.5">
           **未核查 ≠ 无风险** —— 原系统对部分标的未完成质押/公告核查，本页将其单列而非视作干净。
         </p>
         {!risk.isLoading && !latest && (
@@ -92,7 +92,7 @@ export function Component() {
             type="button"
             onClick={() => setOnlyRisky((v) => !v)}
             className={cn(
-              'px-2.5 py-1 text-[12px] rounded-sm border cursor-pointer bg-transparent transition-colors',
+              'px-2.5 py-1 text-12 rounded-sm border cursor-pointer bg-transparent transition-colors',
               onlyRisky ? 'border-line-strong text-txt font-semibold' : 'border-line text-sub hover:text-txt',
             )}
           >
@@ -110,7 +110,7 @@ export function Component() {
               label: '标的',
               cell: (r) => (
                 <span>
-                  <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                  <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                 </span>
               ),
             },
@@ -160,7 +160,7 @@ export function Component() {
               className: 'whitespace-normal min-w-[260px]',
               cell: (r) =>
                 r.notices?.length ? (
-                  <ul className="text-[11.5px] leading-relaxed text-sub">
+                  <ul className="text-12 leading-relaxed text-sub">
                     {r.notices.slice(0, 3).map((n, i) => (
                       // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                       <li key={i}>{summarizeNotice(n)}</li>
@@ -189,7 +189,7 @@ export function Component() {
               { label: '覆盖', num: true, cell: (f) => f.items?.length ?? 0 },
               { label: '带风险标签', num: true, cell: (f) => f.items?.filter((i) => i.risk_labels?.length).length ?? 0 },
               { label: '未核查', num: true, cell: (f) => f.items?.filter((i) => !i.checked).length ?? 0 },
-              { label: '生成于', cell: (f) => <span className="num text-sub text-[11px]">{f.generated_ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span> },
+              { label: '生成于', cell: (f) => <span className="num text-sub text-11">{f.generated_ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span> },
             ]}
           />
         </Card>

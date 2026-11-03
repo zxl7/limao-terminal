@@ -89,7 +89,7 @@ export function DataTable<T>({
       onScroll={virtual ? win.onScroll : undefined}
       className={virtual ? cn('overflow-auto overscroll-contain', heightClass) : 'overflow-x-auto'}
     >
-      <table className="w-full border-collapse text-[12.5px]">
+      <table className="w-full border-collapse text-13">
         <thead className={virtual ? 'sticky top-0 z-10' : undefined}>
           <tr className="border-b border-line bg-line-faint">
             {columns.map((c) => (
@@ -183,8 +183,8 @@ export function StatPair({
 
   return (
     <span className="inline-flex items-baseline gap-1" title={title}>
-      <span className="text-sub text-[12px]">{label}</span>
-      <b className={cn('num text-[13px] font-semibold', toneClass)}>{value ?? '—'}</b>
+      <span className="text-sub text-12">{label}</span>
+      <b className={cn('num text-13 font-semibold', toneClass)}>{value ?? '—'}</b>
     </span>
   )
 }
@@ -231,7 +231,7 @@ export function SegTabs({
           type="button"
           onClick={() => onChange(it.key)}
           className={cn(
-            'px-2.5 py-1 text-[12px] rounded-sm border cursor-pointer bg-transparent transition-colors',
+            'px-2.5 py-1 text-12 rounded-sm border cursor-pointer bg-transparent transition-colors',
             it.key === value
               ? 'border-line-strong text-txt font-semibold'
               : 'border-line text-sub hover:text-txt',

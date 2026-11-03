@@ -93,7 +93,7 @@ export function CardArchiveView({
     <div className={cn(compact ? '' : 'border border-line rounded-sm px-2.5 py-2', className)}>
       {(card.title || card.color) && (
         <div className={cn('flex flex-wrap items-baseline gap-x-2 gap-y-1', compact ? 'mb-1' : 'mb-2')}>
-          {card.title && <span className="text-[13.5px] font-semibold text-txt">{card.title}</span>}
+          {card.title && <span className="text-14 font-semibold text-txt">{card.title}</span>}
           {card.color && <Tag title="原系统推送语义色，与本项目 A 股色板无关">{card.color}</Tag>}
         </div>
       )}
@@ -103,16 +103,16 @@ export function CardArchiveView({
           <div
             // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
             key={i}
-            className="text-[12.5px] leading-relaxed whitespace-pre-wrap border-l-2 border-line-faint pl-2.5"
+            className="text-13 leading-relaxed whitespace-pre-wrap border-l-2 border-line-faint pl-2.5"
           >
             {b}
           </div>
         ))}
-        {blocks.length === 0 && <span className="text-sub text-[12px]">（卡片无文本元素）</span>}
+        {blocks.length === 0 && <span className="text-sub text-12">（卡片无文本元素）</span>}
       </div>
 
       {card.note && (
-        <div className="mt-2 pt-1.5 border-t border-line-faint text-sub text-[11.5px] leading-relaxed">
+        <div className="mt-2 pt-1.5 border-t border-line-faint text-sub text-12 leading-relaxed">
           {card.note}
         </div>
       )}

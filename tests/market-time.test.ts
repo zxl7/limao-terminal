@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { AuctionLiveSchema } from '@/shared/api/schemas'
-import { bjTimeString, inTrading, isTradingDay, sessionName } from '@/shared/lib'
+import { bjTimeString, inTrading, isFrozenSnapshot, isTradingDay, sessionName } from '@/shared/lib'
 
 /**
  * 构造一个「北京时间为指定时刻」的 Date。
@@ -106,5 +106,40 @@ describe('bjTimeString —— 北京时间串', () => {
 
   it('跨日边界正确（BJ 00:00 对应 UTC 前一日 16:00）', () => {
     expect(bjTimeString(bjAt(2026, 9, 15, 0, 0))).toBe('00:00:00')
+  })
+})
+
+describe('isFrozenSnapshot —— 「定格」判定（周末/节假日/盘后）', () => {
+  /**
+   * 用户 2026-10-31（周六）原话：「今天休息日的嘛，数据定格」。
+   * 周末页面落后 66000 秒是正常态，不该报警；盘中断流才是真故障。
+   */
+  it('周六看周五的数据 → 定格', () => {
+    expect(isFrozenSnapshot('2026-10-30 15:00', bjAt(2026, 10, 31, 9, 30))).toBe(true)
+  })
+
+  it('周一盘前看上周五的数据 → 定格', () => {
+    expect(isFrozenSnapshot('2026-10-30 15:00', bjAt(2026, 11, 2, 8, 40))).toBe(true)
+  })
+
+  it('盘中看当天数据 → 不定格（该报警的还是要报）', () => {
+    expect(isFrozenSnapshot('2026-10-30 15:00', bjAt(2026, 10, 30, 10, 0))).toBe(false)
+  })
+
+  it('同一天、收盘后超过 1 小时没更新 → 定稿，也算定格', () => {
+    expect(isFrozenSnapshot('2026-10-30 15:00', bjAt(2026, 10, 30, 16, 30))).toBe(true)
+  })
+
+  it('同一天、收盘后不到 1 小时 → 仍算「刚收盘」，不判定格', () => {
+    expect(isFrozenSnapshot('2026-10-30 15:00', bjAt(2026, 10, 30, 15, 40))).toBe(false)
+  })
+
+  it('没有时间戳 → 不判定（⛔ 不把「不知道」当定格）', () => {
+    expect(isFrozenSnapshot(null, bjAt(2026, 10, 31, 9, 30))).toBe(false)
+    expect(isFrozenSnapshot('', bjAt(2026, 10, 31, 9, 30))).toBe(false)
+  })
+
+  it('只有日期没有时刻（旧的 asof 形态）也能判', () => {
+    expect(isFrozenSnapshot('2026-10-30', bjAt(2026, 10, 31, 9, 30))).toBe(true)
   })
 })

@@ -39,7 +39,7 @@ export function ExpectCard() {
   return (
     <Card
       title="🧭 次日预期"
-      extra={<span className="text-[11px] font-normal text-sub">东财题材榜 · 用于提前埋伏</span>}
+      extra={<span className="text-11 font-normal text-sub">东财题材榜 · 用于提前埋伏</span>}
     >
       {rows.length > 0 ? (
         <div className="flex flex-col gap-1.5">
@@ -54,16 +54,16 @@ export function ExpectCard() {
                 className="rounded-[var(--radius-sm)] bg-line-faint px-2 py-1.5"
               >
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-[13px] font-semibold text-txt">{e.name}</span>
-                  <span className={cn('num text-[12px]', pctTone(e.pct))}>{fmtPct(e.pct, 1)}</span>
-                  <span className="num text-[11px] text-sub">累计 {fmtPct(e.cum_pct, 1)}</span>
-                  <span className="num text-[11px] text-sub">
-                    涨停 <b className="text-[12px] text-up">{e.zt}</b>
+                  <span className="text-13 font-semibold text-txt">{e.name}</span>
+                  <span className={cn('num text-12', pctTone(e.pct))}>{fmtPct(e.pct, 1)}</span>
+                  <span className="num text-11 text-sub">累计 {fmtPct(e.cum_pct, 1)}</span>
+                  <span className="num text-11 text-sub">
+                    涨停 <b className="text-12 text-up">{e.zt}</b>
                   </span>
                 </div>
 
                 {e.title && (
-                  <div className="text-[11px] text-sub mt-0.5 truncate" title={e.title}>
+                  <div className="text-11 text-sub mt-0.5 truncate" title={e.title}>
                     {e.title}
                   </div>
                 )}
@@ -71,13 +71,13 @@ export function ExpectCard() {
                 {(dragons.length > 0 || others.length > 0) && (
                   <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-0.5">
                     {dragons.map((s) => (
-                      <StockLink key={s.code} code={s.code} className="text-[12px] font-semibold text-lead">
+                      <StockLink key={s.code} code={s.code} className="text-12 font-semibold text-lead">
                         ★{s.name}
                         <span className={cn('num ml-1', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</span>
                       </StockLink>
                     ))}
                     {others.map((s) => (
-                      <StockLink key={s.code} code={s.code} className="text-[11.5px] text-txt">
+                      <StockLink key={s.code} code={s.code} className="text-12 text-txt">
                         {s.name}
                         <span className={cn('num ml-1', pctTone(s.pct))}>{fmtPct(s.pct, 1)}</span>
                       </StockLink>
@@ -87,7 +87,7 @@ export function ExpectCard() {
               </div>
             )
           })}
-          <div className="text-[10.5px] text-sub">
+          <div className="text-11 text-sub">
             ★ = 东财标记龙头；涨幅为题材指数涨幅；⛔ 科创板（688）已按无权限剔除
           </div>
         </div>

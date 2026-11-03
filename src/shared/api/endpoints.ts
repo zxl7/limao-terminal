@@ -26,6 +26,7 @@ import type {
   AuditEntry,
   BacktestReport,
   BoardCoreFile,
+  BoardLeaderDailyFile,
   CandidatesFile,
   CardArchiveFile,
   CarrierState,
@@ -113,6 +114,7 @@ export interface RouteTypeMap {
 
   // ── 三、板块核心票 ──
   '/api/board/core': DatedFile<BoardCoreFile>[]
+  '/api/board/leader-daily': DatedFile<BoardLeaderDailyFile>[]
 
   // ── 四、连板晋级量化 ──
   '/api/promotion/summary': PromoSummary
@@ -277,6 +279,8 @@ export const api = {
   // ── 三、板块核心票 ──
   /** 板块核心度（四维加权 core_score）· 板块异动先查 core 票动不动 */
   boardCore: () => fetchRoute('/api/board/core'),
+  /** 连板日观察：板块×交易日 → 龙一/板数/换人/熄火 */
+  boardLeaderDaily: () => fetchRoute('/api/board/leader-daily'),
 
   // ── 四、连板晋级量化 ──
   /** 晋级率汇总（分段成功率 + 次日溢价） */

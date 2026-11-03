@@ -41,7 +41,7 @@ export function AmbushCard() {
     <Card
       title="🚀 早鸟埋伏"
       extra={
-        <span className="text-[11px] font-normal text-sub">
+        <span className="text-11 font-normal text-sub">
           {rows.length > 0 ? `${rows.length} 个在爆发` : '无'}
         </span>
       }
@@ -55,30 +55,30 @@ export function AmbushCard() {
             >
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="badge bg-rec text-white px-1.5">{e.type}</span>
-                <span className="text-[13px] font-semibold text-rec">{e.sector}</span>
-                <span className="num text-[11px] text-sub ml-auto">
-                  板块涨停 <b className="text-[12px] text-up">{e.zt_in_sector}</b>
+                <span className="text-13 font-semibold text-rec">{e.sector}</span>
+                <span className="num text-11 text-sub ml-auto">
+                  板块涨停 <b className="text-12 text-up">{e.zt_in_sector}</b>
                 </span>
               </div>
 
               {/* 催化 —— 空串时不留空行，直接省略（空 desc 本身也是一条信息） */}
               {e.desc ? (
-                <div className="text-[11px] text-sub mt-0.5 line-clamp-2">催化：{e.desc}</div>
+                <div className="text-11 text-sub mt-0.5 line-clamp-2">催化：{e.desc}</div>
               ) : (
-                <div className="text-[11px] text-sub mt-0.5">暂无板块级催化（纯资金驱动）</div>
+                <div className="text-11 text-sub mt-0.5">暂无板块级催化（纯资金驱动）</div>
               )}
 
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mt-1 pt-1 border-t border-rec/15">
-                <span className="flex items-center gap-1 text-[10.5px] text-rec flex-none">
+                <span className="flex items-center gap-1 text-11 text-rec flex-none">
                   <Icon name="target" size={12} />
                   可买
                 </span>
-                <StockLink code={e.buy?.code} className="text-[13px] font-semibold text-txt">{e.buy?.name ?? '—'}</StockLink>
-                <span className={cn('num text-[13px] font-semibold', pctTone(e.buy?.pct))}>
+                <StockLink code={e.buy?.code} className="text-13 font-semibold text-txt">{e.buy?.name ?? '—'}</StockLink>
+                <span className={cn('num text-13 font-semibold', pctTone(e.buy?.pct))}>
                   {fmtPct(e.buy?.pct)}
                 </span>
                 {e.buy?.price != null && (
-                  <span className="num text-[11px] text-sub">¥{e.buy.price}</span>
+                  <span className="num text-11 text-sub">¥{e.buy.price}</span>
                 )}
                 {e.buy?.is_20cm && (
                   <span className="badge bg-lead-soft text-lead">20cm · 波动大</span>
@@ -87,9 +87,9 @@ export function AmbushCard() {
 
               {e.members && e.members.length > 0 && (
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 mt-0.5">
-                  <span className="text-[10.5px] text-sub flex-none">同板强势</span>
+                  <span className="text-11 text-sub flex-none">同板强势</span>
                   {e.members.map((m) => (
-                    <span key={m.name} className="text-[11.5px] text-txt">
+                    <span key={m.name} className="text-12 text-txt">
                       {m.name}
                       <span className={cn('num ml-1', pctTone(m.pct))}>{fmtPct(m.pct)}</span>
                     </span>

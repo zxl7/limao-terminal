@@ -10,7 +10,7 @@ export function TideAlgorithmStrip({ group }: { group: '实时' | '盘面' }) {
   const textTone = tide.tone === 'up' ? 'text-up' : tide.tone === 'down' ? 'text-down' : tide.tone === 'warn' ? 'text-warn' : 'text-sub'
 
   return (
-    <section className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line pb-2 text-[11.5px]" aria-label="情绪周期之潮汐算法">
+    <section className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line pb-2 text-12" aria-label="情绪周期之潮汐算法">
       <span className="font-semibold text-txt">情绪周期 · 潮汐算法</span>
       <span className={cn('font-semibold', textTone)}>{tide.label}</span>
       <span className="text-sub">{tide.action}</span>

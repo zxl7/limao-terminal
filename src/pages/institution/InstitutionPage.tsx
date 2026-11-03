@@ -110,7 +110,7 @@ export function Component() {
           <StatPair label="早盘卡" value={morning.data ? '有' : '无'} tone={morning.data ? 'up' : 'sub'} />
           <StatPair label="晚报" value={evening.data ? '有' : '无'} tone={evening.data ? 'up' : 'sub'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           本系统其余维度从**盘面**反推（涨停 / 资金 / 梯队），机构视角从**产业链逻辑**正推。
           两者不一致处即信息所在：机构先行提供埋伏位，盘面先行提供接力位。
         </p>
@@ -132,7 +132,7 @@ export function Component() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="搜个股 / 代码 / 逻辑…"
-                className="px-2.5 py-1 text-[12.5px] rounded-sm min-w-[170px] bg-transparent border border-line text-txt placeholder:text-sub focus:outline-none focus:border-line-strong"
+                className="px-2.5 py-1 text-13 rounded-sm min-w-[170px] bg-transparent border border-line text-txt placeholder:text-sub focus:outline-none focus:border-line-strong"
               />
             )}
             <SegTabs
@@ -161,7 +161,7 @@ export function Component() {
                 <div key={g.theme} className="border border-line rounded-sm px-2.5 py-2">
                   <div className="flex items-baseline gap-2 mb-1">
                     <Tag tone="up">{tradableStocks(g.items).length} 家</Tag>
-                    <span className="text-[13px] font-semibold text-txt">{g.theme}</span>
+                    <span className="text-13 font-semibold text-txt">{g.theme}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {tradableStocks(g.items).map((it) => (
@@ -178,7 +178,7 @@ export function Component() {
               ))}
             </div>
             {groups.length > 0 && (
-              <p className="text-sub text-[11px] mt-2">
+              <p className="text-sub text-11 mt-2">
                 按机构逻辑归组 —— 同一句话逻辑下的票属于同一条产业链，这与按行业分类不同。
               </p>
             )}
@@ -217,7 +217,7 @@ export function Component() {
               {
                 label: '首条逻辑',
                 className: 'whitespace-normal min-w-[280px]',
-                cell: (f) => <span className="text-sub text-[11.5px]">{f.items?.[0]?.theme ?? '—'}</span>,
+                cell: (f) => <span className="text-sub text-12">{f.items?.[0]?.theme ?? '—'}</span>,
               },
             ]}
           />

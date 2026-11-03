@@ -62,7 +62,7 @@ const PHASE_SURFACE: Record<'down' | 'warn' | 'mid' | 'up' | 'rec' | 'neutral', 
 
 function HeatBadge({ signal, risk = false }: { signal: HeatSignal; risk?: boolean }) {
   const text = signal.level === 'unknown' ? '待确认' : `${HEAT_LABEL[signal.level]}${risk ? '·风险' : ''}`
-  return <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] leading-none ${HEAT_CLASS[signal.level]}`}>{text}</span>
+  return <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-10 leading-none ${HEAT_CLASS[signal.level]}`}>{text}</span>
 }
 
 function HeatItem({
@@ -81,14 +81,14 @@ function HeatItem({
   return (
     <div className={`min-w-0 rounded border px-3 py-2.5 ${HEAT_SURFACE[signal.level]}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[11px] text-sub">{label}</span>
+        <span className="truncate text-11 text-sub">{label}</span>
         <HeatBadge signal={signal} risk={risk} />
       </div>
       <div className="mt-1 flex items-baseline gap-1">
-        <span className="num text-[21px] font-semibold leading-none text-txt">{value}</span>
-        {unit && <span className="text-[11px] text-sub">{unit}</span>}
+        <span className="num text-20 font-semibold leading-none text-txt">{value}</span>
+        {unit && <span className="text-11 text-sub">{unit}</span>}
       </div>
-      <div className="mt-1 text-[10px] text-sub">
+      <div className="mt-1 text-10 text-sub">
         {signal.sampleCount > 0 ? `当前有效窗口 ${signal.sampleCount} 日` : '暂无有效样本'}
       </div>
     </div>
@@ -97,7 +97,7 @@ function HeatItem({
 
 function HeatLegend() {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-faint pt-2 text-[10px] text-sub">
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-faint pt-2 text-10 text-sub">
       <span className="font-medium text-txt">周期冷热</span>
       <span className="text-down">冷</span>
       <span className="text-warn">偏冷</span>
@@ -113,7 +113,7 @@ function PhaseTrack({ phase }: { phase: CyclePhase | null }) {
   const phases: CyclePhase[] = ['ice', 'ebb', 'repair', 'warming', 'high']
   return (
     <div className="mt-4">
-      <div className="mb-1.5 flex items-center justify-between text-[10px] text-sub">
+      <div className="mb-1.5 flex items-center justify-between text-10 text-sub">
         <span>周期位置</span>
         <span>冷 → 热</span>
       </div>
@@ -125,7 +125,7 @@ function PhaseTrack({ phase }: { phase: CyclePhase | null }) {
           return (
             <div
               key={item}
-              className={`rounded px-1 py-1.5 text-center text-[10px] ${surface} ${active ? 'font-semibold text-txt ring-1 ring-inset ring-line-strong' : 'text-sub'}`}
+              className={`rounded px-1 py-1.5 text-center text-10 ${surface} ${active ? 'font-semibold text-txt ring-1 ring-inset ring-line-strong' : 'text-sub'}`}
             >
               {CYCLE_PHASE_LABEL[item]}
             </div>
@@ -167,25 +167,25 @@ export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResu
         <section className={`rounded border p-3 ${PHASE_SURFACE[phase.tone]}`} aria-label="当前周期状态">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] text-sub">当前周期状态</div>
-              <div className="mt-1 text-[25px] font-semibold leading-none text-txt">{phase.label}</div>
+              <div className="text-11 text-sub">当前周期状态</div>
+              <div className="mt-1 text-25 font-semibold leading-none text-txt">{phase.label}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-sub">情绪分</div>
-              <div className="num mt-1 text-[25px] font-semibold leading-none text-txt">{latestSentiment}<span className="ml-1 text-[11px] font-normal text-sub">/10</span></div>
+              <div className="text-10 text-sub">情绪分</div>
+              <div className="num mt-1 text-25 font-semibold leading-none text-txt">{latestSentiment}<span className="ml-1 text-11 font-normal text-sub">/10</span></div>
             </div>
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-sub">情绪周期决定环境温度；下方各维度再看兑现、炸板、涨停和资金是否同步。</p>
+          <p className="mt-2 text-11 leading-relaxed text-sub">情绪周期决定环境温度；下方各维度再看兑现、炸板、涨停和资金是否同步。</p>
           <PhaseTrack phase={phase.phase} />
         </section>
 
         <section className="rounded border border-line bg-panel/50 p-3" aria-label="周期冷热维度">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <div className="text-[12px] font-medium text-txt">数据维度冷热</div>
-              <div className="mt-0.5 text-[10px] text-sub">先看当前值，再看它在有效历史窗口中的相对位置。</div>
+              <div className="text-12 font-medium text-txt">数据维度冷热</div>
+              <div className="mt-0.5 text-10 text-sub">先看当前值，再看它在有效历史窗口中的相对位置。</div>
             </div>
-            <span className="rounded border border-line px-1.5 py-0.5 text-[10px] text-sub">真实样本窗口</span>
+            <span className="rounded border border-line px-1.5 py-0.5 text-10 text-sub">真实样本窗口</span>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 2xl:grid-cols-3">
             <HeatItem label="昨日涨停兑现" value={pct(result.latest.feedback?.promoteRate ?? null)} signal={result.heat.promoteRate} />
@@ -272,7 +272,7 @@ export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResu
           {hasFunds ? (
             <div className="grid grid-cols-1 gap-3 2xl:grid-cols-2">
               <div>
-                <div className="mb-1 text-[10px] text-sub">资金温度（当前窗口相对值）</div>
+                <div className="mb-1 text-10 text-sub">资金温度（当前窗口相对值）</div>
                 <LineChart
                   labels={funds.map((row) => row.date.slice(5))}
                   series={[{ name: '资金温度', values: funds.map((row) => row.temperature), tone: 'mid', area: true }]}
@@ -284,7 +284,7 @@ export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResu
                 />
               </div>
               <div>
-                <div className="mb-1 text-[10px] text-sub">主力净额（亿）</div>
+                <div className="mb-1 text-10 text-sub">主力净额（亿）</div>
                 <BarChart
                   bars={funds.map((row) => ({ label: row.date.slice(5), value: row.mainNetYi, tone: (row.mainNetYi ?? 0) >= 0 ? 'up' : 'down' }))}
                   height={180}

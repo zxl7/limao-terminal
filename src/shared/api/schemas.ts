@@ -46,6 +46,8 @@ const CountNames = z.object({
   // 只用 `.optional()` 会把「今天真是 0 家」与「尚未统计」混为一谈。
   count: nOrNull.optional(),
   names: z.array(s).optional(),
+  // 明细（含跌幅）：早期快照没有该字段，故 optional 且 pct 可空。
+  items: z.array(z.object({ code: s.optional(), name: s, pct: nOrNull.optional() })).optional(),
 })
 
 // ════════════════════════════════════════════════════════════════
@@ -197,6 +199,17 @@ export const MarketSnapshotSchema = z.object({
   index: z.array(IndexQuote).optional(),
   limit_down: CountNames.optional(),
   broken: CountNames.optional(),
+  // 涨停全量名单（首封时间 fbt 的盘中实时来源）· 未声明会被 zod 直接剥掉
+  limit_up_stocks: z.array(z.object({
+    code: s, name: s,
+    pct: nOrNull.optional(),
+    // ⚠️ boards/sector 是**字符串**（`2天2板` / `航天`），写成 nOrNull 会让守卫
+    //    每轮都报 `expected number, received string`，顶栏一直挂「源结构异常」。
+    boards: z.string().nullish(),
+    sector: z.string().nullish(),
+    // fbt 形如 `09:25`；上游早期没有该字段 → 可空
+    fbt: z.string().nullish(),
+  })).optional(),
   weak_sectors: z
     .object({
       // ⚠️ 2026-10-14 修正：生产侧 `intraday_pulse.py:622` 写的是对象

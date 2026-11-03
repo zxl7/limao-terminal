@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { marketQueries, sentimentLabelTone, type Tone } from '@/features/market'
-import { bjTimeString, cn, fmtPct, sessionName, sortLadderDesc, upcls } from '@/shared/lib'
+import { bjTimeString, cn, fmtPct, isFrozenSnapshot, sessionName, sortLadderDesc, upcls } from '@/shared/lib'
 import { useContractIssues, useNow } from '@/shared/hooks'
 import { APP_CONFIG } from '@/shared/config'
 
@@ -42,6 +42,21 @@ export function TopBar() {
 
   const indexes = data?.index ?? []
   const updatedText = data?.data_scope?.asof || (data ? bjTimeString(new Date(data.ts)) : DASH)
+  /**
+   * 数据延迟（秒）：`now` 每秒跳一次，`ts` 是快照生成时刻。
+   *
+   * 为什么非要显示具体秒数：原来的指示灯只回答「新鲜 / 已陈旧」两档，
+   * 而盘中真正会误判的是**「40 秒前」与「4 分钟前」看起来一样**。
+   * 数字让「页面停留在旧盘」这件事无法被忽略。
+   */
+  const lagSec = data?.ts ? Math.max(0, Math.floor((now.getTime() - new Date(data.ts).getTime()) / 1000)) : null
+  /**
+   * 定格态：快照是**已收盘定稿**的历史数据（周末/节假日/盘后）。
+   *
+   * 此时「落后 +66000s」是正常态，不是故障 —— 继续刷黄只会让告警失去意义。
+   * 所以换成中性的「定格」标签，把「数据有问题」这一档留给真正的盘中断流。
+   */
+  const frozen = isFrozenSnapshot(data?.data_scope?.asof || data?.ts, now)
   const contractCount = issues.size
 
   const sd = data?.sentiment_detail
@@ -53,14 +68,12 @@ export function TopBar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center gap-4 px-4 h-[46px] flex-none text-head-txt"
-      style={{ background: 'linear-gradient(90deg, #1c2130, #283049)' }}
+      className="sticky top-0 z-30 flex items-center gap-4 px-4 h-[46px] flex-none text-head-txt bg-head-bg"
     >
       {/* 品牌 —— 仅窄屏显示（≥lg 时品牌在左侧栏，避免重复） */}
-      <div className="max-lg:flex lg:hidden items-center gap-2 font-bold text-[15px] tracking-[0.02em]">
+      <div className="max-lg:flex lg:hidden items-center gap-2 font-bold text-15 tracking-[0.02em]">
         <span
-          className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white text-[13px] font-extrabold"
-          style={{ background: 'linear-gradient(135deg, #ee2500, #ff7a3d)' }}
+          className="w-6 h-6 rounded-md inline-flex items-center justify-center text-white text-13 font-semibold bg-up"
         >
           狸
         </span>
@@ -71,10 +84,10 @@ export function TopBar() {
       <div className="flex items-center gap-4 flex-none">
         {indexes.map((x) => (
           <div key={x.name} className="flex flex-col leading-tight whitespace-nowrap">
-            <span className="text-[10px] text-head-soft">{x.name}</span>
+            <span className="text-10 text-head-soft">{x.name}</span>
             <span className="flex items-baseline gap-1.5">
-              <b className="head-num text-[13px] text-head-txt">{x.price ?? DASH}</b>
-              <b className={cn('head-num text-[11px]', headTone(x.pct))}>{fmtPct(x.pct)}</b>
+              <b className="head-num text-13 text-head-txt">{x.price ?? DASH}</b>
+              <b className={cn('head-num text-11', headTone(x.pct))}>{fmtPct(x.pct)}</b>
             </span>
           </div>
         ))}
@@ -85,9 +98,9 @@ export function TopBar() {
 
       {/* 快照情绪：定性 + 分数（按 label 判色） */}
       <div className="flex items-center gap-1.5 flex-none whitespace-nowrap">
-        <span className="text-[10px] text-head-soft">快照情绪</span>
-        <b className={cn('head-num text-[15px]', headFromTone(tone))}>{sd?.score ?? DASH}</b>
-        <span className="text-[11px] text-head-soft">{sd?.label ?? data?.sentiment ?? DASH}</span>
+        <span className="text-10 text-head-soft">快照情绪</span>
+        <b className={cn('head-num text-15', headFromTone(tone))}>{sd?.score ?? DASH}</b>
+        <span className="text-11 text-head-soft">{sd?.label ?? data?.sentiment ?? DASH}</span>
       </div>
 
       <span className="w-px h-6 bg-white/15 flex-none" aria-hidden />
@@ -138,7 +151,7 @@ export function TopBar() {
 
       {/* 退潮预警 —— 决策权重最高的一条，常驻可见 */}
       {ebb && (
-        <span className="flex-none whitespace-nowrap text-[11px] font-semibold text-head-warn">
+        <span className="flex-none whitespace-nowrap text-11 font-semibold text-head-warn">
           {ebb.severity}
         </span>
       )}
@@ -150,11 +163,29 @@ export function TopBar() {
         <span
           className={cn(
             'w-2 h-2 rounded-full',
-            isStale(data?.ts) ? 'bg-head-soft' : 'bg-head-down shadow-[0_0_6px_#34d399]',
+            frozen || isStale(data?.ts) ? 'bg-head-soft' : 'bg-head-down',
           )}
-          title={isStale(data?.ts) ? '数据已超过陈旧阈值' : '数据新鲜'}
+          title={frozen ? '非当日/已收盘数据：展示的是定格收盘盘面' : isStale(data?.ts) ? '数据已超过陈旧阈值' : '数据新鲜'}
         />
         <span className="text-head-soft">{updatedText}</span>
+        {frozen ? (
+          <span
+            className="text-10 px-1 py-0.5 rounded-sm bg-white/10 text-head-soft leading-none"
+            title="周末/节假日/盘后：页面展示最近一个交易日的收盘定格数据，不做延迟告警"
+          >
+            定格
+          </span>
+        ) : lagSec !== null && (
+          <span
+            className={cn(
+              'head-num tabular-nums',
+              lagSec > 300 ? 'text-head-warn font-semibold' : lagSec > 90 ? 'text-head-warn' : 'text-head-soft',
+            )}
+            title={lagSec > 90 ? `数据快照已落后 ${lagSec} 秒` : '数据新鲜'}
+          >
+            +{lagSec}s
+          </span>
+        )}
 
         {contractCount > 0 && (
           <span
@@ -187,10 +218,10 @@ function HeadKpi({
 }) {
   return (
     <div className={cn('flex-col leading-tight whitespace-nowrap', className || 'flex')}>
-      <span className="text-[10px] text-head-soft">{label}</span>
-      <span className={cn('head-num text-[13px]', tone)}>
+      <span className="text-10 text-head-soft">{label}</span>
+      <span className={cn('head-num text-13', tone)}>
         {value}
-        {unit && <span className="text-[10px] text-head-soft ml-0.5">{unit}</span>}
+        {unit && <span className="text-10 text-head-soft ml-0.5">{unit}</span>}
       </span>
     </div>
   )

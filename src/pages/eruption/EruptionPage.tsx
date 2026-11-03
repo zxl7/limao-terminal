@@ -102,7 +102,7 @@ export function Component() {
           <StatPair label="最新快讯条数" value={activeNews?.newsflash?.length ?? '—'} />
           <StatPair label="生成时间" value={active?.generated_ts?.slice(11, 19) ?? '—'} />
         </div>
-        <p className="text-sub text-[11.5px] leading-relaxed">
+        <p className="text-sub text-12 leading-relaxed">
           题材 + 催化原文绑定是全系统唯一一处 —— 涨停池告诉你「什么多」，这里告诉你「为什么」。
           催化标题为原系统抓取的原始文案，本页不做改写。
         </p>
@@ -119,7 +119,7 @@ export function Component() {
               onChange={(e) => setQ(e.target.value)}
               placeholder="搜题材 / 催化 / 个股…"
               className={cn(
-                'px-2.5 py-1 text-[12.5px] rounded-sm min-w-[180px]',
+                'px-2.5 py-1 text-13 rounded-sm min-w-[180px]',
                 'bg-transparent border border-line text-txt placeholder:text-sub',
                 'focus:outline-none focus:border-line-strong',
               )}
@@ -142,7 +142,7 @@ export function Component() {
                 <select
                   value={active?.date ?? ''}
                   onChange={(e) => setDayIdx(days.findIndex((x) => x.date === e.target.value))}
-                  className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                  className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                 >
                   {days.map((x) => (
                     <option key={x.date} value={x.date}>
@@ -164,7 +164,7 @@ export function Component() {
               {themes.map((t) => (
                 <div key={t.name} className="border border-line rounded-sm px-2.5 py-2">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-[13.5px] font-semibold text-txt">{t.name}</span>
+                    <span className="text-14 font-semibold text-txt">{t.name}</span>
                     <StatPair label="涨停" value={t.zt} tone="up" />
                     <StatPair
                       label="当日"
@@ -176,11 +176,11 @@ export function Component() {
                       value={t.cum_pct != null ? pct(t.cum_pct) : '—'}
                       tone={(t.cum_pct ?? 0) > 0 ? 'up' : 'down'}
                     />
-                    <span className="num text-sub text-[11px]">{t.themeCode || ''}</span>
+                    <span className="num text-sub text-11">{t.themeCode || ''}</span>
                   </div>
 
                   {t.title && (
-                    <div className="mt-1 text-[12.5px] leading-relaxed">
+                    <div className="mt-1 text-13 leading-relaxed">
                       <span className="text-warn">催化：</span>
                       {t.title}
                     </div>
@@ -204,7 +204,7 @@ export function Component() {
                         </span>
                       ))}
                       {t.stocks.length > 12 && (
-                        <span className="text-sub text-[11px] self-center">+{t.stocks.length - 12}</span>
+                        <span className="text-sub text-11 self-center">+{t.stocks.length - 12}</span>
                       )}
                     </div>
                   )}
@@ -216,7 +216,7 @@ export function Component() {
 
         {tab === 'news' && (
           <>
-            <div className="text-sub text-[12px] mb-2">
+            <div className="text-sub text-12 mb-2">
               {activeNews
                 ? `归档日 ${activeNews.date} · ${activeNews.newsflash.length} 条`
                 : '无快讯归档'}
@@ -229,7 +229,7 @@ export function Component() {
                 {
                   label: '快讯',
                   className: 'whitespace-normal min-w-[320px]',
-                  cell: (n) => <span className="text-[12.5px] leading-relaxed">{n.title}</span>,
+                  cell: (n) => <span className="text-13 leading-relaxed">{n.title}</span>,
                 },
                 {
                   label: '指向题材',
@@ -264,7 +264,7 @@ export function Component() {
               ]}
             />
             {!!newsDays.length && newsDays.length > 1 && (
-              <p className="text-sub text-[11px] mt-2">
+              <p className="text-sub text-11 mt-2">
                 已归档 {newsDays.length} 日（{newsDays.at(-1)?.date} ~ {newsDays[0]?.date}），本页展示最新一日。
               </p>
             )}

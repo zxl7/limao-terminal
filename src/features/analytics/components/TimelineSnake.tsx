@@ -223,7 +223,7 @@ function LabelChip({
         data-label-dir={dir}
       />
       <span
-        className="absolute left-1/2 -translate-x-1/2 num text-[9.5px] text-txt whitespace-nowrap pointer-events-none"
+        className="absolute left-1/2 -translate-x-1/2 num text-10 text-txt whitespace-nowrap pointer-events-none"
         style={isUp ? { bottom: HIT_H + slot.tier * LABEL_STEP } : { top: HIT_H + slot.tier * LABEL_STEP }}
         data-label-tier={slot.tier}
         data-label-dir={dir}
@@ -235,8 +235,8 @@ function LabelChip({
           <span
             className={cn(
               tag.compact ? undefined : 'ml-1',
-              tag.kind === 'first' && 'text-[11.5px] font-bold text-rec',
-              tag.kind === 'follow' && 'text-[11px] font-semibold text-rec/80',
+              tag.kind === 'first' && 'text-12 font-bold text-rec',
+              tag.kind === 'follow' && 'text-11 font-semibold text-rec/80',
               tag.kind === 'rotation' && 'text-rec',
               // 走强红、走弱绿 —— 与引导线同色，除「上/下」之外还能直接读强弱
               tag.kind === 'plain' && (tag.dir === 'down' ? 'text-down/75' : 'text-up/75'),
@@ -267,13 +267,13 @@ export function ShapeLegend({ className }: { className?: string }) {
       )}
       aria-label="时间轴图形说明"
     >
-      <span className="text-[10.5px] font-semibold tracking-[0.1em] text-txt">图形说明</span>
+      <span className="text-11 font-semibold tracking-[0.1em] text-txt">图形说明</span>
       {SHAPE_LEGEND_ORDER.map((kind) => {
         const spec = SIGNAL_SHAPE[kind]
         return (
           <span
             key={kind}
-            className="flex items-center gap-1 text-[11px] text-txt/85"
+            className="flex items-center gap-1 text-11 text-txt/85"
             title={spec.desc}
             data-legend-kind={kind}
           >
@@ -288,7 +288,7 @@ export function ShapeLegend({ className }: { className?: string }) {
           </span>
         )
       })}
-      <span className="text-[10.5px] text-sub">图标等大 · 竖线高度 = 活跃度</span>
+      <span className="text-11 text-sub">图标等大 · 竖线高度 = 活跃度</span>
     </div>
   )
 }
@@ -360,7 +360,7 @@ const DETAIL_FLIP_Y = 300
 /**
  * 浮层**字号缩放**（2026-10-22 用户：「字体放大一点」）。
  *
- * ⛔ 为什么用 `zoom` 而不是逐个改 `text-[11px]`：详情内容是 `SlotBody` +
+ * ⛔ 为什么用 `zoom` 而不是逐个改 `text-11`：详情内容是 `SlotBody` +
  *    `IntradayEventLine` + `StockRow` + `EventSlot` 六七个组件拼的，逐个改字号
  *    必然漏一两处，出现「题材名 13.5px、股票名 12px、事件 11.5px」的混排错位。
  *    `zoom` 是**整块等比放大**（字号/间距/圆角一起），不会互相错位；且真实布局重算，
@@ -878,7 +878,7 @@ function TimeGrid({ x, y, rowHeight, label }: { x: number; y: number; rowHeight:
       aria-hidden
     >
       <div className="w-px h-full border-l border-dashed border-line-faint" />
-      <span className="absolute -top-0.5 left-1 text-[9.5px] text-sub whitespace-nowrap">{label}</span>
+      <span className="absolute -top-0.5 left-1 text-10 text-sub whitespace-nowrap">{label}</span>
     </div>
   )
 }
@@ -1397,7 +1397,7 @@ export function TimelineSnake({
         {layout.lanes.map((lane) => (
           <span
             key={`lane-${lane.row}`}
-            className="absolute text-[9.5px] text-txt whitespace-nowrap pointer-events-none"
+            className="absolute text-10 text-txt whitespace-nowrap pointer-events-none"
             style={{
               left: lane.reversed ? layout.x1 : layout.x0,
               // 段末标签贴在**本段**底边（行高自适应后不能再用统一 rowHeight）
@@ -1418,9 +1418,9 @@ export function TimelineSnake({
         >
           <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-line-strong/80" />
           <span className="relative mx-auto flex w-max max-w-[86%] items-center gap-2 rounded-full border border-line bg-card px-3 py-1 shadow-sm">
-            <span className="text-[10.5px] font-semibold tracking-[0.14em] text-lead whitespace-nowrap">黄金分割线</span>
+            <span className="text-11 font-semibold tracking-[0.14em] text-lead whitespace-nowrap">黄金分割线</span>
             <span className="h-3 w-px bg-line" />
-            <span className="max-w-[360px] truncate text-[11.5px] text-sub">AI短线语录 · {aiQuote}</span>
+            <span className="max-w-[360px] truncate text-12 text-sub">AI短线语录 · {aiQuote}</span>
           </span>
         </div>
 

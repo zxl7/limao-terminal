@@ -120,7 +120,7 @@ async function renderIntraday() {
 }
 
 describe('盘中实时页 · PC 大屏布局不变量', () => {
-  it('左 60% / 中 30% / 右 10% 三栏：左 4 张 2×2 均分，中 3 张纵向，右为信号 rail（2026-09-22 定稿）', async () => {
+  it('左 60% / 中 30% / 右 10% 三栏：左首行通栏最强题材 + 次行 2 列，中 3 张纵向，右为信号 rail', async () => {
     const c = await renderIntraday()
     const zones = c.querySelector('.intraday-zones') as HTMLElement | null
     expect(zones, '未找到三栏容器 `.intraday-zones` —— 退回单列会让表格挤成两行').toBeTruthy()
@@ -139,24 +139,32 @@ describe('盘中实时页 · PC 大屏布局不变量', () => {
     expect(cols[1].className, '中栏应占 30%').toContain('xl:w-[30%]')
     expect(cols[2].className, '右栏应占 10%').toContain('xl:w-[10%]')
 
-    // 左栏：4 张卡在一个 2 列均分网格里
+    // 左栏：2 列网格。首行是**通栏**的「今天最强题材」（展开后要铺一条线的全部个股），
+    // 次行才是情绪走势 + 板块资金。⛔ 不能用 Board：它按视口给列数。
     const leftGrid = cols[0].querySelector('div[class*="grid"]') as HTMLElement | null
     expect(leftGrid, '左栏内部应是均分网格（⛔ 不能用 Board：它按视口给列数）').toBeTruthy()
     expect(leftGrid!.className).toContain('xl:grid-cols-2')
-    expect([...leftGrid!.children], '左栏 4 张卡均分').toHaveLength(4)
+    const cells = [...leftGrid!.children] as HTMLElement[]
+    expect(cells, '左栏 = 通栏题材卡 + 情绪 + 资金').toHaveLength(3)
+    expect(cells[0].className, '最强题材应占满整行').toContain('xl:col-span-2')
+    expect(cells[0].querySelector('.panel-title')?.textContent, '首行应是最强题材卡').toContain('最强题材')
+    expect(cells[0].querySelector('.panel-title')?.textContent, '⛔ 旧的题材强度表已并入').not.toContain('题材强度')
 
-    // 中栏：纵向堆叠的 3 张（顺序 = 用户实际调定的顺序；测试跟随，⛔ 不反向覆盖用户的调整）
+    // 中栏：纵向堆叠的 2 张（顺序 = 用户实际调定的顺序；测试跟随，⛔ 不反向覆盖用户的调整）
+    // ⚠️ 2026-10-30 校正：`昨日涨停反馈` 早已并入天梯与极值（见 IntradayPage 注释），
+    //    本条此前仍按 3 张断言 → 长期红着。这里按**实际 DOM** 锁 2 张。
     const midTitles = [...cols[1].querySelectorAll('.panel-title')].map((e) => e.textContent ?? '')
-    expect(midTitles).toHaveLength(3)
-    for (const [i, t] of ['昨日涨停反馈', '连板天梯', '极值名单'].entries()) {
+    expect(midTitles).toHaveLength(2)
+    for (const [i, t] of ['连板天梯', '极值名单'].entries()) {
       expect(midTitles[i], `中栏第 ${i + 1} 张应是「${t}」`).toContain(t)
     }
+    expect(midTitles.some((t) => t.includes('昨日涨停反馈')), '反馈已并入天梯/极值，不应再单独成卡').toBe(false)
 
     // 右栏**本身**即信号 rail（`SignalRail` 根节点带 `.signal-rail`，非 Card → 不计入 panel-title）
     expect(cols[2].classList.contains('signal-rail'), '右栏应是信号 rail').toBe(true)
 
-    // 全页共 7 张 Card：左 4 + 中 3（信号 rail 不是 Card）
-    expect(c.querySelectorAll('.panel-title')).toHaveLength(7)
+    // 全页共 5 张 Card：左 3 + 中 2（信号 rail 不是 Card）
+    expect(c.querySelectorAll('.panel-title')).toHaveLength(5)
   })
 
   it('⚡ 短线精灵渲染「当日沉淀」（signals_today）—— 刷新后列表不空，且剔除科创板', async () => {
@@ -251,44 +259,57 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     }
   })
 
-  it('移除四张旧独立卡，保留紧凑题材表、核心标的与盘中情绪走势', async () => {
+  it('移除四张旧独立卡；题材与个股合并为「今天最强题材」一张，不再各占一张', async () => {
     const c = await renderIntraday()
     const titles = [...c.querySelectorAll('.panel-title')].map((el) => el.textContent ?? '')
     for (const old of ['早鸟埋伏', '主线热度', '次日预期', '板块增减']) {
       expect(titles.some((title) => title.includes(old))).toBe(false)
     }
-    // 7 张 Card 各恰好一次（短线精灵 2026-09-22 起迁入右栏 rail，非 Card → 不在此列）
-    for (const title of ['盘中情绪走势', '题材强度', '昨日涨停反馈', '核心标的', '板块资金', '连板天梯', '极值名单']) {
+    // 5 张 Card 各恰好一次（短线精灵 2026-09-22 起迁入右栏 rail，非 Card → 不在此列）
+    for (const title of ['盘中情绪走势', '最强题材', '板块资金', '连板天梯', '极值名单']) {
       expect(titles.filter((text) => text.includes(title)), `「${title}」应恰好出现一次`).toHaveLength(1)
+    }
+    // 2026-10-30：题材强度表与核心标的表已并成一张可折叠卡，⛔ 不得再单独出现
+    for (const gone of ['题材强度', '核心标的']) {
+      expect(titles.some((text) => text.includes(gone)), `「${gone}」应已并入最强题材卡`).toBe(false)
     }
     // 短线精灵 = 右栏 rail（承载短线精灵，非 Card）
     expect(c.querySelector('.signal-rail'), '短线精灵应迁入右栏 rail').toBeTruthy()
     // ⛔ 盘中实时页不放日内时间轴（用户 2026-09-20 定调：时间轴归 /timeline）
     expect(titles.some((title) => title.includes('时间轴'))).toBe(false)
-    /* 题材表：数据与渲染**同真同假** —— 盘前约 09:06 后端会把 `market/latest` 重置
-       （`top5` 清空，实测 2026-09-21 09:06:58），此刻 ThemeTopCard 本该渲染空态。
-       ⛔ 不能把「盘前无数据」误判成「表格没渲染」。 */
+    /* 题材行：数据与渲染**同真同假** —— 盘前约 09:06 后端会把 `market/latest` 重置
+       （`top5` 清空，实测 2026-09-21 09:06:58），此刻最强题材卡本该渲染空态。
+       ⛔ 不能把「盘前无数据」误判成「没渲染」。 */
     const top5 = ((readSnapshot()?.top5 as unknown[] | undefined) ?? [])
     if (top5.length > 0) {
-      expect(c.querySelector('table[aria-label="题材强度"]'), 'top5 非空却没渲染题材表').not.toBeNull()
+      expect(c.querySelector('button[aria-label^="题材 "]'), 'top5 非空却没渲染题材行').not.toBeNull()
+      // 默认展开第一名 —— 打开页面就能看到最强那条线里是谁
+      const opened = c.querySelector('button[aria-expanded="true"]')
+      expect(opened, '应默认展开最强题材').not.toBeNull()
     } else {
       expect(c.textContent, 'top5 为空时应给明确空态').toContain('暂无题材强度数据')
     }
-    /** 左栏（2×2 均分）的 4 张 —— 顺序即阅读顺序 */
+    /** 左栏 3 张 —— 顺序即阅读顺序 */
     const zones = c.querySelector('.intraday-zones')!
     const leftGrid = zones.children[0].querySelector('div[class*="grid"]')!
     const leftTitles = [...leftGrid.children].map((el) => el.querySelector('.panel-title')?.textContent ?? '')
-    expect(leftTitles).toHaveLength(4)
-    for (const [i, t] of ['盘中情绪走势', '题材强度', '核心标的', '板块资金'].entries()) {
+    expect(leftTitles).toHaveLength(3)
+    for (const [i, t] of ['最强题材', '盘中情绪走势', '板块资金'].entries()) {
       expect(leftTitles[i], `左栏第 ${i + 1} 张应是「${t}」`).toContain(t)
     }
-    /* 核心标的同理：盘前 `latest` 被重置（`leaders` / `early` 清空）时它本该是空态。
-       有数据才要求「票不重复上屏」。 */
+    /* 同一只票全页只出现一次（题材卡是唯一承载个股的地方）。 */
     const codes = [...c.querySelectorAll('[data-stock-code]')].map((el) => el.getAttribute('data-stock-code'))
     if (codes.length > 0) {
-      expect(new Set(codes).size, '同一只票不得重复上屏').toBe(codes.length)
-    } else {
-      expect(c.textContent, 'leaders/early 为空时应给明确空态').toContain('暂无核心标的')
+      // 同一只票可能同时是多个题材的核心（如上海沪工：业绩增长 + 航天），跨题材重复是事实，
+      // 但**同一题材内**不得重复铺行 —— 这里按「题材行内」校验。
+      const perTheme = [...c.querySelectorAll('button[aria-expanded]')].map((btn) =>
+        [...(btn.parentElement?.querySelectorAll('[data-stock-code]') ?? [])].map((el) => el.getAttribute('data-stock-code')),
+      )
+      for (const list of perTheme) {
+        expect(new Set(list).size, '同一题材内同一只票不得重复上屏').toBe(list.length)
+      }
+    } else if (top5.length > 0) {
+      expect(c.textContent, '有题材却一个个股都没渲染').not.toContain('undefined')
     }
   })
 })

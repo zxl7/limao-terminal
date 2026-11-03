@@ -74,7 +74,7 @@ export function AuctionMoneyCard({
       }
       className={className}
     >
-      <p className="text-sub text-[11.5px] leading-relaxed mb-2">
+      <p className="text-sub text-12 leading-relaxed mb-2">
         按{sortKey === 'pct' ? '竞价涨幅' : sortKey === 'share' ? '占榜内比' : sortKey === 'pool' ? '池内角色' : '竞额'}排序 ·
         <span className="text-warn"> 暖黄 = 高开 ≥5% 且竞额 ≥ 榜内中位数</span>
       </p>
@@ -85,7 +85,7 @@ export function AuctionMoneyCard({
           {themes.slice(0, THEME_CHIPS).map((t) => (
             <span
               key={t.theme}
-              className="flex items-center gap-1 text-[11px]"
+              className="flex items-center gap-1 text-11"
               title={`${t.count} 只 · 竞额 ${t.amountYi.toFixed(2)} 亿 · 池内参与 ${t.participate} 只`}
             >
               <span className={cn('font-medium', t.participate > 0 ? 'text-rec' : 'text-sub')}>
@@ -97,7 +97,7 @@ export function AuctionMoneyCard({
             </span>
           ))}
           {themes.length > THEME_CHIPS && (
-            <span className="text-[11px] text-sub">其余 {themes.length - THEME_CHIPS} 条</span>
+            <span className="text-11 text-sub">其余 {themes.length - THEME_CHIPS} 条</span>
           )}
         </div>
       )}
@@ -119,18 +119,18 @@ export function AuctionMoneyCard({
                 label: '#',
                 num: true,
                 className: 'w-8 text-sub',
-                cell: (r) => <span className="num text-[11px] text-sub">{sorted.indexOf(r) + 1}</span>,
+                cell: (r) => <span className="num text-11 text-sub">{sorted.indexOf(r) + 1}</span>,
               },
               {
                 label: '股票',
                 cell: (r) => (
                   <span className="flex items-baseline gap-1.5 min-w-0">
-                    <StockLink code={r.code} className="text-rec">
+                    <StockLink code={r.code} className="text-txt">
                       {r.name}
                     </StockLink>
                     {/* 名称未补齐时 name === code，此时不再重复打印一遍代码 */}
                     {r.name !== r.code && (
-                      <span className="num text-[10.5px] text-sub">{r.code}</span>
+                      <span className="num text-11 text-sub">{r.code}</span>
                     )}
                   </span>
                 ),
@@ -183,8 +183,8 @@ export function AuctionMoneyCard({
                 cell: (r) => (
                   <span className="flex items-center gap-1 whitespace-nowrap">
                     <span className={cn('badge', ROLE_TONE[r.poolRole])}>{r.poolRole}</span>
-                    {r.isCore && <span className="text-[10px] text-lead">核心</span>}
-                    {r.lineRank === 1 && <span className="text-[10px] text-lead">龙一</span>}
+                    {r.isCore && <span className="text-10 text-lead">核心</span>}
+                    {r.lineRank === 1 && <span className="text-10 text-lead">龙一</span>}
                   </span>
                 ),
               },
@@ -192,14 +192,14 @@ export function AuctionMoneyCard({
                 label: '题材',
                 cell: (r) =>
                   r.theme ? (
-                    <span className="text-[11.5px] text-txt">{r.theme}</span>
+                    <span className="text-12 text-txt">{r.theme}</span>
                   ) : (
                     <span className="text-sub">—</span>
                   ),
               },
               {
                 label: '撮合时刻',
-                cell: (r) => <span className="num text-[11px] text-sub">{r.time.slice(11, 19) || '—'}</span>,
+                cell: (r) => <span className="num text-11 text-sub">{r.time.slice(11, 19) || '—'}</span>,
               },
             ]}
           />
@@ -207,7 +207,7 @@ export function AuctionMoneyCard({
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="mt-2 px-2.5 py-1 text-[11.5px] rounded-sm border border-line text-sub bg-transparent cursor-pointer hover:text-txt hover:border-line-strong"
+              className="mt-2 px-2.5 py-1 text-12 rounded-sm border border-line text-sub bg-transparent cursor-pointer hover:text-txt hover:border-line-strong"
             >
               展开其余 {rest} 只
             </button>
@@ -216,7 +216,7 @@ export function AuctionMoneyCard({
             <button
               type="button"
               onClick={() => setExpanded(false)}
-              className="mt-2 ml-2 px-2.5 py-1 text-[11.5px] rounded-sm border border-line text-sub bg-transparent cursor-pointer hover:text-txt hover:border-line-strong"
+              className="mt-2 ml-2 px-2.5 py-1 text-12 rounded-sm border border-line text-sub bg-transparent cursor-pointer hover:text-txt hover:border-line-strong"
             >
               收起
             </button>

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { EbbBanner, ExtremeCard, LadderCard, LeadersCard, SectorFlowCard, SignalRail, ThemeTopCard, marketQueries } from '@/features/market'
+import { EbbBanner, ExtremeCard, LadderCard, SectorFlowCard, SignalRail, TopThemeCard, marketQueries } from '@/features/market'
 import { IntradayMoodCard } from '@/features/analytics'
 import { Zone } from '@/shared/ui'
 import { cn } from '@/shared/lib'
@@ -17,13 +17,17 @@ export async function loader() {
  * ## 版面：左主区 / 中反馈区 / 最右固定信号 rail（2026-09-22 定稿，三栏）
  *
  * ```
- * ┌──────── 左 60% ────────┬── 中 30% ──┬ 最右 rail 10% ──┐
- * │ 2×2 网格              │ 反馈与信号  │ ⚡ 信号（固定）  │
- * │ (情绪/题材/标的/资金) │ 连板/极值   │ 短线精灵按type着色│
- * └───────────────────────┴────────────┴─────────────────┘
+ * ┌──────── 左 60% ──────────────┬── 中 30% ──┬ 最右 rail 10% ──┐
+ * │ 最强题材（通栏·可折叠）       │ 反馈与信号  │ ⚡ 信号（固定）  │
+ * │ ────────────────────────      │ 连板/极值   │ 短线精灵按type着色│
+ * │ 情绪走势 │ 板块资金            │             │                  │
+ * └───────────────────────────────┴────────────┴─────────────────┘
  * ```
  *
- * · **左栏 4 张 = 2×2 均分**（`grid xl:grid-cols-2`）—— 都是「当刻盘面与标的」，需要宽度；
+ * · **左栏首行 = 最强题材通栏**（`xl:col-span-2`）—— 2026-10-30 起把「题材强度」
+ *   与「核心标的」**并成一张可折叠卡**：题材当行、个股当详情。原来两张表各自
+ *   都答不了「最强那条线里都有谁」，用户得靠名字在两表之间来回找。
+ * · **左栏次行 = 情绪走势 + 板块资金**（2 列均分）—— 都是「当刻盘面」，需要宽度；
  * · **中栏 = 连板天梯（含晋级）+ 极值名单（含核按钮）** —— 纵向堆叠；
  * · **最右「信号」rail = 固定 10% 窄列**（`SignalRail`）—— 只放紧凑版短线精灵列表，
  *   按信号 `type` 着色（涨停/接近涨停=红、快速拉升=紫、打开涨停板=橙、打开跌停=青）。
@@ -47,12 +51,12 @@ export function Component() {
   return (
     <div className="flex flex-col gap-3">
       {(isPending || isError || !data) && (
-        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-[12px] text-warn">
+        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-12 text-warn">
           {isPending ? '正在加载主快照…' : isError ? data ? '主快照更新失败，相关卡片保留上次数据；空白项不能视为零值。' : '主快照加载失败，暂无法确认盘面与风险状态。' : '主快照尚未提供，暂无法确认盘面与风险状态。'}
         </p>
       )}
       {data && missingParts && (
-        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-[12px] text-warn">
+        <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-12 text-warn">
           当前快照 {data.ts.slice(11, 19)}：{missingParts}未采集到，量能与广度判断不完整。
         </p>
       )}
@@ -68,9 +72,11 @@ export function Component() {
       <div className="intraday-zones flex gap-3 items-start max-xl:flex-col">
         <Zone label="盘面与标的" dot="bg-up" className={cn('min-w-0', ZONE_MAIN)}>
           <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
+            {/* 最强题材占满整行：展开后要铺一条线的全部个股，半宽会挤成三行 */}
+            <div className="xl:col-span-2">
+              <TopThemeCard />
+            </div>
             <IntradayMoodCard />
-            <ThemeTopCard />
-            <LeadersCard />
             <SectorFlowCard />
           </div>
         </Zone>

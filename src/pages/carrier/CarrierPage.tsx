@@ -77,7 +77,7 @@ export function Component() {
         }
       >
         {feedback.data?.error && (
-          <p className="text-[11.5px] text-sub mb-1.5">
+          <p className="text-12 text-sub mb-1.5">
             {feedback.data.msg || '反馈矩阵当前不计算（盘前或非交易日）'}
           </p>
         )}
@@ -87,7 +87,7 @@ export function Component() {
           <StatPair label="最高板" value={feedback.data?.now_max_boards ?? '—'} tone="up" />
           <StatPair label="核按钮" value={feedback.data?.nuke_count ?? '—'} tone={feedback.data?.nuke_count ? 'down' : 'sub'} />
         </div>
-        <p className="mt-1.5 text-[11px] text-sub">盘中先看晋级与核按钮的承接变化；“确认载体 / 证伪”仍只由盘后结论文件写入，避免把过程信号当终态。</p>
+        <p className="mt-1.5 text-11 text-sub">盘中先看晋级与核按钮的承接变化；“确认载体 / 证伪”仍只由盘后结论文件写入，避免把过程信号当终态。</p>
       </Card>
       <Card
         title="🧭 载体追踪"
@@ -104,7 +104,7 @@ export function Component() {
         </div>
 
         {c?.carrier_migration && (
-          <p className="text-[12.5px] leading-relaxed border-l-2 border-line-strong pl-2.5">
+          <p className="text-13 leading-relaxed border-l-2 border-line-strong pl-2.5">
             {c.carrier_migration}
           </p>
         )}
@@ -128,7 +128,7 @@ export function Component() {
               label: '载体',
               cell: (r) => (
                 <span>
-                  <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                  <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                 </span>
               ),
             },
@@ -159,7 +159,7 @@ export function Component() {
             },
           ]}
         />
-        <p className="text-sub text-[11px] mt-1.5">
+        <p className="text-sub text-11 mt-1.5">
           载体 ≠ 龙头：板数不高但能带动 5 家以上的票，价值高于孤立高板 —— 故本表按带动家数排序。
         </p>
       </Card>
@@ -194,7 +194,7 @@ export function Component() {
               { label: '昨日带动', num: true, cell: (r) => r.carry_cnt ?? '—' },
             ]}
           />
-          <p className="text-sub text-[11px] mt-1.5">
+          <p className="text-sub text-11 mt-1.5">
             证伪 = 昨日确认、今日断板。这一批标的的资金去向，正是今日新载体的来源。
           </p>
         </Card>
@@ -237,10 +237,10 @@ export function Component() {
               {
                 label: '近 5 收',
                 cell: (r) => (
-                  <span className="num text-[11px] text-sub">{r.closes?.map((x) => n1(x)).join(' → ')}</span>
+                  <span className="num text-11 text-sub">{r.closes?.map((x) => n1(x)).join(' → ')}</span>
                 ),
               },
-              { label: '检查时间', cell: (r) => <span className="num text-sub text-[11px]">{r.checked_at?.slice(11, 19) ?? '—'}</span> },
+              { label: '检查时间', cell: (r) => <span className="num text-sub text-11">{r.checked_at?.slice(11, 19) ?? '—'}</span> },
             ]}
           />
         ) : (
@@ -249,7 +249,7 @@ export function Component() {
             hint={m ? undefined : 'cache/ma5_status.json 缺失'}
           />
         )}
-        {m?.ts && <p className="text-sub text-[11px] mt-1.5">检查于 {m.ts}</p>}
+        {m?.ts && <p className="text-sub text-11 mt-1.5">检查于 {m.ts}</p>}
       </Card>
         </Zone>
       </ZoneRow>

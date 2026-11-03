@@ -56,7 +56,7 @@ export function Radar({
   if (axes.length < 3) {
     // 少于 3 个维度构不成面 —— 退回文字列表，不强行画
     return (
-      <div className={cn('text-sub text-[12px]', className)}>
+      <div className={cn('text-sub text-12', className)}>
         {axes.map((a) => (
           <span key={a.label} className="mr-3">
             {a.label} <span className="num text-txt">{isNum(a.value) ? a.value : '—'}</span>
@@ -230,7 +230,7 @@ export function Radar({
       )}
 
       {/* ── 读数表（雷达图不擅长精确读数，用表格补齐） ── */}
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11.5px]">
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-12">
         {axes.map((a) => (
           <span key={`rd-${a.label}`} className="text-sub">
             {a.label}{' '}

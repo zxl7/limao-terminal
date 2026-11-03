@@ -64,9 +64,9 @@ export function SelectionLogicSection({ selectionEffect }: { selectionEffect: Se
         <StatPair label="失败核按钮" value={failureRatio} tone="down" />
         <StatPair label="断板回补" value={repairRatio} tone="up" />
       </div>
-      <p className="text-[11px] text-sub">{selectionEffect?.prev_date ?? '—'} → {selectionEffect?.date ?? '—'} · 竞价溢价按 09:25—09:30 有效报价计算；失败核按钮和断板回补均为猎手已发布事实。</p>
+      <p className="text-11 text-sub">{selectionEffect?.prev_date ?? '—'} → {selectionEffect?.date ?? '—'} · 竞价溢价按 09:25—09:30 有效报价计算；失败核按钮和断板回补均为猎手已发布事实。</p>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-sub">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-11 text-sub">
         <span>1进2 <b className="num text-txt">{rate(market?.stages?.one_to_two?.promote_rate)}</b></span>
         <span>2进3 <b className="num text-txt">{rate(market?.stages?.two_to_three?.promote_rate)}</b></span>
         <span>高位接力 <b className="num text-txt">{rate(market?.stages?.high_relay?.promote_rate)}</b></span>
@@ -75,8 +75,8 @@ export function SelectionLogicSection({ selectionEffect }: { selectionEffect: Se
       </div>
 
       <div>
-        <p className="mb-1 text-[12px] font-medium text-txt">当前选股结果 · 接力池优先，观察池待确认</p>
-        {!plan ? <p role="status" className="text-[12px] text-sub">{planQ.isPending ? '正在读取选股结果…' : '选股结果尚未发布。'}</p> : <DataTable dense rows={tradableStocks(rows)} rowKey={(row) => `${row.code}-${row.bucket ?? 'pool'}`} columns={[
+        <p className="mb-1 text-12 font-medium text-txt">当前选股结果 · 接力池优先，观察池待确认</p>
+        {!plan ? <p role="status" className="text-12 text-sub">{planQ.isPending ? '正在读取选股结果…' : '选股结果尚未发布。'}</p> : <DataTable dense rows={tradableStocks(rows)} rowKey={(row) => `${row.code}-${row.bucket ?? 'pool'}`} columns={[
           { label: '池位 / 标的', cell: (row) => <span><StockLink code={row.code}>{row.name}</StockLink><span className="ml-1 text-sub">{row.bucket === 'relay' ? `接力 ${row.relay_rank ?? '—'}` : `观察 ${row.watch_rank ?? '—'}`}</span></span> },
           { label: '板数', num: true, cell: (row) => row.boards == null ? '—' : `${row.boards}板` },
           { label: '同高度历史晋级', num: true, cell: (row) => <span>{row.history_relay_prob == null ? '—' : `${(row.history_relay_prob * 100).toFixed(1)}%`}<small className="block text-sub">样本 {row.history_relay_samples ?? '—'}</small></span> },
@@ -94,7 +94,7 @@ export function SelectionLogicSection({ selectionEffect }: { selectionEffect: Se
           { label: '候选阶段 / 形态', cell: (row) => <span className="text-sub">{row.expectation?.phase ?? '—'} · {row.expectation?.seal_form ?? '—'}</span> },
         ]} />}
       </div>
-      <p className="text-[10.5px] text-sub">反馈快照 {selectionEffect?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj}` : ''}。{feedbackMatchesPlan ? '当前候选已与反馈日期对齐。' : '当前候选尚未有对应次日反馈。'} 未发布或缺失的候选反馈显示“—”，不以其他行情快照补算。</p>
+      <p className="text-11 text-sub">反馈快照 {selectionEffect?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj}` : ''}。{feedbackMatchesPlan ? '当前候选已与反馈日期对齐。' : '当前候选尚未有对应次日反馈。'} 未发布或缺失的候选反馈显示“—”，不以其他行情快照补算。</p>
     </div>
   </Card>
 }
@@ -200,7 +200,7 @@ export function Component() {
         }
       >
         {err ? (
-          <div className="text-down text-[12px] py-2">数据不可用：{String((err as Error).message ?? err)}</div>
+          <div className="text-down text-12 py-2">数据不可用：{String((err as Error).message ?? err)}</div>
         ) : (
           <>
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
@@ -212,7 +212,7 @@ export function Component() {
             </div>
           </>
         )}
-        <p className="mt-3 text-[11.5px] text-sub leading-relaxed">
+        <p className="mt-3 text-12 text-sub leading-relaxed">
           当前情绪 <span className="num text-txt">{sentiment}</span>。先读“赚钱回报”和“亏钱压力”是否同步恶化，再看历史与下一交易日的条件基线。
         </p>
       </Card>
@@ -251,7 +251,7 @@ export function Component() {
         </div>
       </div>
 
-      <p className="text-[11px] text-sub leading-relaxed">
+      <p className="text-11 text-sub leading-relaxed">
         基于公开信息与历史统计，仅供参考，不构成投资建议。推演为条件期望与情景假设，非未来收益承诺。
       </p>
     </div>

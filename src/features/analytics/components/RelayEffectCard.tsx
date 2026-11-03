@@ -12,7 +12,7 @@ const tone = (v: number | null) => v == null || v === 0 ? 'text-sub' : v > 0 ? '
 const labels: Record<string, string> = { relay: '昨日连板', '2': '昨2板 → 3板', '3': '昨3板 → 4板', '4+': '昨4板及以上', '1': '昨首板 · 低位对照' }
 const views: [RelayView, string][] = [['strong', '活跃走强'], ['sealed', '封板维持'], ['weak', '活跃走弱'], ['all', '全部股票']]
 const state = (s: RelayStock) => s.stale ? '行情过期' : s.sealed === true ? '当前封板' : s.sealed === false ? '当前未封板' : '状态未知'
-const button = 'rounded-sm border px-2 py-1 text-[11px] transition-colors focus-visible:outline-2 focus-visible:outline-up'
+const button = 'rounded-sm border px-2 py-1 text-11 transition-colors focus-visible:outline-2 focus-visible:outline-up'
 
 export function RelayEffectCard() {
   const query = useQuery(marketQueries.relayEffect())
@@ -32,7 +32,7 @@ export function RelayEffectCard() {
   const scope = selectRelay(stocks, group, 'all')
   const detail = scope.find(s => s.code === selected)
   const chooseGroup = (key: string) => { setGroup(key); setSelected(null) }
-  return <Card className="min-w-0 w-full" title="连板量能与承接" extra={<span className="text-[11px] text-sub">{data ? `${historical ? '历史回放 · ' : ''}${data.prev_date} → ${data.date}` : '等待数据'}</span>}>
+  return <Card className="min-w-0 w-full" title="连板量能与承接" extra={<span className="text-11 text-sub">{data ? `${historical ? '历史回放 · ' : ''}${data.prev_date} → ${data.date}` : '等待数据'}</span>}>
     {!data ? <p role="status" className="text-sub text-xs py-4">{query.isPending ? '正在读取连板观察数据…' : '连板观察快照尚未提供，等待数据层发布。'}</p> : <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         <StatPair label="昨日连板" value={`${data.overview.count} 只`} />
@@ -42,7 +42,7 @@ export function RelayEffectCard() {
         <StatPair label={data.overview.amount_count < data.overview.count ? '已覆盖成交额' : '累计成交额'} value={fmt(data.overview.amount_yi, '亿')} />
         <StatPair label="行情覆盖" value={`${data.overview.quote_count}/${data.overview.count}`} />
       </div>
-      <p role="status" className={cn('text-[11px]', expired || query.isError ? 'text-warn' : 'text-sub')}>
+      <p role="status" className={cn('text-11', expired || query.isError ? 'text-warn' : 'text-sub')}>
         {historical ? data.source_note : expired ? '快照已过期，保留最后读数并暂停承接排名。' : query.isError ? '更新失败，保留最后快照。' : '固定昨日样本，失败股仍保留。'}
         {' '}更新于 {data.generated_ts.replace('T', ' ').slice(0, 19)} · {data.phase === 'closed' ? '收盘快照' : afterClose ? '盘后最后快照' : '盘中快照'}。涨幅为相对昨收表现，成交额表示交易规模。
       </p>
@@ -60,7 +60,7 @@ export function RelayEffectCard() {
       <div className="flex flex-wrap gap-1.5">{Object.entries(labels).map(([key, text]) => <button type="button" key={key} aria-pressed={group === key} className={cn(button, group === key ? 'border-up/30 bg-up-soft text-up' : 'border-line text-sub')} onClick={() => chooseGroup(key)}>{text}</button>)}</div>
       <RelayBars historical={historical} stocks={scope} />
       <div className="flex flex-wrap gap-1.5">{views.filter(([key]) => !historical || key === 'all' || key === 'sealed').map(([key, text]) => <button type="button" key={key} aria-pressed={activeView === key} className={cn(button, activeView === key ? 'bg-txt text-card border-txt' : 'border-line text-sub')} onClick={() => { setView(key); setSelected(null) }}>{text}</button>)}</div>
-      <p className="text-[11px] text-sub">{historical ? '历史回放保留全部昨日样本；缺少成交额的股票仍列出，15分钟指标显示未归档。' : '按近15分钟成交额降序；同额按涨幅变化排序。窗口不足或行情失效不进入走强/走弱排名。'}</p>
+      <p className="text-11 text-sub">{historical ? '历史回放保留全部昨日样本；缺少成交额的股票仍列出，15分钟指标显示未归档。' : '按近15分钟成交额降序；同额按涨幅变化排序。窗口不足或行情失效不进入走强/走弱排名。'}</p>
       <DataTable dense rows={rows} rowKey={s => s.code} empty="当前没有符合条件的股票" rowClass={s => s.code === selected ? 'bg-up-soft/40' : undefined} columns={[
         { label: '股票', cell: s => <button type="button" onClick={() => setSelected(selected === s.code ? null : s.code)} aria-expanded={s.code === selected} className="text-txt text-left">{s.name}<small className="block text-sub">{s.code} · 昨{s.prev_boards}板</small></button> },
         { label: '今日涨幅', num: true, cell: s => <span className={tone(s.pct)}>{fmt(s.pct, '%')}</span> },
@@ -81,12 +81,12 @@ function RelayBars({ historical, stocks }: { historical: boolean; stocks: RelayS
   const amounts = points.map((s) => ({ label: s.name, value: historical ? s.amount_yi : s.window?.amount_yi ?? null, tone: s.sealed === true ? 'up' as const : 'sub' as const }))
   const changes = points.map((s) => ({ label: s.name, value: historical ? s.pct : s.window?.pct_change ?? null }))
   return <div className="rounded-sm border border-line-faint p-2">
-    <p className="text-xs text-txt">连板量价柱状图 <span className="text-[10px] text-sub">{historical ? '历史截面：归档成交额与收盘涨幅' : '近15分钟成交额与涨幅变化分别显示'}</span></p>
+    <p className="text-xs text-txt">连板量价柱状图 <span className="text-10 text-sub">{historical ? '历史截面：归档成交额与收盘涨幅' : '近15分钟成交额与涨幅变化分别显示'}</span></p>
     {!points.length ? <p className="text-xs text-sub py-6 text-center">{historical ? '当前梯队没有可用历史数据' : '等待同一交易时段内的有效15分钟窗口'}</p> : <div className="grid gap-3 lg:grid-cols-2">
-      <div><p className="text-[10.5px] text-sub mb-1">{historical ? '归档成交额（亿）' : '近15分钟成交额（亿）'}</p><BarChart bars={amounts} height={190} format={v => `${v.toFixed(2)}亿`} /></div>
-      <div><p className="text-[10.5px] text-sub mb-1">{historical ? '收盘涨幅（%）' : '近15分钟涨幅变化（百分点）'}</p><BarChart bars={changes} height={190} bipolar format={v => `${v.toFixed(1)}${historical ? '%' : 'pp'}`} /></div>
+      <div><p className="text-11 text-sub mb-1">{historical ? '归档成交额（亿）' : '近15分钟成交额（亿）'}</p><BarChart bars={amounts} height={190} format={v => `${v.toFixed(2)}亿`} /></div>
+      <div><p className="text-11 text-sub mb-1">{historical ? '收盘涨幅（%）' : '近15分钟涨幅变化（百分点）'}</p><BarChart bars={changes} height={190} bipolar format={v => `${v.toFixed(1)}${historical ? '%' : 'pp'}`} /></div>
     </div>}
-    <p className="text-[10px] text-sub">按成交额由高到低排列；成交额图红柱表示当前封板，灰柱表示未封板或状态未知。涨幅柱以零轴区分强弱。</p>
+    <p className="text-10 text-sub">按成交额由高到低排列；成交额图红柱表示当前封板，灰柱表示未封板或状态未知。涨幅柱以零轴区分强弱。</p>
   </div>
 }
 
@@ -104,7 +104,7 @@ function RelayDetail({ stock }: { stock: RelayStock }) {
       <LineChart labels={points.map(p => p.at.slice(11, 16))} series={[{ name: '涨幅', values: points.map(p => p.pct), tone: 'up' }]} height={170} format={v => `${v.toFixed(1)}%`} />
       <LineChart labels={points.map(p => p.at.slice(11, 16))} series={[{ name: '相邻快照成交额增量', values: deltas, tone: 'sub' }]} height={170} format={v => `${v.toFixed(2)}亿`} />
     </div>
-    <p className="text-[10px] text-sub">成交增量按相邻采样区间展示，不等同于固定每分钟成交额；空档不补数据。</p>
-    <div className="mt-2 flex flex-wrap gap-2 text-[11px]">{changes.map(p => <span key={p.at} className="rounded-sm bg-line-faint px-2 py-1">{p.at.slice(11, 19)} {p.sealed ? '观察到封板' : '观察到未封板'}</span>)}</div>
+    <p className="text-10 text-sub">成交增量按相邻采样区间展示，不等同于固定每分钟成交额；空档不补数据。</p>
+    <div className="mt-2 flex flex-wrap gap-2 text-11">{changes.map(p => <span key={p.at} className="rounded-sm bg-line-faint px-2 py-1">{p.at.slice(11, 19)} {p.sealed ? '观察到封板' : '观察到未封板'}</span>)}</div>
   </div>
 }

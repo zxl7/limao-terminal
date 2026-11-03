@@ -147,11 +147,11 @@ export function TimelineDetailList({
       {/* 栏头：色条 + 标题 + 延伸线 + 节点数 */}
       <div className="flex items-center gap-2 px-0.5 pt-0.5">
         <span className="w-[3px] h-3.5 rounded-[2px] bg-rec flex-none" aria-hidden />
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
+        <span className="text-11 font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
           节点详情
         </span>
         <span className="flex-1 h-px bg-line min-w-2" aria-hidden />
-        <span className="num text-[10.5px] text-sub flex-none">{ordered.length}</span>
+        <span className="num text-11 text-sub flex-none">{ordered.length}</span>
       </div>
 
       {/* 虚拟滚动视口：只渲染窗口内的条目 */}
@@ -161,7 +161,7 @@ export function TimelineDetailList({
         className="flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain"
       >
         {ordered.length === 0 ? (
-          <div className="text-sub text-[11px] px-1.5 py-2">当日无可定位到分钟的记录</div>
+          <div className="text-sub text-11 px-1.5 py-2">当日无可定位到分钟的记录</div>
         ) : (
           <div className="relative w-full" style={{ height: total }}>
             {rows.map(({ i, top, block }) => {

@@ -47,7 +47,7 @@ function AxisMeter({ level, axis, tier }: { level: number | null; axis: 'gain' |
   const pos = level == null ? 50 : ((Math.max(-2, Math.min(2, level)) + 2) / 4) * 100
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <span className="text-[10px] text-sub flex-none">{edge[0]}</span>
+      <span className="text-10 text-sub flex-none">{edge[0]}</span>
       <div className="relative h-1.5 flex-1 min-w-[80px] rounded-full bg-line-faint">
         {/* 中位（0 轴）刻度 */}
         <span className="absolute top-[-2px] h-[10px] w-px bg-line" style={{ left: '50%' }} />
@@ -56,7 +56,7 @@ function AxisMeter({ level, axis, tier }: { level: number | null; axis: 'gain' |
           style={{ left: `calc(${pos}% - 2px)` }}
         />
       </div>
-      <span className="text-[10px] text-sub flex-none">{edge[1]}</span>
+      <span className="text-10 text-sub flex-none">{edge[1]}</span>
     </div>
   )
 }
@@ -84,11 +84,11 @@ function AxisBlock({
   return (
     <div className="min-w-0 flex flex-col gap-1.5" data-effect-axis={kind}>
       <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-        <span className="text-[12.5px] font-semibold text-txt flex-none">{title}</span>
-        <span className={cn('text-[20px] font-semibold leading-none flex-none', TONE_TEXT[tone])}>
+        <span className="text-13 font-semibold text-txt flex-none">{title}</span>
+        <span className={cn('text-20 font-semibold leading-none flex-none', TONE_TEXT[tone])}>
           {axisWord(kind, axis.word)}
         </span>
-        <span className="text-sub text-[10.5px] min-w-0 break-all">{hint}</span>
+        <span className="text-sub text-11 min-w-0 break-all">{hint}</span>
       </div>
       <AxisMeter level={axis.level} axis={kind} tier={axis.tier} />
       <DataTable
@@ -122,7 +122,7 @@ function AxisBlock({
         ]}
       />
       {axis.missing > 0 && (
-        <div className="text-[10.5px] text-warn">{axis.missing} 项读数缺料（已显示「—」，未计入轴位）</div>
+        <div className="text-11 text-warn">{axis.missing} 项读数缺料（已显示「—」，未计入轴位）</div>
       )}
     </div>
   )
@@ -133,7 +133,7 @@ export function EffectAxesCard({ axes }: { axes: EffectAxes }) {
   const b = axes.basis
   return (
     <div className="flex flex-col gap-2.5 min-w-0">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[11.5px] text-sub">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-12 text-sub">
         <span>
           昨涨停池 <span className="num text-txt font-semibold">{b.prevZtCount ?? '—'}</span> 只
           <span className="num ml-1">({b.prevDate || '—'})</span>
@@ -144,7 +144,7 @@ export function EffectAxesCard({ axes }: { axes: EffectAxes }) {
         <span>
           晋级 <span className="num text-txt font-semibold">{b.promoteCount ?? '—'}</span> 只
         </span>
-        <span className="text-[10.5px]">两轴共用同一池子，按今日涨跌分组</span>
+        <span className="text-11">两轴共用同一池子，按今日涨跌分组</span>
       </div>
 
       <div className="grid gap-3 xl:grid-cols-2">
@@ -163,7 +163,7 @@ export function EffectAxesCard({ axes }: { axes: EffectAxes }) {
       </div>
 
       {axes.caveats.length > 0 && (
-        <div className="rounded-[var(--radius-sm)] border border-warn/40 bg-warn-soft px-2 py-1 text-[11px] text-warn">
+        <div className="rounded-[var(--radius-sm)] border border-warn/40 bg-warn-soft px-2 py-1 text-11 text-warn">
           {axes.caveats.join(' · ')}
         </div>
       )}
@@ -174,7 +174,7 @@ export function EffectAxesCard({ axes }: { axes: EffectAxes }) {
 /** ── 卡 2：T-3..T 历史窗口（纯聚合，零推断）── */
 export function EffectTrendCard({ points }: { points: EffectHistoryPoint[] }) {
   if (points.length === 0) {
-    return <div className="text-sub text-[12px] py-2">历史窗口不可用（trend.history 缺失）</div>
+    return <div className="text-sub text-12 py-2">历史窗口不可用（trend.history 缺失）</div>
   }
   /** ⛔ 资金/情绪两轴同图但**量纲不同**：轴位是 -2..+2，情绪分是 1..10 → 情绪分改走副轴 */
   const series: LineSeries[] = [
@@ -214,7 +214,7 @@ export function EffectTrendCard({ points }: { points: EffectHistoryPoint[] }) {
           { label: '涨停', num: true, cell: (p) => <span className="num">{p.ztCount ?? '—'}</span> },
         ]}
       />
-      <p className="text-[10.5px] text-sub leading-relaxed">
+      <p className="text-11 text-sub leading-relaxed">
         轴位 = 该日「晋级率 / 反转率」同一套阶梯的均值；缺口显示「—」（⛔ 不以 0 代替）。
       </p>
     </div>
@@ -233,7 +233,7 @@ export function NextDayProjectionCard({
   const maxCount = Math.max(...p.stages.map((s) => s.count), 1)
   return (
     <div className="flex flex-col gap-2.5 min-w-0">
-      <div className="flex flex-wrap gap-x-5 gap-y-1 text-[10.5px] text-sub">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-11 text-sub">
         <span>当前结构快照：<span className="num text-txt">{snapshot?.ts || '—'}</span></span>
         <span>最高板：<span className="num text-txt">{snapshot?.highestBoards == null ? '—' : `${snapshot.highestBoards} 板`}</span></span>
         <span>历史基线：晋级样本</span>
@@ -263,10 +263,10 @@ export function NextDayProjectionCard({
       {p.stages.length > 0 && (
         <div className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1">
           <div className="rounded-[var(--radius-sm)] border border-line p-2">
-            <div className="mb-1.5 text-[10.5px] text-sub">当前快照 · 梯队家数</div>
+            <div className="mb-1.5 text-11 text-sub">当前快照 · 梯队家数</div>
             <div className="flex flex-col gap-1.5">
               {p.stages.map((s) => (
-                <div key={s.stage} className="grid grid-cols-[38px_1fr_26px] items-center gap-1.5 text-[10.5px]">
+                <div key={s.stage} className="grid grid-cols-[38px_1fr_26px] items-center gap-1.5 text-11">
                   <span className="num text-sub">{s.stage}</span>
                   <div className="h-2 overflow-hidden rounded-full bg-line-faint">
                     <div className="h-full rounded-full bg-up" style={{ width: `${(s.count / maxCount) * 100}%` }} />
@@ -277,10 +277,10 @@ export function NextDayProjectionCard({
             </div>
           </div>
           <div className="rounded-[var(--radius-sm)] border border-line p-2">
-            <div className="mb-1.5 text-[10.5px] text-sub">历史样本 · 晋级成功率</div>
+            <div className="mb-1.5 text-11 text-sub">历史样本 · 晋级成功率</div>
             <div className="flex flex-col gap-1.5">
               {p.stages.map((s) => (
-                <div key={s.stage} className="grid grid-cols-[38px_1fr_38px] items-center gap-1.5 text-[10.5px]">
+                <div key={s.stage} className="grid grid-cols-[38px_1fr_38px] items-center gap-1.5 text-11">
                   <span className="num text-sub">{s.stage}</span>
                   <div className="h-2 overflow-hidden rounded-full bg-line-faint">
                     <div className="h-full rounded-full bg-up" style={{ width: `${Math.max(0, (s.succRate ?? 0) * 100)}%` }} />
@@ -319,15 +319,15 @@ export function NextDayProjectionCard({
       />
 
       {p.uncovered.length > 0 && (
-        <div className="text-[10.5px] text-warn">历史无样本的阶段（未计入期望）：{p.uncovered.join(' · ')}</div>
+        <div className="text-11 text-warn">历史无样本的阶段（未计入期望）：{p.uncovered.join(' · ')}</div>
       )}
       <div className="flex flex-col gap-0.5">
         {p.caveats.map((c) => (
-          <div key={c} className="text-[10.5px] text-warn">
+          <div key={c} className="text-11 text-warn">
             {c}
           </div>
         ))}
-        <div className="text-[10.5px] text-sub leading-relaxed">
+        <div className="text-11 text-sub leading-relaxed">
           当前快照仅提供梯队家数；收益与成功率均来自全历史阶段统计（{decisiveStages.length} 个阶段样本 ≥{STAGE_MIN_SAMPLE}）的条件期望，非预测；展示中位数（均值受尾部极值影响）。
         </div>
       </div>
@@ -347,7 +347,7 @@ export function NextDayProjectionCard({
           )}
         >
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={cn('text-[12.5px] font-semibold flex-none', TONE_TEXT[s.tone])}>{s.label}</span>
+            <span className={cn('text-13 font-semibold flex-none', TONE_TEXT[s.tone])}>{s.label}</span>
             {s.live ? (
               <Tag tone={s.tone}>条件已成立</Tag>
             ) : (
@@ -355,11 +355,11 @@ export function NextDayProjectionCard({
                 条件 {s.met.hit}/{s.met.total}
               </Tag>
             )}
-            <span className="text-sub text-[11px] min-w-0 break-all">{s.outlook}</span>
+            <span className="text-sub text-11 min-w-0 break-all">{s.outlook}</span>
           </div>
           <ul className="flex flex-col gap-0.5">
             {s.conditions.map((c) => (
-              <li key={c} className="text-[11px] text-sub leading-relaxed">
+              <li key={c} className="text-11 text-sub leading-relaxed">
                 <span className={cn('mr-1', s.live ? TONE_TEXT[s.tone] : 'text-sub')}>
                   {s.live ? '✓' : '·'}
                 </span>
@@ -369,7 +369,7 @@ export function NextDayProjectionCard({
           </ul>
         </div>
       ))}
-      <p className="text-[10.5px] text-sub leading-relaxed">
+      <p className="text-11 text-sub leading-relaxed">
         只给机械可判的触发条件，⛔ 不给概率、不做点预测 —— 请自行盯条件是否成立。
       </p>
     </div>
@@ -399,24 +399,24 @@ export function EffectWindowCard({
             key={p.date}
             className="flex-1 min-w-[74px] rounded-[var(--radius-sm)] border border-line px-2 py-1.5 flex flex-col gap-0.5"
           >
-            <span className="num text-[10.5px] text-sub">{p.date.slice(5)}</span>
-            <span className={cn('num text-[12px] font-semibold', cellTone('gain', p.gainLevel))}>
+            <span className="num text-11 text-sub">{p.date.slice(5)}</span>
+            <span className={cn('num text-12 font-semibold', cellTone('gain', p.gainLevel))}>
               赚 {words(p.gainLevel)}
             </span>
-            <span className={cn('num text-[12px] font-semibold', cellTone('loss', p.lossLevel))}>
+            <span className={cn('num text-12 font-semibold', cellTone('loss', p.lossLevel))}>
               亏 {words(p.lossLevel)}
             </span>
           </div>
         ))}
 
         <div className="flex-1 min-w-[86px] rounded-[var(--radius-sm)] border border-line-strong bg-line-faint px-2 py-1.5 flex flex-col gap-0.5">
-          <span className="num text-[10.5px] text-txt font-semibold">
+          <span className="num text-11 text-txt font-semibold">
             {axes.basis.date.slice(5) || '今日'}
           </span>
-          <span className={cn('num text-[12px] font-semibold', cellTone('gain', axes.gain.level))}>
+          <span className={cn('num text-12 font-semibold', cellTone('gain', axes.gain.level))}>
             赚 {axes.gain.word}
           </span>
-          <span className={cn('num text-[12px] font-semibold', cellTone('loss', axes.loss.level))}>
+          <span className={cn('num text-12 font-semibold', cellTone('loss', axes.loss.level))}>
             亏 {axes.loss.word}
           </span>
         </div>
@@ -426,12 +426,12 @@ export function EffectWindowCard({
             key={f}
             className="flex-1 min-w-[64px] rounded-[var(--radius-sm)] border border-dashed border-line px-2 py-1.5 flex flex-col gap-0.5"
           >
-            <span className="num text-[10.5px] text-sub">{f}</span>
-            <span className="text-[11px] text-sub">推演</span>
+            <span className="num text-11 text-sub">{f}</span>
+            <span className="text-11 text-sub">推演</span>
           </div>
         ))}
       </div>
-      <p className="text-[10.5px] text-sub leading-relaxed">
+      <p className="text-11 text-sub leading-relaxed">
         实线格 = 已落盘事实（T-3~T）；虚线格 = 推演（T+1 条件期望 / T+2~T+4 三情景）。
       </p>
     </div>

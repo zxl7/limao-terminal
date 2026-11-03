@@ -154,7 +154,7 @@ export function Gauge({
         )}
       </svg>
 
-      {label && <div className="text-[12px] text-sub -mt-1">{label}</div>}
+      {label && <div className="text-12 text-sub -mt-1">{label}</div>}
 
       {hover && (
         <ChartTooltip

@@ -593,7 +593,7 @@ export function Component() {
                   )}
                 </div>
                 {blocks.length === 0 && (
-                  <div className="text-sub text-[12px] py-2">当日无可定位到分钟的记录</div>
+                  <div className="text-sub text-12 py-2">当日无可定位到分钟的记录</div>
                 )}
               </>
             )}
@@ -602,19 +602,19 @@ export function Component() {
           {/* ── 行业级集群（辅口径）：题材榜之外的完整视角 · ⛔ 全天汇总，非时间定位 ── */}
           <Card title="行业级集群" extra={<CardBadge>{tally.sectorTotal} 个行业</CardBadge>}>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
-              <span className={cn('text-[12.5px]', SHAPE_META.burst.cls)}>
+              <span className={cn('text-13', SHAPE_META.burst.cls)}>
                 🚀 爆发 {tally.burst.length}
               </span>
-              <span className={cn('text-[12.5px]', SHAPE_META.spread.cls)}>
+              <span className={cn('text-13', SHAPE_META.spread.cls)}>
                 〰 扩散 {tally.spread.length}
               </span>
-              <span className="text-[12.5px] text-sub">· 成对 {tally.pair.length}</span>
-              <span className="text-[12.5px] text-sub">单票 {tally.single} 只</span>
+              <span className="text-13 text-sub">· 成对 {tally.pair.length}</span>
+              <span className="text-13 text-sub">单票 {tally.single} 只</span>
             </div>
             {tally.burst.length + tally.spread.length > 0 && (
               <div className="mt-1.5 flex flex-col gap-1">
                 {[...tally.burst, ...tally.spread].map((s) => (
-                  <div key={s.sector} className="flex items-baseline gap-2 text-[12px]">
+                  <div key={s.sector} className="flex items-baseline gap-2 text-12">
                     <span className={cn('flex-none', SHAPE_META[s.shape].cls)}>
                       {SHAPE_META[s.shape].icon}
                     </span>
@@ -640,7 +640,7 @@ export function Component() {
             >
               <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                 {looseStocks.map((s) => (
-                  <span key={s.code} className="text-[12px] text-txt">
+                  <span key={s.code} className="text-12 text-txt">
                     <StockLink code={s.code}>{s.name}</StockLink>
                     <span className="num text-sub ml-1">{s.boards}板</span>
                     <span className="text-sub ml-1">{s.sector}</span>

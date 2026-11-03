@@ -36,7 +36,7 @@ export function SectorDeltaCard() {
   return (
     <Card
       title="🔀 板块增减"
-      extra={<span className="text-[11px] font-normal text-sub">{total} 个板块</span>}
+      extra={<span className="text-11 font-normal text-sub">{total} 个板块</span>}
     >
       {total > 0 ? (
         <div className="flex flex-col gap-1.5">
@@ -49,14 +49,14 @@ export function SectorDeltaCard() {
                 </span>
                 <span className="flex flex-wrap gap-x-2.5 gap-y-1 min-w-0">
                   {g.items.map((s) => (
-                    <span key={s} className="text-[12px] text-txt whitespace-nowrap">
+                    <span key={s} className="text-12 text-txt whitespace-nowrap">
                       {s}
                     </span>
                   ))}
                 </span>
               </div>
             ))}
-          <div className="text-[10.5px] text-sub mt-0.5">
+          <div className="text-11 text-sub mt-0.5">
             括号内为「今日涨停数 → 昨日同期」；涨停家数相同不代表结构相同
           </div>
         </div>

@@ -621,7 +621,7 @@ describe('TimelineSnake · 题材爆发节点（紫四角星首爆 + 光晕 + �
     expect(node.textContent).toContain('首爆·光通信')
     const tag = node.querySelector('[data-burst="first"]') as HTMLElement
     expect(tag, '首爆标签应带 data-burst=first（供样式与测试定位）').toBeTruthy()
-    expect(tag.className).toContain('text-[11.5px]')
+    expect(tag.className).toContain('text-12') // 2026-11-02 字号刻度收敛：11.5px → text-12
 
     // 反例：普通节点仍是灰 —— 红色是爆发专用色，不能处处红
     const { container: c2 } = render(

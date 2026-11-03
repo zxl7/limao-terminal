@@ -114,7 +114,7 @@ export function NavErrorBanner({
   return (
     <div
       role="alert"
-      className="fixed left-1/2 -translate-x-1/2 top-[56px] z-50 flex items-center gap-2.5 px-3 py-2 text-[12px] text-head-txt shadow-[0_6px_20px_rgba(0,0,0,0.28)]"
+      className="fixed left-1/2 -translate-x-1/2 top-[56px] z-50 flex items-center gap-2.5 px-3 py-2 text-12 text-head-txt shadow-[0_6px_20px_rgba(0,0,0,0.28)]"
       style={{ background: '#1c2130', borderRadius: 'var(--radius-sm)' }}
     >
       <span className="w-1.5 h-1.5 rounded-full bg-up flex-none" aria-hidden />
@@ -124,7 +124,7 @@ export function NavErrorBanner({
       <button
         type="button"
         onClick={onRetry}
-        className="px-2 py-0.5 rounded-[3px] bg-white/15 text-white text-[11.5px] border-0 cursor-pointer hover:bg-white/25"
+        className="px-2 py-0.5 rounded-[3px] bg-white/15 text-white text-12 border-0 cursor-pointer hover:bg-white/25"
       >
         重试
       </button>
@@ -136,7 +136,7 @@ export function NavErrorBanner({
       <button
         type="button"
         onClick={() => globalThis.location.reload()}
-        className="px-2 py-0.5 rounded-[3px] bg-white/15 text-white text-[11.5px] border-0 cursor-pointer hover:bg-white/25"
+        className="px-2 py-0.5 rounded-[3px] bg-white/15 text-white text-12 border-0 cursor-pointer hover:bg-white/25"
       >
         刷新
       </button>
@@ -144,7 +144,7 @@ export function NavErrorBanner({
         type="button"
         onClick={onDismiss}
         aria-label="关闭提示"
-        className="px-1 text-head-soft text-[13px] leading-none bg-transparent border-0 cursor-pointer hover:text-white"
+        className="px-1 text-head-soft text-13 leading-none bg-transparent border-0 cursor-pointer hover:text-white"
       >
         ×
       </button>

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { HithinkLhbFile, HithinkLhbStock, ZtHistoryDay } from '@/shared/api'
-import { boardHeightOf, buildThemeCoreIndex, matchFundBoard } from '@/features/analytics'
+import { boardHeightOf, buildGeneIndex, buildThemeCoreIndex, matchFundBoard } from '@/features/analytics'
 import { Component as LhbPage } from '@/pages/lhb/LhbPage'
 import { Component as MainlinePage } from '@/pages/mainline/MainlinePage'
 
@@ -236,6 +236,19 @@ describe('升级项：分层、股性、相对资金', () => {
     expect(within(screen.getByRole('region', { name: '核心个股·连板' })).getByText('1')).toBeInTheDocument()
   })
 
+  it('严格连板龙打「严龙」标，无档案的票不打', async () => {
+    const dragon = [
+      { file: 'h1.json', data: { code: '603278', first_day: '20200101', last_day: '20261023', zt_total: 40, zt_250: 24, max_boards_hist: 6, promo_rate_hist: 61 } },
+    ]
+    vi.stubGlobal('fetch', mainlineStub(file([]), { leaders, boards, genes: dragon }))
+    mountMainline()
+    const robot = await screen.findByRole('button', { name: '题材 机器人' })
+    const panel = robot.parentElement!
+    expect(within(panel).getAllByText('严龙')).toHaveLength(1)
+    expect(within(panel).getByText('大业股份').closest('li')!.textContent).toContain('严龙')
+    expect(within(panel).getByText('某首板').closest('li')!.textContent).not.toContain('严龙')
+  })
+
   it('叠加股性：年涨停次数与晋级率；无档案的票不显示，更不写 0', async () => {
     vi.stubGlobal('fetch', mainlineStub(file([]), { leaders, boards, genes }))
     mountMainline()
@@ -266,6 +279,73 @@ describe('升级项：分层、股性、相对资金', () => {
     expect(within(panel).getByText('页内相对')).toBeInTheDocument()
     const fill = panel.querySelector('[title="仅在本页题材之间相对比较"]')!.parentElement!.querySelector('span[style*="width"]')!
     expect((fill as HTMLElement).style.width).toBe('100%')
+  })
+})
+
+describe('排序权重：高度优先于概率（2026-10-28 用户定）', () => {
+  /**
+   * 用户原话：「更信已经走出来的高度」。
+   * 所以「严龙」只是**标记**，不参与排序 —— 一只 4 板但没严龙标的票，
+   * 必须排在一只 2 板严龙前面。这条锁一旦被改，说明有人替用户改了权重。
+   */
+  const snap = {
+    leaders: [
+      { sector: '机器人', name: '二板严龙', code: '000001', pct: 10, buyable: true, is_20cm: false, boards: '1天2板' },
+      { sector: '机器人', name: '四板普通', code: '000002', pct: 10, buyable: true, is_20cm: false, boards: '6天4板' },
+    ],
+    early: [],
+    top5: [],
+  } as unknown as Parameters<typeof buildThemeCoreIndex>[0]['snapshot']
+
+  it('4 板无严龙标 排在 2 板严龙 之前', () => {
+    const index = buildThemeCoreIndex({ snapshot: snap, themeNames: ['机器人'] })
+    expect(index.get('机器人')!.stocks.map((s) => s.name)).toEqual(['四板普通', '二板严龙'])
+  })
+
+  it('只有连板高度相同时，才轮到龙头身份与涨幅', () => {
+    const tie = {
+      leaders: [
+        { sector: '机器人', name: '四板低涨幅', code: '000003', pct: 2, buyable: true, is_20cm: false, boards: '6天4板' },
+        { sector: '机器人', name: '四板高涨幅', code: '000004', pct: 19, buyable: true, is_20cm: false, boards: '5天4板' },
+      ],
+      early: [],
+      top5: [],
+    } as unknown as Parameters<typeof buildThemeCoreIndex>[0]['snapshot']
+    const index = buildThemeCoreIndex({ snapshot: tie, themeNames: ['机器人'] })
+    expect(index.get('机器人')!.stocks.map((s) => s.name)).toEqual(['四板高涨幅', '四板低涨幅'])
+  })
+})
+
+describe('严格连板龙判定', () => {
+  const mk = (over: Record<string, unknown>) => buildGeneIndex([{
+    file: 'hist.json',
+    data: { code: '603278', first_day: '20200101', last_day: '20261023', zt_total: 40, zt_250: 24, max_boards_hist: 6, promo_rate_hist: 60, ...over } as never,
+  }]).get('603278')!
+
+  it('晋级≥40% 且年涨停高于历史年均 → 标记为严格连板龙', () => {
+    // 6.8 年 40 次 ≈ 年均 5.9 → 24 次远高于年均
+    expect(mk({}).strictDragon).toBe(true)
+  })
+
+  it('晋级率不足 40% → 不标（哪怕涨停次数很高）', () => {
+    expect(mk({ promo_rate_hist: 39.9 }).strictDragon).toBe(false)
+  })
+
+  it('近一年次数未超过自身历史年均 → 不标（吃老本的票不算）', () => {
+    // 1.2 年 100 次 ≈ 年均 83 → 24 次低于年均
+    expect(mk({ first_day: '20250801', zt_total: 100 }).strictDragon).toBe(false)
+  })
+
+  it('上市不足半年或字段缺失 → 不判定（null），不用 false 冒充', () => {
+    expect(mk({ first_day: '20260601' }).strictDragon).toBeNull()
+    expect(mk({ promo_rate_hist: null }).strictDragon).toBeNull()
+    expect(mk({ last_day: 'bad' }).strictDragon).toBeNull()
+  })
+
+  it('年均由 zt_total / 上市年数推出，不是固定阈值', () => {
+    const g = mk({})
+    expect(g.annualAvg).toBeGreaterThan(5)
+    expect(g.annualAvg).toBeLessThan(7)
   })
 })
 

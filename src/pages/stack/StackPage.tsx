@@ -145,7 +145,7 @@ export function Component() {
         >
           <div className="flex flex-col gap-2 mb-3">
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="pulse" size={13} className="text-up" />
                 窗口内每日涨停家数
               </div>
@@ -159,7 +159,7 @@ export function Component() {
               />
             </div>
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex items-center gap-1">
+              <div className="text-12 font-semibold mb-1 flex items-center gap-1">
                 <Icon name="stairs" size={13} className="text-lead" />
                 窗口内最高连板（独立 Y 轴）
               </div>
@@ -172,7 +172,7 @@ export function Component() {
                 format={(v) => `${n1(v)} 板`}
               />
             </div>
-            <p className="text-sub text-[11px] leading-relaxed">
+            <p className="text-sub text-11 leading-relaxed">
               两张小图<b className="text-txt">共用同一时间轴、各自独立 Y 轴</b> ——
               家数在 20~90 量级、最高板在 2~9 量级，共轴会把最高板压成贴底直线，
               「高度是升是降」当场消失。此处的对齐是为了让「家数上升 + 高度上升 = 情绪全面转强」
@@ -189,7 +189,7 @@ export function Component() {
             cellH={22}
             labelWidth={96}
           />
-          <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
+          <p className="text-sub text-12 mt-2 leading-relaxed">
             行 = 窗口内涨停家数累计前 <b className="text-txt">{heat.rows.length}</b> 个题材，
             <b className="text-txt">不受「仅看升温题材」开关影响</b>（开关只过滤下方表格）——
             否则一按开关颜色量纲就变，跨次截图无法对比。
@@ -231,13 +231,13 @@ export function Component() {
             type="button"
             onClick={() => setOnlyRising((v) => !v)}
             className={cn(
-              'px-2.5 py-1 text-[12px] rounded-sm border cursor-pointer bg-transparent transition-colors',
+              'px-2.5 py-1 text-12 rounded-sm border cursor-pointer bg-transparent transition-colors',
               onlyRising ? 'border-line-strong text-txt font-semibold' : 'border-line text-sub hover:text-txt',
             )}
           >
             仅看升温题材
           </button>
-          <span className="text-sub text-[11.5px]">
+          <span className="text-sub text-12">
             「·」= 该日无记录（非 0）· 悬停单元格可看当日龙头
           </span>
         </div>
@@ -248,7 +248,7 @@ export function Component() {
 
         {!!rows.length && (
           <div className="overflow-x-auto max-h-[var(--panel-max-h)] overflow-y-auto">
-            <table className="border-collapse text-[12.5px]">
+            <table className="border-collapse text-13">
               <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-line text-sub">
                   <th className="text-left font-normal py-1.5 px-2 whitespace-nowrap sticky left-0 bg-card">
@@ -328,7 +328,7 @@ export function Component() {
                     cellH={20}
                   />
                 </div>
-                <div className="text-sub text-[11px]">
+                <div className="text-sub text-11">
                   按该周涨停天数降序取前 40 只 · 格子只表示「当日是否涨停」，
                   板数见行尾（原数据无逐日板数）
                 </div>
@@ -382,7 +382,7 @@ export function Component() {
                       label: '原因',
                       className: 'max-w-[280px] truncate',
                       cell: (r) => (
-                        <span className="text-sub text-[11.5px]">{r.e.reasons?.[0] || '—'}</span>
+                        <span className="text-sub text-12">{r.e.reasons?.[0] || '—'}</span>
                       ),
                     },
                   ]}
@@ -453,7 +453,7 @@ function MatrixRow({
       <td className="py-1.5 px-2 whitespace-nowrap">
         {row.leader_today ? (
           <span>
-            <StockLink code={row.leader_today.code} className="text-rec">{row.leader_today.name}</StockLink>
+            <StockLink code={row.leader_today.code} className="text-txt">{row.leader_today.name}</StockLink>
             {row.leader_today.boards > 0 && <Tag tone="up">{row.leader_today.boards}板</Tag>}
           </span>
         ) : (

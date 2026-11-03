@@ -69,7 +69,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
   return (
     <>
       <Card title="📈 净值闭环（接力脚本轨）" extra={<CardBadge tone={last && last.nav >= 1 ? 'up' : 'down'}>净值 {last ? n2(last.nav) : '—'}</CardBadge>}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 mb-2 text-[12.5px]">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 mb-2 text-13">
           <Metric label="累计收益" value={last ? pct((last.nav - 1) * 100) : '—'} cls={last && last.nav >= 1 ? 'text-up' : 'text-down'} />
           <Metric label="胜率（有成交日）" value={winRate == null ? '—' : `${winRate.toFixed(0)}%`} cls={winRate != null && winRate >= 50 ? 'text-up' : 'text-txt'} />
           <Metric label="结算日数" value={String(rows.length)} />
@@ -77,12 +77,12 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
           <Metric label="最新决策日" value={last?.recommendation_date ?? '—'} />
           <Metric label="最新成交" value={last ? `${last.stock_count}只` : '—'} cls={last && last.stock_count > 0 ? 'text-txt' : 'text-sub'} />
         </div>
-        {firstAiIdx > 0 && <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5 mb-2">口径分界：自 <span className="num font-semibold">{rows[firstAiIdx].trade_date}</span> 起采用AI口径，此前为机械口径。</p>}
+        {firstAiIdx > 0 && <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5 mb-2">口径分界：自 <span className="num font-semibold">{rows[firstAiIdx].trade_date}</span> 起采用AI口径，此前为机械口径。</p>}
       </Card>
 
       <Card title="📈 全部交易走势" extra={<CardBadge tone={tradeChart.tone === 'up' ? 'up' : tradeChart.tone === 'down' ? 'down' : 'neutral'}>{tradeChart.navs.length}笔实际交易</CardBadge>}>
         {tradeChart.navs.length ? <><LineChart labels={tradeChart.labels} series={[{ name: '逐笔净值', values: tradeChart.navs, tone: tradeChart.tone, area: true }]} height={260} showLegend={false} format={(value) => value.toFixed(3)} yTickCount={5} refLines={[{ value: 1, label: '本金线 1.00', tone: 'sub' }]} />
-          <p className="text-sub text-[11.5px] mt-1.5 leading-relaxed">每个点对应一笔实际成交。{tradeChart.fallbackCount > 0 && `其中${tradeChart.fallbackCount}笔旧记录缺逐票收益，按当日平均收益绘制。`}</p></> : <EmptyState text={loading ? '正在读取交易账本' : '交易账本为空'} />}
+          <p className="text-sub text-12 mt-1.5 leading-relaxed">每个点对应一笔实际成交。{tradeChart.fallbackCount > 0 && `其中${tradeChart.fallbackCount}笔旧记录缺逐票收益，按当日平均收益绘制。`}</p></> : <EmptyState text={loading ? '正在读取交易账本' : '交易账本为空'} />}
       </Card>
 
       <Card title="📊 逐日收益分布" extra={<CardBadge tone={winRate != null && winRate >= 50 ? 'up' : 'neutral'}>胜率 {winRate == null ? '—' : `${winRate.toFixed(0)}%`}</CardBadge>}>
@@ -93,7 +93,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
         <DataTable<AccountNavEntry> rows={[...rows].reverse()} rowKey={(row) => row.trade_date} empty="尚无结算记录" columns={[
           { label: '结算日', cell: (row) => <span className="num">{row.trade_date}</span> },
           { label: '决策日', cell: (row) => <span className="num text-sub">{row.recommendation_date}</span> },
-          { label: '口径', cell: (row) => { const caliber = row.caliber ? CALIBER_LABEL[row.caliber] : null; return caliber ? <Tag tone={caliber.tone} title={row.note}>{caliber.text}</Tag> : <span className="text-sub text-[11.5px]">机械</span> } },
+          { label: '口径', cell: (row) => { const caliber = row.caliber ? CALIBER_LABEL[row.caliber] : null; return caliber ? <Tag tone={caliber.tone} title={row.note}>{caliber.text}</Tag> : <span className="text-sub text-12">机械</span> } },
           { label: '成交', num: true, cell: (row) => <span className={row.stock_count === 0 ? 'text-sub' : 'text-txt'}>{row.stock_count}</span> },
           { label: '均收益', num: true, cell: (row) => <ReturnText value={row.avg_return_pct} /> },
           { label: '净值', num: true, cell: (row) => <span className={cn('num font-semibold', row.nav >= 1 ? 'text-up' : 'text-down')}>{n2(row.nav)}</span> },
@@ -109,5 +109,5 @@ function ReturnText({ value }: { value: number }) {
 }
 
 function Metric({ label, value, cls }: { label: string; value: string; cls?: string }) {
-  return <div className="flex flex-col"><span className="text-sub text-[11.5px]">{label}</span><span className={cn('num text-[15px] font-semibold', cls ?? 'text-txt')}>{value}</span></div>
+  return <div className="flex flex-col"><span className="text-sub text-12">{label}</span><span className={cn('num text-15 font-semibold', cls ?? 'text-txt')}>{value}</span></div>
 }

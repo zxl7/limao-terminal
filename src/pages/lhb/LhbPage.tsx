@@ -141,7 +141,7 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                    <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                   </span>
                 ),
               },
@@ -164,7 +164,7 @@ export function Component() {
               },
               {
                 label: '连榜',
-                cell: (r) => <span className="text-sub text-[11.5px]">{r.days_on_board || '—'}</span>,
+                cell: (r) => <span className="text-sub text-12">{r.days_on_board || '—'}</span>,
               },
             ]}
           />
@@ -176,7 +176,7 @@ export function Component() {
             rowKey={(r, i) => `${r.seat}-${i}`}
             empty="该日无游资席位数据"
             columns={[
-              { label: '席位', cell: (r) => <span className="text-[12px]">{r.seat}</span> },
+              { label: '席位', cell: (r) => <span className="text-12">{r.seat}</span> },
               {
                 label: '买入额',
                 num: true,
@@ -207,7 +207,7 @@ export function Component() {
 
         {tab === 'stocks' && (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[11.5px] text-sub">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-12 text-sub">
               <span>
                 共 <b className="text-txt">{thsStocks.length}</b> 行 · <b className="text-txt">{thsStockCodes}</b> 只
                 （同票上「单日榜」与「三日榜」各占一行，不合并金额）
@@ -224,8 +224,8 @@ export function Component() {
                   label: '标的',
                   cell: (r) => (
                     <span className="whitespace-nowrap">
-                      <StockLink code={r.ticker} className="text-rec">{r.name}</StockLink>
-                      <span className="ml-1.5 text-sub text-[10.5px] num">{r.ticker}</span>
+                      <StockLink code={r.ticker} className="text-txt">{r.name}</StockLink>
+                      <span className="ml-1.5 text-sub text-11 num">{r.ticker}</span>
                     </span>
                   ),
                 },
@@ -270,7 +270,7 @@ export function Component() {
                   className: 'whitespace-normal min-w-[240px]',
                   cell: (r) => (
                     <span className="flex flex-col gap-0.5">
-                      {r.limit_reason && <span className="text-[11.5px] text-warn">{r.limit_reason}</span>}
+                      {r.limit_reason && <span className="text-12 text-warn">{r.limit_reason}</span>}
                       {!!r.concept_list?.length && (
                         <span className="flex flex-wrap gap-1">
                           {r.concept_list.slice(0, 4).map((c) => (
@@ -290,7 +290,7 @@ export function Component() {
         {tab === 'seatTop' && (
           <div className="flex flex-col gap-3">
             <div>
-              <div className="text-[12px] text-sub mb-1">机构席位 Top5（同花顺口径）</div>
+              <div className="text-12 text-sub mb-1">机构席位 Top5（同花顺口径）</div>
               <DataTable
                 rows={thsLatest?.org_top5 ?? []}
                 // ⚠️ 同花顺源同一只票可能因多个席位重复出现，仅用 code 会 key 冲突
@@ -301,7 +301,7 @@ export function Component() {
                     label: '标的',
                     cell: (r) => (
                       <span>
-                        <StockLink code={r.code} className="text-rec">{r.name}</StockLink>
+                        <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
                       </span>
                     ),
                   },
@@ -345,13 +345,13 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] text-sub mb-1">游资席位 Top5（同花顺口径）</div>
+              <div className="text-12 text-sub mb-1">游资席位 Top5（同花顺口径）</div>
               <DataTable
                 rows={thsLatest?.hotmoney_top5 ?? []}
                 rowKey={(r, i) => `${r.seat}-${i}`}
                 empty="无数据"
                 columns={[
-                  { label: '席位', cell: (r) => <span className="text-[12px]">{r.seat}</span> },
+                  { label: '席位', cell: (r) => <span className="text-12">{r.seat}</span> },
                   {
                     label: '买入额',
                     num: true,
@@ -384,7 +384,7 @@ export function Component() {
           <EmptyState text="暂无龙虎榜数据" />
         )}
         {txLatest && (
-          <p className="text-sub text-[11px] mt-2">
+          <p className="text-sub text-11 mt-2">
             腾讯源生成于 {txLatest.generated_ts || '—'}
             {thsLatest && ` · 同花顺源生成于 ${thsLatest.generated_ts || '—'}`}
             {txFiles.length > 1 && ` · 已归档 ${txFiles.length} 期（最新 ${txLatest.date}）`}

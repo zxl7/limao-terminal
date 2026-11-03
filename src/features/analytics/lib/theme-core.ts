@@ -108,6 +108,8 @@ export function buildThemeCoreIndex({ snapshot, fundBoards, themeNames }: {
     const seen = new Set<string>()
     const push = (s: Omit<ThemeCoreStock, 'turn' | 'boardHeight'> & { turn?: number | null; boardHeight?: number }) => {
       if (!s.code) return
+      s = { ...s, code: bareCode(s.code) }
+      if (!s.code) return
       const boardHeight = s.boardHeight ?? boardHeightOf(s.boards)
       const existing = facts.stocks.find((x) => x.code === s.code)
       if (existing) {
@@ -196,9 +198,47 @@ export interface GeneFacts {
   zt250: number
   maxBoards: number
   promoRate: number | null
+  /** 历史年均涨停次数 = zt_total / 上市至今整年数；样本不足为 null */
+  annualAvg: number | null
+  /**
+   * 严格连板龙：**晋级率 ≥40%** 且 **近一年涨停次数高于历史年均**。
+   *
+   * 为什么是这两条而不是「某个固定次数」：涨停次数本身依赖上市年限与板块属性，
+   * 用绝对阈值（例如 8 次）会把这几年才上市、但近期明显活跃的票判死；
+   * 用「现在比它自己的历史更活跃」+「涨停后确实有人接力」才是可比的。
+   * duration < 0.5 年或字段缺失时不判定 —— 不猜测，不默认 False 冒充判断。
+   */
+  strictDragon: boolean | null
 }
 
-export function buildGeneIndex(files: Array<{ data?: GeneHistory | null }> | null | undefined): Map<string, GeneFacts> {
+/** 严格连板龙的晋级率门槛（与策略侧口径一致） */
+export const STRICT_DRAGON_PROMO_MIN = 40
+
+/**
+ * `002708.SZ` → `002708`。
+ *
+ * ⚠️ 实测（2026-10-28）：`leaders[].code` 带交易所后缀（`002708.SZ`），而
+ * `theme.top5[].leader.code` 与股性档案 `gene/hist` 都是 6 位纯数字。
+ * 不归一化会出现两个后果：股性永远查不到（map 未命中）、同一只票被当成两只
+ * （去重键不同）。故**所有内部身份统一用 6 位**，展示层仍可原样交给 StockLink。
+ */
+export function bareCode(code: string | null | undefined): string {
+  return String(code ?? '').trim().toUpperCase().replace(/[.](SH|SS|SZ|BJ)$/, '')
+}
+
+/** `20200728` → Date；格式不符返回 null */
+function parseYmd(v: string | null | undefined): Date | null {
+  if (!v || !/^\d{8}$/.test(v)) return null
+  const y = Number(v.slice(0, 4))
+  const m = Number(v.slice(4, 6))
+  const d = Number(v.slice(6, 8))
+  const date = new Date(y, m - 1, d)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+export function buildGeneIndex(
+  files: ReadonlyArray<{ file?: string; data?: GeneHistory | null }> | null | undefined,
+): Map<string, GeneFacts> {
   const index = new Map<string, GeneFacts>()
   for (const f of files ?? []) {
     const d = f?.data
@@ -206,11 +246,19 @@ export function buildGeneIndex(files: Array<{ data?: GeneHistory | null }> | nul
     const zt250 = typeof d.zt_250 === 'number' && Number.isFinite(d.zt_250) ? d.zt_250 : null
     const maxBoards = typeof d.max_boards_hist === 'number' ? d.max_boards_hist : 0
     if (zt250 === null) continue
-    index.set(d.code, {
-      zt250,
-      maxBoards,
-      promoRate: typeof d.promo_rate_hist === 'number' && Number.isFinite(d.promo_rate_hist) ? d.promo_rate_hist : null,
-    })
+    const promoRate = typeof d.promo_rate_hist === 'number' && Number.isFinite(d.promo_rate_hist) ? d.promo_rate_hist : null
+    const first = parseYmd(d.first_day)
+    const last = parseYmd(d.last_day)
+    let annualAvg: number | null = null
+    if (first && last && typeof d.zt_total === 'number' && d.zt_total >= 0) {
+      const years = (last.getTime() - first.getTime()) / (365.25 * 24 * 3600 * 1000)
+      // 上市不足半年没有可比基数，宁可 null 也不给一个由两三个月外推出的「年均」
+      if (years >= 0.5) annualAvg = d.zt_total / years
+    }
+    const strictDragon = annualAvg === null || promoRate === null
+      ? null
+      : promoRate >= STRICT_DRAGON_PROMO_MIN && zt250 > annualAvg
+    index.set(bareCode(d.code), { zt250, maxBoards, promoRate, annualAvg, strictDragon })
   }
   return index
 }

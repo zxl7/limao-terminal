@@ -84,7 +84,7 @@ function StockRow({
       {/* 列 1：名称 + 题材标记 + 👑（可换行，不溢出） */}
       <span className="flex items-baseline gap-1 flex-wrap min-w-0">
         <span
-          className={cn('text-[12px] truncate min-w-0', s.boards === topBoard && 'font-semibold text-up')}
+          className={cn('text-12 truncate min-w-0', s.boards === topBoard && 'font-semibold text-up')}
           title={s.name}
         >
           {s.name}
@@ -92,7 +92,7 @@ function StockRow({
         {tag?.leaderOf.map((t) => (
           <span
             key={t}
-            className="text-[10px] px-1 rounded-sm bg-lead-soft text-lead min-w-0 max-w-full truncate"
+            className="text-10 px-1 rounded-sm bg-lead-soft text-lead min-w-0 max-w-full truncate"
             title={`当前龙头：${t}`}
           >
             👑 {t}
@@ -103,7 +103,7 @@ function StockRow({
           .map((t) => (
             <span
               key={t}
-              className="text-[10.5px] font-medium px-1 rounded-sm bg-rec-soft text-rec min-w-0 max-w-full truncate"
+              className="text-11 font-medium px-1 rounded-sm bg-rec-soft text-rec min-w-0 max-w-full truncate"
               title={`题材归属：${t}`}
             >
               {t}
@@ -115,13 +115,13 @@ function StockRow({
         <StockMarks s={s} />
       </span>
       {/* 列 3：行业（固定宽，截断） */}
-      <span className="text-[11px] text-sub truncate flex-none" title={s.sector} style={{ maxWidth: 84 }}>
+      <span className="text-11 text-sub truncate flex-none" title={s.sector} style={{ maxWidth: 84 }}>
         {s.sector}
       </span>
       {/* 列 4：涨停原因（长文 ellipsis + title，绝不溢出） */}
       {reason ? (
         <span
-          className="text-[10.5px] text-sub truncate min-w-0"
+          className="text-11 text-sub truncate min-w-0"
           title={`涨停原因：${reason}`}
         >
           {reason}
@@ -137,16 +137,16 @@ function StockRow({
 function StockMarks({ s }: { s: ZtPoolStock }) {
   return (
     <>
-      <span className={cn('num text-[11px]', s.boards >= 2 ? 'text-up' : 'text-sub')}>
+      <span className={cn('num text-11', s.boards >= 2 ? 'text-up' : 'text-sub')}>
         {s.boards}板
       </span>
       {s.is_20cm && (
-        <span className="text-[10px] text-warn" title="20cm 标的 · 波动大须紧止损">
+        <span className="text-10 text-warn" title="20cm 标的 · 波动大须紧止损">
           20cm
         </span>
       )}
       {s.zbc > 0 && (
-        <span className="num text-[10px] text-warn" title={`当日炸板 ${s.zbc} 次`}>
+        <span className="num text-10 text-warn" title={`当日炸板 ${s.zbc} 次`}>
           ×{s.zbc}
         </span>
       )}
@@ -177,7 +177,7 @@ function SectorSlotGroup({
         {rank != null && (
           <span
             className={cn(
-              'num text-[10px] px-1 rounded-sm flex-none',
+              'num text-10 px-1 rounded-sm flex-none',
               rank === 1 ? 'bg-up-soft text-up font-semibold' : 'bg-line-faint text-sub',
             )}
             title={`强度排名第 ${rank}（按当刻封板家数 → 组内最高板 → 全天总数）`}
@@ -185,12 +185,12 @@ function SectorSlotGroup({
             #{rank}
           </span>
         )}
-        <span className="text-[12.5px] font-semibold text-txt break-all min-w-0">{g.sector}</span>
-        <span className="num text-[11px] text-sub">当刻 {g.count} 只</span>
+        <span className="text-13 font-semibold text-txt break-all min-w-0">{g.sector}</span>
+        <span className="num text-11 text-sub">当刻 {g.count} 只</span>
         {/* ⚠️ 跨时形态只作「全天汇总」小注（muted），不冒充当刻爆发 */}
         {meta && (
           <span
-            className="text-[10.5px] text-sub flex-none"
+            className="text-11 text-sub flex-none"
             title="全天形态"
           >
             {meta.icon} {meta.label}
@@ -198,7 +198,7 @@ function SectorSlotGroup({
         )}
         {g.dayTotal != null && (
           <span
-            className="text-[10px] text-sub"
+            className="text-10 text-sub"
             title="全天封板总数"
           >
             当日共 {g.dayTotal} 只
@@ -207,7 +207,7 @@ function SectorSlotGroup({
         )}
       </div>
       {blockThemes.length > 0 && (
-        <div className="text-[10.5px] text-sub break-all min-w-0">
+        <div className="text-11 text-sub break-all min-w-0">
           含题材：<span className="text-rec font-medium break-all">{blockThemes.join(' / ')}</span>
         </div>
       )}
@@ -282,30 +282,30 @@ function ThemeSlotGroup({
       )}
     >
       <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
-        {burst && <span className="text-[11px] flex-none">🚀</span>}
+        {burst && <span className="text-11 flex-none">🚀</span>}
         <span
           className={cn(
             'font-semibold break-all min-w-0',
             // 爆发 = 大红 + 放大一号（用户 2026-10-18：「字体稍微大一点，突出这个题材牛逼」）
             // 首爆 = 紫（2026-10-20 用户：「首爆改为紫色」），与轴上标记同色
-            burst ? 'text-[13.5px] font-bold text-rec' : 'text-[12.5px] text-txt',
+            burst ? 'text-14 font-bold text-rec' : 'text-13 text-txt',
           )}
         >
           {theme}
         </span>
-        <span className="num text-[11px] text-sub flex-none">当刻 {stocks.length} 只</span>
+        <span className="num text-11 text-sub flex-none">当刻 {stocks.length} 只</span>
         {t && t.members.length > 0 && (
-          <span className="num text-[10.5px] text-sub flex-none" title="该题材当日涨停池成员总数">
+          <span className="num text-11 text-sub flex-none" title="该题材当日涨停池成员总数">
             当日 {t.members.length} 只
           </span>
         )}
         {t?.currentLeader && (
-          <span className="text-[10.5px] text-lead flex-none">龙 {t.currentLeader}</span>
+          <span className="text-11 text-lead flex-none">龙 {t.currentLeader}</span>
         )}
       </div>
 
       {t?.catalyst && (
-        <div className="text-[11px] text-txt break-all min-w-0">催化：{t.catalyst}</div>
+        <div className="text-11 text-txt break-all min-w-0">催化：{t.catalyst}</div>
       )}
 
       <div className="grid gap-x-2 gap-y-0.5 min-w-0">
@@ -330,7 +330,7 @@ function ThemeSlotGroup({
       </div>
 
       {restMembers.length > 0 && (
-        <div className="text-[10.5px] text-sub break-all min-w-0">
+        <div className="text-11 text-sub break-all min-w-0">
           当日其余涨停成员：
           <span className="text-txt">{restMembers.map((m) => m.name).join('、')}</span>
         </div>
@@ -372,7 +372,7 @@ function EventRow({
 }) {
   const sev = severityNote(e.severity)
   return (
-    <li className="flex items-baseline gap-1.5 text-[12px] min-w-0">
+    <li className="flex items-baseline gap-1.5 text-12 min-w-0">
       <span className={cn('min-w-0', wrap ? 'break-all' : 'truncate')} title={e.event}>
         {/* 分段与 key 都由内核给（位移即身份）—— ⛔ 组件里不做跨段累加 */}
         {splitEventTextKeyed(e.event).map((seg) => (
@@ -381,7 +381,7 @@ function EventRow({
           </span>
         ))}
       </span>
-      {sev && <span className="text-[10px] text-sub flex-none">[{sev}]</span>}
+      {sev && <span className="text-10 text-sub flex-none">[{sev}]</span>}
     </li>
   )
 }
@@ -410,7 +410,7 @@ function EventSlot({ slot, unfold = false }: { slot: TimelineSlot; unfold?: bool
       {shown.length > 0 && (
         <>
           <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className="text-[10px] text-sub">
+            <span className="text-10 text-sub">
               {shown.length > 1 ? `系统观测 ${shown.length} 条` : '系统观测'}
             </span>
           </div>
@@ -424,7 +424,7 @@ function EventSlot({ slot, unfold = false }: { slot: TimelineSlot; unfold?: bool
       )}
       {hidden.length > 0 && (
         <details className="min-w-0">
-          <summary className="text-[10px] text-sub cursor-pointer select-none">
+          <summary className="text-10 text-sub cursor-pointer select-none">
             另有 {hidden.length} 条系统观测
           </summary>
           <ul className="flex flex-col gap-0.5 pt-0.5">
@@ -452,9 +452,9 @@ function PushSlot({
   return (
     <div className="flex flex-col gap-0.5 border-t border-line-faint pt-1 mt-0.5 min-w-0">
       <div className="flex items-baseline gap-1.5 flex-wrap">
-        <span className="text-[10px] text-sub flex-none">📤</span>
-        <span className="text-[10px] text-sub">题材推送 {pushes.length} 条</span>
-        <span className="num text-sub text-[10.5px]">
+        <span className="text-10 text-sub flex-none">📤</span>
+        <span className="text-10 text-sub">题材推送 {pushes.length} 条</span>
+        <span className="num text-sub text-11">
           {minToClock(at)}~{minToClock(to ?? at)}
         </span>
       </div>
@@ -468,12 +468,12 @@ function PushSlot({
             seen.set(sig, n + 1)
             return (
               <div key={`${sig}#${n}`} className="flex flex-col min-w-0">
-                <span className="text-[12px] text-txt break-all min-w-0" title={p.name}>
+                <span className="text-12 text-txt break-all min-w-0" title={p.name}>
                   {p.name}
                   <span className="num text-sub ml-1">×{p.push_count}</span>
                 </span>
                 {p.context && (
-                  <span className="text-[10.5px] text-sub leading-snug truncate" title={p.context}>
+                  <span className="text-11 text-sub leading-snug truncate" title={p.context}>
                     {p.context}
                   </span>
                 )}
@@ -528,12 +528,12 @@ function SlotHead({ slot, sectorCount }: { slot: TimelineSlot; sectorCount: numb
   const stockCount = slot.sectors.reduce((n, g) => n + g.count, 0) + slot.singles.length
   return (
     <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-      <span className="num text-[13px] font-semibold text-txt flex-none">
+      <span className="num text-13 font-semibold text-txt flex-none">
         {minToClock(slot.at)}
       </span>
-      <span className="text-sub text-[10.5px]">当刻封板 {stockCount} 只</span>
+      <span className="text-sub text-11">当刻封板 {stockCount} 只</span>
       {sectorCount > 0 && (
-        <span className="text-sub text-[10.5px]">板块 {sectorCount} 个</span>
+        <span className="text-sub text-11">板块 {sectorCount} 个</span>
       )}
     </div>
   )
@@ -618,10 +618,10 @@ export function SlotBody({
     <>
       {showTime && (
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="num text-[12px] font-semibold text-txt flex-none">
+          <span className="num text-12 font-semibold text-txt flex-none">
             {minToClock(slot.at)}
           </span>
-          <span className="text-sub text-[10.5px]">当刻封板 {slot.sectors.reduce((n, g) => n + g.count, 0) + slot.singles.length} 只</span>
+          <span className="text-sub text-11">当刻封板 {slot.sectors.reduce((n, g) => n + g.count, 0) + slot.singles.length} 只</span>
         </div>
       )}
 
@@ -642,12 +642,12 @@ export function SlotBody({
                 {/* 题材爆发 = **大红**（2026-10-18 用户定调：与「题材轮动紫」分家）——
                     原为紫色，与「轮动/回流」同色，看不出「新爆发」还是「又轮动一下」。
                     轴上竖条已同步为红：首爆实心大红、后续续强半档红。 */}
-                <span className="text-[11.5px] font-bold text-rec flex-none">🚀 首爆</span>
+                <span className="text-12 font-bold text-rec flex-none">🚀 首爆</span>
                 {bursts.map(({ key, item: b }) => (
                   <span key={key} className="flex items-baseline gap-1 flex-none">
-                    <span className="text-[12px] font-semibold text-rec break-all">{b.theme}</span>
-                    {b.count != null && <span className="num text-[10px] text-sub">{b.count}只</span>}
-                    {b.leader && <span className="text-[10px] text-lead">龙 {b.leader}</span>}
+                    <span className="text-12 font-semibold text-rec break-all">{b.theme}</span>
+                    {b.count != null && <span className="num text-10 text-sub">{b.count}只</span>}
+                    {b.leader && <span className="text-10 text-lead">龙 {b.leader}</span>}
                   </span>
                 ))}
               </div>
@@ -659,14 +659,14 @@ export function SlotBody({
                   if (t.catalyst == null && t.members.length === 0 && t.points.length <= 1) return null
                   return (
                     <div key={`${key}#detail`} className="flex flex-col gap-0.5 pl-3 min-w-0">
-                      {t.catalyst && <span className="text-[11px] text-txt break-all">催化：{t.catalyst}</span>}
+                      {t.catalyst && <span className="text-11 text-txt break-all">催化：{t.catalyst}</span>}
                       {t.members.length > 0 && (
-                        <span className="text-[11px] text-sub break-all">
+                        <span className="text-11 text-sub break-all">
                           当日涨停成员：{t.members.map((m) => m.name).join('、')}
                         </span>
                       )}
                       {t.points.length > 1 && (
-                        <span className="num text-[10.5px] text-sub break-all">
+                        <span className="num text-11 text-sub break-all">
                           观测 {t.points.map((p) => minToClock(p.at)).join(' → ')}
                         </span>
                       )}
@@ -680,15 +680,15 @@ export function SlotBody({
                ⚠️ 与 2026-09-17 撤除的「↻ 反复」不同：那类把机械换人当**题材层信号**渲染，
                   本类只回答「这个题材今天在动」，且不参与强度判定（仍可被低频合并）。 */
             <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10px] text-sub flex-none">轮动</span>
+              <span className="text-10 text-sub flex-none">轮动</span>
               {rotateds.map(({ key, item: r }) => (
                 <span
                   key={key}
-                  className="text-[11px] text-rec/80 border border-rec/30 rounded-sm px-1"
+                  className="text-11 text-rec/80 border border-rec/30 rounded-sm px-1"
                 >
                   {r.theme}
                   {themeInfo && r.leader && (
-                    <span className="text-[10px] text-sub ml-1">龙 {r.leader}</span>
+                    <span className="text-10 text-sub ml-1">龙 {r.leader}</span>
                   )}
                 </span>
               ))}
@@ -696,23 +696,23 @@ export function SlotBody({
           )}
           {marks.fade.length > 0 && (
             <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10.5px] font-semibold text-down flex-none">⚠️ 衰竭</span>
+              <span className="text-11 font-semibold text-down flex-none">⚠️ 衰竭</span>
               {fades.map(({ key, item: f }) => (
                 <span key={key} className="flex items-baseline gap-1 flex-none">
-                  <span className="text-[11.5px] text-down break-all">{f.label}</span>
-                  <span className="text-[10px] text-sub">集体重挫</span>
+                  <span className="text-12 text-down break-all">{f.label}</span>
+                  <span className="text-10 text-sub">集体重挫</span>
                 </span>
               ))}
             </div>
           )}
           {marks.pushed.length > 0 && (
             <div className="flex items-baseline gap-1 flex-wrap min-w-0">
-              <span className="text-[10.5px] font-semibold text-lead flex-none">📤 推送</span>
+              <span className="text-11 font-semibold text-lead flex-none">📤 推送</span>
               {pushes.map(({ key, item: p }) => (
-                <span key={key} className="text-[11px] text-txt break-all flex-none">
+                <span key={key} className="text-11 text-txt break-all flex-none">
                   {p.name}
                   {p.pushCount != null && p.pushCount > 1 && (
-                    <span className="num text-[10px] text-sub">×{p.pushCount}</span>
+                    <span className="num text-10 text-sub">×{p.pushCount}</span>
                   )}
                 </span>
               ))}
@@ -747,7 +747,7 @@ export function SlotBody({
           ))}
           {themeGroups.unthemed.length > 0 && (
             <div className="flex flex-col gap-0.5 min-w-0">
-              <div className="text-[10.5px] text-sub">
+              <div className="text-11 text-sub">
                 无题材标记 {themeGroups.unthemed.length} 只
               </div>
               <div className="grid gap-x-2 gap-y-0.5 min-w-0">
@@ -782,7 +782,7 @@ export function SlotBody({
       ))}
       {restSectors.length > 0 && (
         <>
-          <div className="text-[10.5px] text-sub">
+          <div className="text-11 text-sub">
             ↓ 其余 {restSectors.length} 个板块
           </div>
           {restSectors.map((g, i) => (
@@ -801,7 +801,7 @@ export function SlotBody({
       {/* 单票分区（仅同分钟合并，不跨分钟） */}
       {slot.singles.length > 0 && (
         <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="text-[10.5px] text-sub">单票 {slot.singles.length} 只</div>
+          <div className="text-11 text-sub">单票 {slot.singles.length} 只</div>
           <div className="grid gap-x-2 gap-y-0.5 min-w-0">
             {(() => {
               const seen = new Map<string, number>()
@@ -905,11 +905,11 @@ export function TimelineLinkageCard({
       ariaLabel={`${minToClock(block.at)} 板块联动 ${block.sectors.length} 个`}
       head={
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-          <span className="num text-[13px] font-semibold text-txt flex-none">
+          <span className="num text-13 font-semibold text-txt flex-none">
             {block.at === block.to ? minToClock(block.at) : `${minToClock(block.at)}~${minToClock(block.to)}`}
           </span>
-          <span className="text-[11.5px] font-semibold text-up flex-none">🚀 板块联动</span>
-          <span className="text-sub text-[10.5px] min-w-0 break-all">
+          <span className="text-12 font-semibold text-up flex-none">🚀 板块联动</span>
+          <span className="text-sub text-11 min-w-0 break-all">
             {block.sectors.length} 个板块 · {block.sectors.join(' / ')}
           </span>
         </div>
@@ -956,17 +956,17 @@ export function TimelineMergedCard({
       ariaLabel={`${minToClock(block.at)} 起合并 ${block.slots.length} 个低强度时刻`}
       head={
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-          <span className="num text-[13px] font-semibold text-txt flex-none">
+          <span className="num text-13 font-semibold text-txt flex-none">
             {block.at === block.to ? minToClock(block.at) : `${minToClock(block.at)}~${minToClock(block.to)}`}
           </span>
-          <span className="text-[10.5px] px-1 rounded-sm bg-line-faint text-sub flex-none">
+          <span className="text-11 px-1 rounded-sm bg-line-faint text-sub flex-none">
             📎 合并 {block.slots.length} 刻
           </span>
-          <span className="text-[10.5px] font-medium text-txt flex-none">
+          <span className="text-11 font-medium text-txt flex-none">
             涉及板块 {block.sectors.length} 个
           </span>
           {block.sectors.length > 0 && (
-            <span className="text-sub text-[10.5px] min-w-0 break-all">
+            <span className="text-sub text-11 min-w-0 break-all">
               {block.sectors.join(' / ')}
             </span>
           )}

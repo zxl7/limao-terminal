@@ -159,7 +159,7 @@ export function Component() {
             <CardBadge tone={d?.regime === 'risk_on' ? 'up' : d?.regime === 'ice' ? 'down' : 'neutral'}>
               {regimeText(d?.regime)}
             </CardBadge>
-            <span className="text-[11px] text-sub">
+            <span className="text-11 text-sub">
               {d?.date ?? '—'} · {d?.generated_at_bj ?? '—'}
             </span>
           </span>
@@ -169,7 +169,7 @@ export function Component() {
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-4">
               <div>
-                <div className="text-[11px] text-sub mb-1">脚本环境（选股输入）</div>
+                <div className="text-11 text-sub mb-1">脚本环境（选股输入）</div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <StatPair label="情绪分" value={num(env?.sentiment_score)} />
                   <StatPair label="标签" value={env?.sentiment_label ?? '—'} />
@@ -179,7 +179,7 @@ export function Component() {
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-sub mb-1">真实盘面（盘中快照）</div>
+                <div className="text-11 text-sub mb-1">真实盘面（盘中快照）</div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <StatPair label="情绪分" value={num(renv?.sentiment_score)} />
                   <StatPair label="情绪" value={renv?.sentiment ?? '—'} />
@@ -189,7 +189,7 @@ export function Component() {
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-sub mb-1">池规模</div>
+                <div className="text-11 text-sub mb-1">池规模</div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <StatPair label="接力池" value={(d.relay ?? []).length} tone="up" />
                   <StatPair label="观察池" value={(d.watch ?? []).length} />
@@ -198,7 +198,7 @@ export function Component() {
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-sub mb-1">诊断计数</div>
+                <div className="text-11 text-sub mb-1">诊断计数</div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <StatPair label="参与评分" value={num(dg?.['scored'])} />
                   <StatPair label="严格池" value={num(dg?.['strict_pool'])} />
@@ -207,7 +207,7 @@ export function Component() {
                 </div>
               </div>
             </div>
-            <p className="text-sub text-[11px] leading-relaxed mt-2">
+            <p className="text-sub text-11 leading-relaxed mt-2">
               脚本环境与真实盘面是**两套独立读数** —— 两者背离即「脚本环境失真」的证据，
               故并列展示而不合并。
             </p>
@@ -289,18 +289,18 @@ export function Component() {
                   >
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="badge bg-rec-soft text-rec">{e.type}</span>
-                      <span className="text-[13px] font-semibold text-txt">{e.sector}</span>
-                      <span className="text-[11px] text-sub">
+                      <span className="text-13 font-semibold text-txt">{e.sector}</span>
+                      <span className="text-11 text-sub">
                         涨停 {e.zt_in_sector ?? '—'} · 池 {e.count ?? '—'}
                       </span>
                     </div>
                     {e.buy && (
-                      <div className="text-[12.5px] mt-0.5">
+                      <div className="text-13 mt-0.5">
                         <span className="text-sub">关注 </span>
-                        <StockLink code={e.buy.code} className="text-rec font-medium">{e.buy.name}</StockLink>
+                        <StockLink code={e.buy.code} className="text-txt font-medium">{e.buy.name}</StockLink>
                         <span
                           className={cn(
-                            'num text-[12px] ml-1.5',
+                            'num text-12 ml-1.5',
                             e.buy.pct > 0 ? 'text-up' : e.buy.pct < 0 ? 'text-down' : 'text-sub',
                           )}
                         >
@@ -310,7 +310,7 @@ export function Component() {
                       </div>
                     )}
                     {e.desc && (
-                      <p className="text-sub text-[11.5px] leading-relaxed mt-0.5">催化：{e.desc}</p>
+                      <p className="text-sub text-12 leading-relaxed mt-0.5">催化：{e.desc}</p>
                     )}
                   </li>
                 ))}
@@ -395,11 +395,11 @@ export function Component() {
                     className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
                   >
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <StockLink code={q.code} className="text-[13px] text-txt truncate">{q.name}</StockLink>
+                      <StockLink code={q.code} className="text-13 text-txt truncate">{q.name}</StockLink>
                     </span>
                     <span
                       className={cn(
-                        'num text-[13px] font-medium',
+                        'num text-13 font-medium',
                         q.pct == null ? 'text-sub' : q.pct > 0 ? 'text-up' : q.pct < 0 ? 'text-down' : 'text-sub',
                       )}
                     >
@@ -448,7 +448,7 @@ export function Component() {
       {/* 全局旁白：账户 + 盘面 + 结论，分段文本 —— 原样呈现，不改写 */}
       <Card title="🗣️ 全局旁白" extra={<CardBadge>决策原件的自然语言部分</CardBadge>}>
         {d?.global_narrative ? (
-          <p className="text-[12.5px] leading-relaxed whitespace-pre-line text-txt">
+          <p className="text-13 leading-relaxed whitespace-pre-line text-txt">
             {d.global_narrative}
           </p>
         ) : (
@@ -492,7 +492,7 @@ export function Component() {
                 </div>
 
                 <div className="border-t border-line-faint pt-2">
-                  <div className="text-[11px] text-sub mb-1">
+                  <div className="text-11 text-sub mb-1">
                     影子排序（{shadow.shadow_ranked.length} 只 · 按影子分降序 ·
                     高亮 = 影子会推而实际没推）
                   </div>
@@ -534,7 +534,7 @@ export function Component() {
                 </div>
 
                 <div className="border-t border-line-faint pt-2">
-                  <div className="text-[11px] text-sub mb-1">
+                  <div className="text-11 text-sub mb-1">
                     实际入池（{shadow.eod_relay.length} 只 · 现行规则产出，即上方接力池）
                   </div>
                   <DataTable
@@ -596,22 +596,22 @@ export function Component() {
                 </div>
 
                 <div className="border-t border-line-faint pt-2">
-                  <div className="text-[11px] text-sub mb-1">影子分档计数</div>
+                  <div className="text-11 text-sub mb-1">影子分档计数</div>
                   {Object.keys(shadow.bands ?? {}).length === 0 ? (
-                    <div className="text-sub text-[12px]">—</div>
+                    <div className="text-sub text-12">—</div>
                   ) : (
                     <div className="flex flex-col gap-1">
                       {Object.entries(shadow.bands).map(([band, n]) => (
                         <div key={band} className="flex items-baseline justify-between gap-2">
                           <Tag>{band}</Tag>
-                          <span className="num text-[12.5px]">{n} 只</span>
+                          <span className="num text-13">{n} 只</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
 
-                <div className="border-t border-line-faint pt-1.5 text-sub text-[11px] leading-relaxed">
+                <div className="border-t border-line-faint pt-1.5 text-sub text-11 leading-relaxed">
                   环境指纹是影子判定当时的盘面快照 —— 复盘影子排序是否合理时，
                   必须先看当时的 regime 与情绪分，否则等于用今天的盘面评判当时的排序。
                 </div>

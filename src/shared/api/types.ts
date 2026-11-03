@@ -102,7 +102,22 @@ export interface MarketDailyBar {
   ingested_at: string | null
 }
 
+export interface RsiEvidence {
+  schema: 'rsi_evidence_v1'
+  code: string
+  asof: string
+  bar_date: string | null
+  method: 'wilder'
+  adjustment: 'none'
+  sample_count: number
+  dates: string[]
+  quality: string
+  readings: Record<string, { period: number; value: number | null; previous: number | null; change: number | null; status: string; series: Array<number | null> }>
+  warnings: string[]
+}
+
 export interface MarketDailyResponse {
+  rsi_evidence?: RsiEvidence
   code: string
   limit: number
   bars: MarketDailyBar[]
@@ -165,6 +180,44 @@ export interface StockRegistryResponse {
 export interface CountNames {
   count: number
   names: string[]
+  /**
+   * 明细（含跌幅）。**仅当上游能给出涨跌幅时才存在**。
+   *
+   * ⚠️ 2026-10-31 起生产端（`intraday_pulse.parse_pool`）开始透传 `items`；
+   * 更早的快照只有 `names`。所以**消费方必须两者都能渲染**：
+   * 有 items 就上跌幅，没有就退回纯名单，⛔ 不得用 0 或推算值补位。
+   */
+  items?: PoolNameItem[]
+}
+
+/**
+ * 本轮完整涨停名单（`intraday_pulse.build_limit_up_stocks` 落盘）。
+ *
+ * 为什么要暴露它：题材卡里同一批票要**按首封时间排序**（2026-10-31 用户口径），
+ * 而 `top5[].zt_stocks` 只有名字与涨幅、没有时间。`fbt` 是首封时间的唯一盘中实时来源
+ * （盘后归档走 `zt_pool`，两者同口径）。
+ */
+export interface LimitUpStock {
+  code: string
+  name: string
+  pct?: number | null
+  /** 连板文案，如 `3天3板` */
+  boards?: string | null
+  /** 所属题材（上游用「、」拼接） */
+  sector?: string | null
+  /**
+   * 首封时间 `HH:MM`。
+   * ⚠️ 2026-10-31 前落盘的快照**没有该字段**（当时只写 code/name/pct/boards/sector），
+   * 故必须 optional；缺失时前端退回「盘后归档 zt_pool」或排到最后。
+   */
+  fbt?: string | null
+}
+
+/** 跌停/炸板池里的单只票 —— `pct` 缺失表示上游没给，不是 0 */
+export interface PoolNameItem {
+  code?: string
+  name: string
+  pct?: number | null
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -441,6 +494,8 @@ export interface MarketSnapshot {
   index: IndexQuote[]
   limit_down: CountNames
   broken: CountNames
+  /** 本轮完整涨停名单（含首封时间）· 早段可能不给 */
+  limit_up_stocks?: LimitUpStock[] | null
   weak_sectors: WeakSectors
   sector_risk: SectorRisk
   ladder: LadderGroup[]
@@ -1521,7 +1576,6 @@ export interface ZtPoolSnapshot {
 //
 // 用途（中枢原文）：板块异动先查 core 票动不动 —— 不动而只有杂毛涨 = 假启动。
 // 四维权重：时效 0.25 / 封板硬度 0.20 / 连板领先 0.25 / 带动+参与 0.30
-
 export interface BoardCoreStock {
   code: string
   name: string
@@ -1547,6 +1601,79 @@ export interface BoardCoreFile {
   days: number
   top: BoardCoreStock[]
   ts: string
+}
+
+// ── 连板日观察（scripts/board_leader_daily.py · 2026-10-27）──
+//
+// 每条板块线 × 每个交易日：当天谁是龙一、几板、封单多厚、换没换人、
+// 昨日龙一今天还在不在涨停池（断板 = 这条线换挡/熄火）。
+//
+// 龙一判据与选股**同源**（wealth_code/core/sector_leader.py）：
+// 板数 → 封板时刻 ±5 分钟算同一档 → 封单/流通% → 带动家数 → 更早封板 → 代码稳定。
+
+/** 某板块某日的龙一 */
+export interface BoardLeaderPick {
+  code: string
+  name: string
+  boards: number
+  /** 首次封板时刻 HHMMSS */
+  fbt: string
+  /** 封单 / 流通市值（%）；缺失 = 拿不到流通市值，不是 0 */
+  seal_ratio_pct: number | null
+  /** 买不进的情形：'one_word' 一字 / 'st' / '' 正常 */
+  block: string
+}
+
+/** 组内身位（dragon_rank=1 即龙一） */
+export interface BoardDragonRank {
+  code: string
+  name: string
+  boards: number
+  fbt: string
+  seal_ratio_pct: number | null
+  dragon_rank: number
+}
+
+/**
+ * 相对上一交易日的变化。
+ * `same` 还是同一只 ｜ `switch` 换人 ｜ `new` 昨日这条线没记录 ｜ `gone` 今日整条线没涨停
+ */
+export interface BoardLeaderChange {
+  kind: 'same' | 'switch' | 'new' | 'gone' | string
+  prev: BoardLeaderPick | null
+  /** 板数变化（同一只时） */
+  boards_step?: number
+  /** 昨日龙一今天还在涨停池时给板数；null/缺失 = 今天没涨停（断板） */
+  prev_today?: { boards: number } | null
+  note?: string
+}
+
+export interface BoardLeaderRow {
+  theme: string
+  /** 该条线当日涨停家数（0 = 今日整条线没涨停） */
+  mates: number
+  leader: BoardLeaderPick
+  dragon_ranks: BoardDragonRank[]
+  change?: BoardLeaderChange
+}
+
+export interface BoardLeaderDailyFile {
+  schema: string
+  date: string
+  generated_at: string
+  /**
+   * 题材来源：
+   * · `snapshot`         = 当日题材冻结映射（与选股同源，可比）
+   * · `sector_fallback`  = 题材快照上线前，降级用申万行业分组（**口径不同**，不可与前者横比）
+   * · `missing`          = 两份都拿不到（该日无有效板块线）
+   */
+  theme_source: 'snapshot' | 'sector_fallback' | 'missing' | string
+  degraded: boolean
+  zt_count: number
+  max_boards: number
+  window_min: number
+  mates_min: number
+  boards: BoardLeaderRow[]
 }
 
 // ── 连板晋级量化（scripts/promo_quant.py · 冷启动矩阵 1进2 15.4% / 2进3 34.3% / 3进4 51.6% / 4to5+ 51.7%）──

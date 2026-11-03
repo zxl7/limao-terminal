@@ -314,7 +314,7 @@ export function Component() {
                   <select
                     value={activeDay?.date ?? ''}
                     onChange={(e) => setDayIdx(days.findIndex((x) => x.date === e.target.value))}
-                    className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                    className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                   >
                     {days.map((x) => (
                       <option key={x.date} value={x.date}>
@@ -322,7 +322,7 @@ export function Component() {
                       </option>
                     ))}
                   </select>
-                  <span className="text-sub text-[11.5px]">
+                  <span className="text-sub text-12">
                     共 {activeDay?.rows.length ?? 0} 个板块 · 生成于 {activeDay?.generated_ts?.slice(11, 19) || '—'}
                     {activeDay?.source === 'live' && ' · 今日盘中全量快照'}
                   </span>
@@ -409,7 +409,7 @@ export function Component() {
                       },
                     ]}
                   />
-                <p className="text-sub text-[11px] mt-1.5">
+                <p className="text-sub text-11 mt-1.5">
                   「同花顺」「滚动 5/10 日」为可选字段 —— 早于该口径上线日期的归档没有，渲染为「—」而非 0。
                 </p>
               </>
@@ -445,7 +445,7 @@ export function Component() {
               signed
               fit
             />
-            <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
+            <p className="text-sub text-12 mt-2 leading-relaxed">
               仅展示<b className="text-txt">今日净流入前 {MATRIX_INFLOW_ROWS}</b> 与
               <b className="text-txt">净流出前 {MATRIX_ROWS_MAX - MATRIX_INFLOW_ROWS}</b> 个板块，行序按今日净额从高到低；每格保留该日真实净额，悬停可读数。
               颜色深浅按各格绝对值占全窗口最大单日净额（<span className="num">{n1(crossDay.absMax)}</span> 亿）的比例着色：
@@ -467,12 +467,12 @@ export function Component() {
 /** 小节标题 —— 统一「图标 + 标题 + 口径提示」三件套，避免口径靠读者自己猜 */
 function SectionHead({ icon, title, hint }: { icon: 'upRight' | 'stairs' | 'compass'; title: string; hint?: string }) {
   return (
-    <div className="text-[12px] mb-1.5 flex flex-wrap items-baseline gap-x-2">
+    <div className="text-12 mb-1.5 flex flex-wrap items-baseline gap-x-2">
       <span className="flex items-center gap-1 font-semibold text-txt">
         <Icon name={icon} size={13} className="text-sub" />
         {title}
       </span>
-      {hint && <span className="text-sub text-[11px]">{hint}</span>}
+      {hint && <span className="text-sub text-11">{hint}</span>}
     </div>
   )
 }
@@ -481,7 +481,7 @@ function FlowSide({ title, rows }: { title: string; rows: SectorFlowFull[] }) {
   const isIn = title.includes('流入')
   return (
     <div>
-      <div className="text-[12px] text-sub mb-1 flex items-center gap-1">
+      <div className="text-12 text-sub mb-1 flex items-center gap-1">
         <Icon name={isIn ? 'upRight' : 'downRight'} size={12} className={isIn ? 'text-up' : 'text-down'} />
         {title}
       </div>
@@ -537,7 +537,7 @@ function Flow5D({
   const isIn = title.includes('流入')
   return (
     <div>
-      <div className="text-[12px] text-sub mb-1 flex items-center gap-1">
+      <div className="text-12 text-sub mb-1 flex items-center gap-1">
         <Icon name={isIn ? 'upRight' : 'downRight'} size={12} className={isIn ? 'text-up' : 'text-down'} />
         {title}
       </div>
@@ -572,7 +572,7 @@ function Flow5D({
               </span>
             ),
           },
-          { label: '趋势', cell: (r) => <span className="text-sub text-[11.5px]">{r.trend || '—'}</span> },
+          { label: '趋势', cell: (r) => <span className="text-sub text-12">{r.trend || '—'}</span> },
           { label: '日均', num: true, cell: (r) => <span className="text-sub">{r.days ? n1(r.total_yi / r.days) : '—'}</span> },
         ]}
       />

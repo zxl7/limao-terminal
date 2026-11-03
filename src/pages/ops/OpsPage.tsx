@@ -152,7 +152,7 @@ export function Component() {
           </div>
         )}
 
-        <p className="text-warn text-[11.5px] leading-relaxed border-l-2 border-warn pl-2.5">
+        <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5">
           判据：推送状态文件**极小或各计数全为 0** = 该日事件链**零产出**（链路没跑起来），
           而不是「当日没有信号」。两者结果都是「没有推送」，但含义完全不同 ——
           一个安静的日子和一条断掉的链路，只能靠本页区分。
@@ -171,18 +171,18 @@ export function Component() {
             dense
             empty="无"
             columns={[
-              { label: '时间', cell: (a) => <span className="num text-sub text-[11px]">{a.ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span> },
+              { label: '时间', cell: (a) => <span className="num text-sub text-11">{a.ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span> },
               { label: '事件', cell: (a) => <Tag tone="warn">{a.event || '—'}</Tag> },
-              { label: '模块', cell: (a) => <span className="text-[11.5px]">{a.module || '—'}</span> },
-              { label: '目标', cell: (a) => <span className="num text-[11.5px]">{a.target || '—'}</span> },
+              { label: '模块', cell: (a) => <span className="text-12">{a.module || '—'}</span> },
+              { label: '目标', cell: (a) => <span className="num text-12">{a.target || '—'}</span> },
               {
                 label: '详情',
                 className: 'whitespace-normal min-w-[240px]',
-                cell: (a) => <span className="text-[11.5px] leading-relaxed">{brief(a)}</span>,
+                cell: (a) => <span className="text-12 leading-relaxed">{brief(a)}</span>,
               },
             ]}
           />
-          <p className="text-sub text-[11px] mt-1.5">
+          <p className="text-sub text-11 mt-1.5">
             19001 = 客户群 webhook 失效。原系统对客户群镜像失败**只记审计不告警**，
             因此排查镜像是否到货只能看这里。
           </p>
@@ -198,15 +198,15 @@ export function Component() {
                     key={r.hash}
                     className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
                   >
-                    <span className="num text-[11.5px] text-sub">{r.hash.slice(0, 10)}…</span>
-                    <span className="num text-[11.5px] text-txt">{r.at}</span>
+                    <span className="num text-12 text-sub">{r.hash.slice(0, 10)}…</span>
+                    <span className="num text-12 text-txt">{r.at}</span>
                   </li>
                 ))}
               </ul>
             ) : (
               <EmptyState text="暂无去重记录" />
             )}
-            <p className="text-sub text-[11px] leading-relaxed mt-1.5">
+            <p className="text-sub text-11 leading-relaxed mt-1.5">
               同内容 10min 内不重复推送 —— 若发现重复卡而此处**无**对应记录，
               说明去重未生效（而非被它挡住）。
             </p>
@@ -238,7 +238,7 @@ export function Component() {
                   <select
                     value={activeDay?.file ?? ''}
                     onChange={(e) => setPulseDate(e.target.value)}
-                    className="text-[12px] px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+                    className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
                   >
                     {pulseDays.map((f) => (
                       <option key={f.file} value={f.file}>
@@ -246,7 +246,7 @@ export function Component() {
                       </option>
                     ))}
                   </select>
-                  <span className="text-sub text-[11.5px]">
+                  <span className="text-sub text-12">
                     该日 {activeCards.length} 张卡 · 逐字节留存的成品，用于判断「当时那句话该不该说」
                     {activeDay && staleLabel(fileDate(activeDay.file), 7) && (
                       <span className="badge bg-warn-soft text-warn ml-1.5">
@@ -272,7 +272,7 @@ export function Component() {
               <EmptyState text="无推送状态文件" hint="cache/pulse_snapshots/pushed_signals_*.json 缺失" />
             ) : (
               <>
-                <div className="text-sub text-[12px] mb-2">
+                <div className="text-sub text-12 mb-2">
                   归档日 <span className="num text-txt">{fileDate(signalFiles[0].file)}</span>
                 </div>
                 <div className="grid md:grid-cols-2 gap-3">
@@ -301,7 +301,7 @@ export function Component() {
               columns={[
                 {
                   label: '时间',
-                  cell: (a) => <span className="num text-sub text-[11px]">{a.ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span>,
+                  cell: (a) => <span className="num text-sub text-11">{a.ts?.slice(0, 19).replace('T', ' ') ?? '—'}</span>,
                 },
                 {
                   label: '事件',
@@ -311,23 +311,23 @@ export function Component() {
                     </Tag>
                   ),
                 },
-                { label: '模块', cell: (a) => <span className="text-[11.5px]">{a.module || '—'}</span> },
-                { label: '动作', cell: (a) => <span className="text-[11.5px] text-sub">{a.action || '—'}</span> },
-                { label: '规则', cell: (a) => <span className="text-[11.5px] text-sub">{a.rule || '—'}</span> },
+                { label: '模块', cell: (a) => <span className="text-12">{a.module || '—'}</span> },
+                { label: '动作', cell: (a) => <span className="text-12 text-sub">{a.action || '—'}</span> },
+                { label: '规则', cell: (a) => <span className="text-12 text-sub">{a.rule || '—'}</span> },
                 {
                   label: '目标',
                   className: 'whitespace-normal min-w-[180px]',
-                  cell: (a) => <span className="num text-[11px]">{a.target || '—'}</span>,
+                  cell: (a) => <span className="num text-11">{a.target || '—'}</span>,
                 },
                 {
                   label: '详情',
                   className: 'whitespace-normal min-w-[220px]',
-                  cell: (a) => <span className="text-[11.5px] leading-relaxed">{brief(a)}</span>,
+                  cell: (a) => <span className="text-12 leading-relaxed">{brief(a)}</span>,
                 },
               ]}
             />
             {auditRows.length > 300 && (
-              <p className="text-sub text-[11px] mt-1.5">仅显示最近 300 条（共 {auditRows.length} 条）</p>
+              <p className="text-sub text-11 mt-1.5">仅显示最近 300 条（共 {auditRows.length} 条）</p>
             )}
           </div>
         )}
@@ -341,7 +341,7 @@ export function Component() {
 function SigList({ title, items, wide }: { title: string; items?: string[]; wide?: boolean }) {
   return (
     <div className={wide ? 'md:col-span-2' : undefined}>
-      <div className="text-[12px] text-sub mb-1">{title}</div>
+      <div className="text-12 text-sub mb-1">{title}</div>
       {items?.length ? (
         <div className="flex flex-wrap gap-1">
           {items.map((x, i) => (
@@ -352,7 +352,7 @@ function SigList({ title, items, wide }: { title: string; items?: string[]; wide
           ))}
         </div>
       ) : (
-        <span className="text-sub text-[12px]">空</span>
+        <span className="text-sub text-12">空</span>
       )}
     </div>
   )

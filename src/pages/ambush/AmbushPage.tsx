@@ -78,7 +78,7 @@ function AmbushPerformance({ signals: sourceSignals, settlements: sourceSettleme
   return (
     <div className="flex flex-col gap-3">
       <Card title="🎯 AI尾盘潜伏战绩" extra={<CardBadge tone="rec">当日买入 → 次交易日10:00</CardBadge>}>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 text-[12.5px]">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 text-13">
           <Metric label="已结算" value={`${settlements.length}笔`} />
           <Metric label="胜率" value={summary.winRate == null ? '—' : `${summary.winRate.toFixed(0)}%`} cls={summary.winRate != null && summary.winRate >= 50 ? 'text-up' : undefined} />
           <Metric label="平均收益" value={summary.avg == null ? '—' : pct(summary.avg)} cls={summary.avg != null && summary.avg > 0 ? 'text-up' : summary.avg != null && summary.avg < 0 ? 'text-down' : undefined} />
@@ -151,5 +151,5 @@ function ReturnText({ value }: { value: number }) {
 }
 
 function Metric({ label, value, cls }: { label: string; value: string; cls?: string }) {
-  return <div className="flex flex-col"><span className="text-sub text-[11.5px]">{label}</span><span className={cn('num text-[15px] font-semibold', cls ?? 'text-txt')}>{value}</span></div>
+  return <div className="flex flex-col"><span className="text-sub text-12">{label}</span><span className={cn('num text-15 font-semibold', cls ?? 'text-txt')}>{value}</span></div>
 }

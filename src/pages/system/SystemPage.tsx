@@ -96,7 +96,7 @@ function brief(v: unknown): string {
  */
 function KeyVals({ obj, depth = 0 }: { obj: Record<string, unknown>; depth?: number }) {
   const entries = Object.entries(obj)
-  if (entries.length === 0) return <span className="text-sub text-[12px]">（空）</span>
+  if (entries.length === 0) return <span className="text-sub text-12">（空）</span>
   return (
     <div className={cn('flex flex-col', depth > 0 && 'pl-3')}>
       {entries.map(([k, v]) => (
@@ -104,8 +104,8 @@ function KeyVals({ obj, depth = 0 }: { obj: Record<string, unknown>; depth?: num
           key={k}
           className="flex items-baseline justify-between gap-3 py-1 border-b border-line-faint last:border-0"
         >
-          <span className="num text-[11.5px] text-sub break-all">{k}</span>
-          <span className="text-[12px] text-txt text-right">{brief(v)}</span>
+          <span className="num text-12 text-sub break-all">{k}</span>
+          <span className="text-12 text-txt text-right">{brief(v)}</span>
         </div>
       ))}
     </div>
@@ -179,7 +179,7 @@ export function Component() {
           <StatPair label="备份快照" value={backups.length} />
           <StatPair label="存档期数" value={indexRows.length} />
         </div>
-        <div className="text-sub text-[11.5px] mt-2 leading-relaxed">
+        <div className="text-sub text-12 mt-2 leading-relaxed">
           本页只读原系统落盘的配置文件与小状态件，不含任何写操作。
           ⛔ `config/settings.json` 与 `config/app_config.yaml`（含飞书 webhook /
           BIYING_TOKEN 明文密钥）**刻意不接入**；`cache/backups` 走前缀白名单，
@@ -217,7 +217,7 @@ export function Component() {
                       label: '调度',
                       className: 'whitespace-nowrap',
                       cell: (t) => (
-                        <span className="num text-[12px]" title={t.rrule ?? '无 rrule（平台侧可能已停用）'}>
+                        <span className="num text-12" title={t.rrule ?? '无 rrule（平台侧可能已停用）'}>
                           {describeRrule(t.rrule)}
                         </span>
                       ),
@@ -234,14 +234,14 @@ export function Component() {
                       label: 'automation id',
                       className: 'whitespace-nowrap',
                       cell: (t) => (
-                        <span className="num text-[10.5px] text-sub">{t.id || '—'}</span>
+                        <span className="num text-11 text-sub">{t.id || '—'}</span>
                       ),
                     },
                   ]}
                 />
               </div>
             )}
-            <div className="text-sub text-[11px] mt-2 leading-relaxed">
+            <div className="text-sub text-11 mt-2 leading-relaxed">
               原始文件是 YAML，路由按**文本**透传、前端只解析所需子集（name/id/kind/rrule/
               webhook/writeback）。无「调度」的行 = 台账留档但平台侧已停用。
               ⛔ 改调度只改 `config/tasks.yaml` + 平台任务两处，不在页面里改。
@@ -270,11 +270,11 @@ export function Component() {
                     <StatPair label="规则数" value={Object.keys(learn.rules ?? {}).length} />
                   </div>
                   <div className="border-t border-line-faint pt-2">
-                    <div className="text-[11px] text-sub mb-1">规则清单</div>
+                    <div className="text-11 text-sub mb-1">规则清单</div>
                     <KeyVals obj={learn.rules ?? {}} />
                   </div>
                   {learn.note && (
-                    <div className="text-sub text-[11px] leading-relaxed border-t border-line-faint pt-1.5">
+                    <div className="text-sub text-11 leading-relaxed border-t border-line-faint pt-1.5">
                       {learn.note}
                     </div>
                   )}
@@ -322,14 +322,14 @@ export function Component() {
                   {activeRule.schema && <Tag tone="up">{activeRule.schema}</Tag>}
                   {activeRule.version && <Tag>v{activeRule.version}</Tag>}
                   {activeRule.updated && (
-                    <span className="num text-[11.5px] text-sub">更新 {activeRule.updated}</span>
+                    <span className="num text-12 text-sub">更新 {activeRule.updated}</span>
                   )}
                 </div>
                 {activeRule.note && (
-                  <div className="text-[11.5px] text-sub leading-relaxed">{activeRule.note}</div>
+                  <div className="text-12 text-sub leading-relaxed">{activeRule.note}</div>
                 )}
                 {activeRule.desc && (
-                  <div className="text-[11.5px] text-sub leading-relaxed">{activeRule.desc}</div>
+                  <div className="text-12 text-sub leading-relaxed">{activeRule.desc}</div>
                 )}
                 <div className="border-t border-line-faint pt-2">
                   <KeyVals
@@ -360,11 +360,11 @@ export function Component() {
                   return (
                     <div key={f.file} className="border border-line-faint rounded-sm px-2 py-1.5">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="num text-[12px] font-semibold text-txt">
+                        <span className="num text-12 font-semibold text-txt">
                           {f.file.replace(/[.]json$/, '')}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <span className="num text-[11px] text-sub">
+                          <span className="num text-11 text-sub">
                             {typeof d.ts === 'number'
                               ? new Date(d.ts * 1000).toLocaleString('zh-CN', { hour12: false })
                               : d.date || '—'}
@@ -382,7 +382,7 @@ export function Component() {
                     </div>
                   )
                 })}
-                <div className="text-sub text-[11px] leading-relaxed">
+                <div className="text-sub text-11 leading-relaxed">
                   ⚠️ 这几件是**盘中引擎自己的工作状态**（加速名单 / 待推队列 / 板块风险缓存 /
                   资金池），不是行情数据 —— 排查「为什么没推送 / 推重了」时先看这里。
                 </div>
@@ -407,7 +407,7 @@ export function Component() {
                   columns={[
                     {
                       label: '文件',
-                      cell: (b) => <span className="num text-[11.5px] text-txt">{b.file}</span>,
+                      cell: (b) => <span className="num text-12 text-txt">{b.file}</span>,
                     },
                     {
                       label: '内容规模',
@@ -426,7 +426,7 @@ export function Component() {
                 />
               </div>
             )}
-            <div className="text-sub text-[11px] mt-2 leading-relaxed">
+            <div className="text-sub text-11 mt-2 leading-relaxed">
               仅放行 `nav_` / `ai_decisions_` / `learning_rollback_` 三类前缀。
               ⛔ 该目录下存在 `settings.json.bak_*`（含 webhook 明文），
               故路由用前缀白名单而非 `*.json` 通配。
@@ -451,7 +451,7 @@ export function Component() {
                     {
                       label: '日期',
                       className: 'whitespace-nowrap',
-                      cell: (r) => <span className="num text-[12px] text-txt">{r.date}</span>,
+                      cell: (r) => <span className="num text-12 text-txt">{r.date}</span>,
                     },
                     { label: '来源', num: true, cell: (r) => <span className="num">{r.sources}</span> },
                     { label: '接力', num: true, cell: (r) => <span className="num">{r.relay}</span> },
@@ -470,13 +470,13 @@ export function Component() {
                     {
                       label: '归档于',
                       className: 'whitespace-nowrap',
-                      cell: (r) => <span className="num text-[11px] text-sub">{r.archived_at}</span>,
+                      cell: (r) => <span className="num text-11 text-sub">{r.archived_at}</span>,
                     },
                   ]}
                 />
               </div>
             )}
-            <div className="text-sub text-[11px] mt-2 leading-relaxed">
+            <div className="text-sub text-11 mt-2 leading-relaxed">
               「缺口」= 该日归档缺失的来源数。缺口 &gt; 0 的日子，当时的决策输入本来就不全，
               复盘时必须打折看待。
             </div>

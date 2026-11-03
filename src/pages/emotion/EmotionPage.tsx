@@ -312,7 +312,7 @@ export function Component() {
         }
       >
         {feedback.isError && (
-          <p role="status" className="text-[11px] text-warn mb-2">
+          <p role="status" className="text-11 text-warn mb-2">
             {feedback.data ? '反馈更新失败，显示上次快照' : '反馈加载失败，潮位待确认'}
           </p>
         )}
@@ -321,7 +321,7 @@ export function Component() {
 
       {/* 日频与归档用于复盘，默认展开但不参与实时潮位判定。 */}
       <details open className="border border-line rounded-sm bg-card px-3 py-2">
-        <summary className="cursor-pointer text-[12.5px] font-semibold text-txt">
+        <summary className="cursor-pointer text-13 font-semibold text-txt">
           历史复盘 · 日频方向与涨停归档
         </summary>
         <div className="flex flex-col gap-3 pt-3">
@@ -343,14 +343,14 @@ export function Component() {
           <StatPair label="窗口" value={`${s?.window_days ?? '—'} 日`} />
           <StatPair label="轨迹样本" value={historicTrajectory.length || '—'} />
           {turnStyle && (
-            <span className={cn('text-[12.5px] font-semibold', turnStyle.cls)}>
+            <span className={cn('text-13 font-semibold', turnStyle.cls)}>
               {turnStyle.label}
             </span>
           )}
         </div>
 
         {turn?.divergence && (
-          <p className="text-[12px] leading-relaxed text-sub border-l-2 border-line-strong pl-2.5">
+          <p className="text-12 leading-relaxed text-sub border-l-2 border-line-strong pl-2.5">
             背离：{turn.divergence}
           </p>
         )}
@@ -369,7 +369,7 @@ export function Component() {
           <Card
             title="📈 情绪轨迹"
         extra={
-          <span className="text-sub text-[11.5px]">
+          <span className="text-sub text-12">
             <Icon name="info" size={12} className="inline align-[-2px] mr-1" />
             实线=逐日情绪分 · 虚线=MA{traj?.ma3_window ?? 3}（方向层）
           </span>
@@ -394,7 +394,7 @@ export function Component() {
                 { value: 2, label: '≤2 退潮', tone: 'down' },
               ]}
             />
-            <p className="text-sub text-[11.5px] mt-1.5 leading-relaxed">
+            <p className="text-sub text-12 mt-1.5 leading-relaxed">
               决策依赖的是 <b className="text-txt">方向</b> 而非水平：实线抬升并站上虚线 →
               修复方向；实线跌穿虚线 → 退潮方向。当日值显著高于 MA3 属单日脉冲，
               须次日确认（即上方「背离」提示）。
@@ -412,7 +412,7 @@ export function Component() {
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-4">
           <div>
-            <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+            <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
               <Icon name="trendUp" size={13} className="text-up" />
               晋级率（越高越好）
             </div>
@@ -435,7 +435,7 @@ export function Component() {
           </div>
 
           <div>
-            <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+            <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
               <Icon name="alert" size={13} className="text-down" />
               核按钮家数（越低越好）
             </div>
@@ -451,7 +451,7 @@ export function Component() {
             />
           </div>
         </div>
-        <p className="text-sub text-[11.5px] mt-2 leading-relaxed">
+        <p className="text-sub text-12 mt-2 leading-relaxed">
           ⚠️ 两者<b className="text-txt">不共用一个 Y 轴</b>：晋级率是百分比、核按钮是家数，
           共轴会让「两条线的高低关系」变成无意义的伪信息。分轴并置后，各自只与自己历史比较。
         </p>
@@ -470,7 +470,7 @@ export function Component() {
               format={(v) => String(Math.round(v))}
               maxBarWidth={30}
             />
-            <p className="text-sub text-[11.5px] mt-1.5 leading-relaxed">
+            <p className="text-sub text-12 mt-1.5 leading-relaxed">
               柱色 = 较前一交易日 <b className="text-up">增多（转强）</b> /{' '}
               <b className="text-down">减少（转弱）</b>。
               数据取自 <span className="num">zt_history</span> 每日末个盘中快照的涨停总数 ——
@@ -512,7 +512,7 @@ export function Component() {
                 cell: (d) => (
                   <span className="num">
                     {d.date}
-                    {d.seed && <span className="text-warn text-[11px] ml-1.5">冰点种子</span>}
+                    {d.seed && <span className="text-warn text-11 ml-1.5">冰点种子</span>}
                   </span>
                 ),
               },
@@ -556,7 +556,7 @@ export function Component() {
                         <Tag key={t}>{t}</Tag>
                       ))}
                       {(d.main_themes?.length ?? 0) > 4 && (
-                        <span className="text-sub text-[11px]">+{(d.main_themes?.length ?? 0) - 4}</span>
+                        <span className="text-sub text-11">+{(d.main_themes?.length ?? 0) - 4}</span>
                       )}
                     </span>
                   ) : (
@@ -580,7 +580,7 @@ export function Component() {
                 <SeqRow label="晋级率" seq={historicTrajectory.map((day) => n1(day.promote))} tone="plain" />
                 <SeqRow label="核按钮" seq={historicTrajectory.map((day) => (day.nuke == null ? '—' : String(day.nuke)))} tone="nu" />
                 <SeqRow label="涨停数" seq={historicTrajectory.map((day) => (day.zt == null ? '—' : String(day.zt)))} tone="plain" />
-                <p className="text-sub text-[11.5px] mt-1 leading-relaxed">
+                <p className="text-sub text-12 mt-1 leading-relaxed">
                   序列按时间正序；`—` = 该日字段为空（盘前快照尚未落盘），非 0。
                 </p>
               </>
@@ -595,11 +595,11 @@ export function Component() {
             {/* 最近归档日的盘中节奏 —— 逐快照窗口，回答「涨停堆早盘还是补午后」 */}
             {latestHistoryRhythm && (
               <div className="border border-line rounded-sm px-2.5 py-2">
-                <div className="text-[12px] font-semibold mb-1.5 flex items-center gap-1">
+                <div className="text-12 font-semibold mb-1.5 flex items-center gap-1">
                   <Icon name="clock" size={13} className="text-sub" />
                   {latestHistoryRhythm.date} 盘中涨停节奏
                   {latestHistoryRhythm.truncated && (
-                    <span className="text-warn text-[11px] font-normal ml-1">归档残缺（仅盘中点）</span>
+                    <span className="text-warn text-11 font-normal ml-1">归档残缺（仅盘中点）</span>
                   )}
                 </div>
                 <LineChart
@@ -608,7 +608,7 @@ export function Component() {
                   height={170}
                   format={(v) => String(Math.round(v))}
                 />
-                <p className="text-sub text-[11.5px] mt-1.5 leading-relaxed">
+                <p className="text-sub text-12 mt-1.5 leading-relaxed">
                   早盘快速抬升 → 情绪亢奋（追高需谨慎）；尾盘才补量 → 资金态度犹豫，
                   次日溢价通常更弱。高点回落幅度即为当日炸板强度。
                 </p>
@@ -626,7 +626,7 @@ export function Component() {
                   <span className="num">
                     {d.date}
                     {d.intraday_only && (
-                      <span className="text-warn text-[11px] ml-1.5">归档残缺</span>
+                      <span className="text-warn text-11 ml-1.5">归档残缺</span>
                     )}
                   </span>
                 ),
@@ -669,10 +669,10 @@ export function Component() {
           <div className="flex flex-col gap-2">
             {s.news.map((blk) => (
               <div key={blk.date} className="border-l-2 border-line pl-2.5">
-                <div className="text-[12px] text-sub mb-0.5">
+                <div className="text-12 text-sub mb-0.5">
                   <span className="num">{blk.date}</span> · {blk.count} 条
                 </div>
-                <ul className="text-[12.5px] leading-relaxed">
+                <ul className="text-13 leading-relaxed">
                   {blk.titles.slice(0, 6).map((t, i) => (
                     // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
                     <li key={i}>{t}</li>
@@ -702,7 +702,7 @@ function sentCls(score: number): string {
 function SeqRow({ label, seq, tone }: { label: string; seq: string[]; tone: 'sent' | 'nu' | 'plain' }) {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="text-sub text-[12px] w-[62px] flex-none pt-0.5">{label}</span>
+      <span className="text-sub text-12 w-[62px] flex-none pt-0.5">{label}</span>
       <div className="flex flex-wrap gap-1">
         {seq.map((v, i) => {
           const n = Number(v.replace('%', ''))
@@ -718,7 +718,7 @@ function SeqRow({ label, seq, tone }: { label: string; seq: string[]; tone: 'sen
             <span
               // oxlint-disable-next-line react/no-array-index-key -- 位置序列 / 同名去重 —— 索引即身份：这些列表与日期轴或原数组严格对齐，元素本身没有稳定唯一 id，用内容做 key 反而会在重复项上出错。
               key={i}
-              className={cn('num text-[12px] px-1.5 py-0.5 border border-line-faint rounded-sm min-w-[38px] text-center', cls)}
+              className={cn('num text-12 px-1.5 py-0.5 border border-line-faint rounded-sm min-w-[38px] text-center', cls)}
             >
               {v}
             </span>

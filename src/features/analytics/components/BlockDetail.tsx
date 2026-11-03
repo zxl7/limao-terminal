@@ -81,11 +81,11 @@ export function BlockDetail({
 
   const headInner: ReactNode = (
     <>
-      <span className="num text-[13px] font-semibold text-txt flex-none">{range}</span>
-      <span className="text-[10.5px] px-1 rounded-sm bg-line-faint text-sub flex-none">
+      <span className="num text-13 font-semibold text-txt flex-none">{range}</span>
+      <span className="text-11 px-1 rounded-sm bg-line-faint text-sub flex-none">
         {KIND_LABEL[block.kind]}
       </span>
-      <span className="num text-sub text-[10.5px] min-w-0 break-all">
+      <span className="num text-sub text-11 min-w-0 break-all">
         {summary.stockCount > 0 && <>封板 {summary.stockCount} · </>}题材 {themeCount} · 盘中记录{' '}
         {/* 炸板已从 otherDownCount 单列，这里补回；跌停仍在 otherDownCount 内，⛔ 不要重复加 */}
         {summary.upSectorCount +
@@ -118,7 +118,7 @@ export function BlockDetail({
       )}
 
       {outside && (
-        <div className="flex-none border-b border-line-faint px-2.5 py-1 text-[10px] text-warn">
+        <div className="flex-none border-b border-line-faint px-2.5 py-1 text-10 text-warn">
           {minToClock(summary.at)} {outside === 'post' ? '盘后' : '盘前'}记录
         </div>
       )}
@@ -164,7 +164,7 @@ export function BlockDetail({
             )}
           >
             {slots.length > 1 && (
-              <div className="num text-[11px] font-semibold text-txt">{minToClock(s.at)}</div>
+              <div className="num text-11 font-semibold text-txt">{minToClock(s.at)}</div>
             )}
             <SlotBody
               slot={s}

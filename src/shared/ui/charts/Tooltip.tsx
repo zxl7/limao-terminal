@@ -131,12 +131,12 @@ export function ChartTooltip({
       }}
     >
       {payload.title && (
-        <div className="text-[11.5px] font-semibold text-txt mb-1 whitespace-nowrap">{payload.title}</div>
+        <div className="text-12 font-semibold text-txt mb-1 whitespace-nowrap">{payload.title}</div>
       )}
       <div className="flex flex-col gap-0.5">
         {payload.rows.map((r, i) => (
           // oxlint-disable-next-line react/no-array-index-key -- 同一读数可含重复 label（如多序列同名），索引是唯一稳定身份
-          <div key={`${r.label}-${i}`} className="flex items-center justify-between gap-3 text-[11.5px]">
+          <div key={`${r.label}-${i}`} className="flex items-center justify-between gap-3 text-12">
             <span className="text-sub whitespace-nowrap">{r.label}</span>
             <span
               className="num font-semibold whitespace-nowrap"

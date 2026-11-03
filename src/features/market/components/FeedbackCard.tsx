@@ -46,15 +46,15 @@ export function FeedbackCard() {
       title="📊 昨日涨停反馈"
       extra={
         fb?.prev_date && (
-          <span className="text-[11px] font-normal text-sub">
+          <span className="text-11 font-normal text-sub">
             对照 {fb.prev_date} 涨停 {fb.prev_zt_count ?? '—'} 只
           </span>
         )
       }
     >
-      {isError && <p role="status" className="text-[11px] text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
-      {fb?.generated_ts && <div className="num text-[10.5px] text-sub mb-2">数据时间 {fb.generated_ts}</div>}
-      {fb?.market_missing && <p role="status" className="text-[11px] text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
+      {isError && <p role="status" className="text-11 text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
+      {fb?.generated_ts && <div className="num text-11 text-sub mb-2">数据时间 {fb.generated_ts}</div>}
+      {fb?.market_missing && <p role="status" className="text-11 text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
       {fb && !fb.error ? (
         <>
           {/* 缺失指标使用中性色，避免把未知状态表达为改善。 */}
@@ -123,7 +123,7 @@ export function FeedbackCard() {
 
           {/* ── 晋级个股 ── */}
           {fb.promote_list && fb.promote_list.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pt-2 border-t border-dashed border-line text-[12px]">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pt-2 border-t border-dashed border-line text-12">
               <span className="text-sub font-semibold">
                 晋级 {fb.promote_count ?? fb.promote_list.length}
               </span>
@@ -143,7 +143,7 @@ export function FeedbackCard() {
           {/* ── 核按钮明细（带均线破位）── */}
           {nukes.length > 0 && (
             <div className="mt-2 pt-2 border-t border-dashed border-line">
-              <div className="text-[10.5px] text-sub mb-1">
+              <div className="text-11 text-sub mb-1">
                 核按钮明细 · 破位 = 同时跌破 5/10 日均线（结构性走坏）
               </div>
               <div className="flex flex-col max-h-[132px] overflow-y-auto">
@@ -153,7 +153,7 @@ export function FeedbackCard() {
                     className="grid grid-cols-[1fr_auto_auto] items-center gap-2 px-1 py-[2px]"
                   >
                     <span className="flex items-baseline gap-1.5 min-w-0">
-                      <StockLink code={n.code} className="text-[12px] text-txt truncate">{n.name}</StockLink>
+                      <StockLink code={n.code} className="text-12 text-txt truncate">{n.name}</StockLink>
                       {n.tag && <span className="badge bg-line-faint text-sub">{n.tag}</span>}
                     </span>
                     <span className="flex gap-1">
@@ -166,7 +166,7 @@ export function FeedbackCard() {
                         </>
                       )}
                     </span>
-                    <span className="num text-[12px] font-semibold text-down text-right">
+                    <span className="num text-12 font-semibold text-down text-right">
                       {n.prev_boards}板 · {n.pct}%
                     </span>
                   </div>
@@ -176,9 +176,9 @@ export function FeedbackCard() {
           )}
         </>
       ) : fb?.error ? (
-        <p className="text-[12px] text-down py-2">反馈矩阵异常：{fb.error}</p>
+        <p className="text-12 text-down py-2">反馈矩阵异常：{fb.error}</p>
       ) : (
-        <p className="text-[12px] text-sub py-2">{isPending ? '正在加载反馈数据…' : isError ? '暂无法确认反馈状态' : '反馈数据未提供'}</p>
+        <p className="text-12 text-sub py-2">{isPending ? '正在加载反馈数据…' : isError ? '暂无法确认反馈状态' : '反馈数据未提供'}</p>
       )}
     </Card>
   )

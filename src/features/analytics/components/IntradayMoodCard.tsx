@@ -60,7 +60,7 @@ export function IntradayMoodCard() {
     <Card
       title="📈 盘中情绪走势"
       extra={
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] font-normal text-sub">
+        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-11 font-normal text-sub">
           {basis ? (
             <>
               <span className={cn('num', live && 'font-semibold text-txt')}>
@@ -74,8 +74,8 @@ export function IntradayMoodCard() {
         </span>
       }
     >
-      {query.isError && <p role="status" className="text-[11px] text-warn">{hasLive ? '曲线更新失败，保留上次数据' : '盘中逐事件加载失败'}</p>}
-      {hasLive && <p className="m-0 mb-1 text-[10px] text-sub leading-relaxed">跌停、炸板按时段内新增事件累计（不含 ST）。炸板累计比 = 累计炸板事件 ÷（涨停数 + 累计炸板事件），与反馈炸板率口径不同。</p>}
+      {query.isError && <p role="status" className="text-11 text-warn">{hasLive ? '曲线更新失败，保留上次数据' : '盘中逐事件加载失败'}</p>}
+      {hasLive && <p className="m-0 mb-1 text-10 text-sub leading-relaxed">跌停、炸板按时段内新增事件累计（不含 ST）。炸板累计比 = 累计炸板事件 ÷（涨停数 + 累计炸板事件），与反馈炸板率口径不同。</p>}
       {hasLive ? (
         <LineChart
           series={curve}

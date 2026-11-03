@@ -147,7 +147,7 @@ export function LineChart({
   /** 空态：全序列无有效样本 —— 不画假线 */
   if (!hasData) {
     return (
-      <div className={cn('flex items-center justify-center text-sub text-[12px]', className)} style={{ height }}>
+      <div className={cn('flex items-center justify-center text-sub text-12', className)} style={{ height }}>
         无可用序列数据
       </div>
     )
@@ -209,7 +209,7 @@ export function LineChart({
       {showLegend && series.length > 1 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           {series.map((s) => (
-            <span key={s.name} className="inline-flex items-center gap-1 text-[11.5px] text-sub">
+            <span key={s.name} className="inline-flex items-center gap-1 text-12 text-sub">
               <span
                 className="inline-block w-3.5"
                 style={{

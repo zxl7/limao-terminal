@@ -43,7 +43,7 @@ export function Component() {
           <span className="flex items-center gap-1.5">
             <CardBadge tone="neutral">只读证据链</CardBadge>
             {data?.generated_at_bj && (
-              <span className="text-[11px] text-sub">生成 {data.generated_at_bj.slice(0, 16)}</span>
+              <span className="text-11 text-sub">生成 {data.generated_at_bj.slice(0, 16)}</span>
             )}
             {staleLabel(data?.generated_at_bj?.slice(0, 10), 2) && (
               <span className="badge bg-warn-soft text-warn">
@@ -53,7 +53,7 @@ export function Component() {
           </span>
         }
       >
-        <p className="text-sub text-[12px] leading-relaxed mb-3">
+        <p className="text-sub text-12 leading-relaxed mb-3">
           主口径只统计“盘后冻结候选 → 9:25 竞价 → 实际入场 → 当日收盘”。候选命中、连板晋级与题材回流留在各自研究页，不会混入账户收益。
         </p>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
@@ -65,7 +65,7 @@ export function Component() {
           <StatPair label="AI 预案缺失候选" value={data?.summary.ai_plan_missing_candidates ?? '—'} tone="warn" />
           <StatPair label="冰点 AI 冲突" value={data?.summary.ice_ai_entries ?? '—'} tone="warn" />
         </div>
-        <p className="text-sub text-[11px] mt-3">
+        <p className="text-sub text-11 mt-3">
           {data?.main_metric.label ?? '—'}；不含手续费和滑点。交易日历来自已冻结的市场证据与法定休市配置，共 {data?.calendar.count ?? 0} 日。
         </p>
       </Card>
@@ -91,12 +91,12 @@ export function Component() {
       <Card title="批次缺口与风控">
         <div className="flex flex-col gap-2">
           {batches.filter((batch) => !batch.integrity.complete).map((batch) => (
-            <div key={batch.recommendation_date} className="border border-warn/50 rounded-sm px-3 py-2 text-[12px]">
+            <div key={batch.recommendation_date} className="border border-warn/50 rounded-sm px-3 py-2 text-12">
               <span className="font-medium">{batch.recommendation_date} → {batch.trade_date ?? '待证实'}</span>
               <span className="text-sub"> · {batch.integrity.issues.join('；')}</span>
             </div>
           ))}
-          {batches.length > 0 && batches.every((batch) => batch.integrity.complete) && <p className="text-sub text-[12px]">全部批次的冻结证据完整。</p>}
+          {batches.length > 0 && batches.every((batch) => batch.integrity.complete) && <p className="text-sub text-12">全部批次的冻结证据完整。</p>}
         </div>
       </Card>
     </div>

@@ -45,7 +45,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
       label: '标的',
       cell: (s: DossierStock) => (
         <span>
-          <StockLink code={s.code} className="text-rec">{s.name}</StockLink>
+          <StockLink code={s.code} className="text-txt">{s.name}</StockLink>
           {s.is_20cm && <Tag tone="warn">20cm</Tag>}
           {s.is_st && <Tag tone="down">ST</Tag>}
           {s.is_capacity_core && <Tag tone="rec">容量核心</Tag>}
@@ -57,7 +57,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
       cell: (s: DossierStock) => (
         <span>
           <span className="text-txt">{s.core_theme || s.theme || '—'}</span>
-          <div className="text-sub text-[11px] leading-snug">{s.core_theme_logic || ''}</div>
+          <div className="text-sub text-11 leading-snug">{s.core_theme_logic || ''}</div>
         </span>
       ),
     },
@@ -72,7 +72,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
       label: '维度（点火/爆发/带动/容量）',
       num: true,
       cell: (s: DossierStock) => (
-        <span className="text-sub text-[11.5px] num">
+        <span className="text-sub text-12 num">
           {n1(s.ign_score)} / {n1(s.exp_score)} / {n1(s.lead_score)} / {n1(s.cap_score)}
         </span>
       ),
@@ -134,7 +134,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
           <Tag tone={s.ladder_grade === 'A' ? 'up' : s.ladder_grade === 'D' ? 'down' : 'neutral'}>
             {s.ladder_grade || '—'}
           </Tag>
-          <span className="num text-sub text-[11px] ml-1">{n1(s.ladder_health)}</span>
+          <span className="num text-sub text-11 ml-1">{n1(s.ladder_health)}</span>
         </span>
       ),
     },
@@ -157,8 +157,8 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
         return (
           <span className="block leading-snug">
             <span className="num text-txt">{rangePct(e.expected_range)}</span>
-            {e.boom_label && <span className="text-sub text-[11px] ml-1">{e.boom_label}</span>}
-            <span className="block num text-[11px] text-sub">
+            {e.boom_label && <span className="text-sub text-11 ml-1">{e.boom_label}</span>}
+            <span className="block num text-11 text-sub">
               量≥{n2(e.auction_amount_min_yi)}亿
               {amtMin != null ? `（昨${rangePct(e.auction_amount_range)}）` : ''}
             </span>
@@ -177,7 +177,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
         return (
           <span className="block leading-snug">
             <Tag tone={tone}>{cardPhaseText(e.phase)}</Tag>
-            <span className="num text-[11px] text-sub ml-1">{n2(e.confidence)}</span>
+            <span className="num text-11 text-sub ml-1">{n2(e.confidence)}</span>
             {e.non_tradeable && <Tag tone="down">不可交易</Tag>}
           </span>
         )
@@ -190,7 +190,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
         const g = s.expectation?.dragon_diagnosis
         if (!g) return <span className="text-sub">—</span>
         return (
-          <span className="text-[11.5px] num text-sub">
+          <span className="text-12 num text-sub">
             {g.leadership?.stars ?? '—'}/{g.breakthrough?.stars ?? '—'}/{g.uniqueness?.stars ?? '—'}
             {g.identity && <span className="ml-1 text-txt">{g.identity}</span>}
           </span>
@@ -201,7 +201,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
       label: '买入条件（脚本原文）',
       className: 'whitespace-normal min-w-[340px]',
       cell: (s: DossierStock) => (
-        <span className="text-[11.5px] leading-relaxed">
+        <span className="text-12 leading-relaxed">
           {s.expectation?.expected_text || '—'}
         </span>
       ),
@@ -286,7 +286,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
 
         {real && (
           <div className="mt-2 pt-2 border-t border-line-faint">
-            <div className="text-[12px] text-sub mb-1">
+            <div className="text-12 text-sub mb-1">
               决策时点真实盘面（用于核对脚本环境是否失真）
             </div>
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
@@ -312,7 +312,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
             {/* ── 双套情绪读数对照 —— 「脚本环境是否失真」的唯一证据 ── */}
             {real.feedback && (
               <div className="mt-2">
-                <div className="text-[12px] text-sub mb-1">
+                <div className="text-12 text-sub mb-1">
                   情绪读数对照（左＝选股脚本自算 · 右＝盘中快照真实值）
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
@@ -339,7 +339,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
                 tone={(real.limit_down?.count ?? 0) > 0 ? 'down' : 'sub'}
               />
               {real.sector_risk?.declining?.length ? (
-                <span className="text-[11.5px] text-sub">
+                <span className="text-12 text-sub">
                   弱势板块{' '}
                   {real.sector_risk.declining.slice(0, 5).map((x) => (
                     <span key={x.name} className="num text-down mr-2">
@@ -353,10 +353,10 @@ export function DossierView({ d }: { d: DecisionDossier }) {
             {/* ── 板块级热点：板块 → 领涨标的 ── */}
             {real.hot_spots?.length ? (
               <div className="mt-2">
-                <div className="text-[12px] text-sub mb-1">决策时点板块热点</div>
+                <div className="text-12 text-sub mb-1">决策时点板块热点</div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {real.hot_spots.slice(0, 6).map((h) => (
-                    <span key={h.sector} className="text-[11.5px]">
+                    <span key={h.sector} className="text-12">
                       <span className="text-rec">{h.sector}</span>{' '}
                       <span className="text-sub num">
                         {(h.stocks ?? [])
@@ -394,7 +394,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
             <StatPair label="核心达标" value={diag.core_eligible ?? '—'} />
             <StatPair label="1进2 达标" value={diag.one_to_two_eligible ?? '—'} />
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[12px]">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 text-12">
             <span className="text-sub">
               剔除低换手 <b className="num text-txt">{diag.excluded_low_turnover ?? '—'}</b>
             </span>
@@ -444,7 +444,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
       >
         {tab === 'relay' && (
           <>
-            <p className="text-sub text-[11.5px] mb-1.5 leading-relaxed">
+            <p className="text-sub text-12 mb-1.5 leading-relaxed">
               接力池 = 可直接执行，列表按冻结总分由高到低展示。列序按「结果 → 可交易 → 结构 → 资金」排列，
               `theme` 与 `core_theme` 不同轴时以主轴为准（原系统铁律：按个股真实主轴归类）。
             </p>
@@ -462,7 +462,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
 
         {tab === 'watch' && (
           <>
-            <p className="text-sub text-[11.5px] mb-1.5 leading-relaxed">
+            <p className="text-sub text-12 mb-1.5 leading-relaxed">
               观察池 = 待确认，列表按冻结总分由高到低展示。分组由脚本给出（如「容量核心」）—— 属于不同介入逻辑，
               不可与接力池同等对待。
             </p>
@@ -500,7 +500,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
                     label: '关注标的',
                     cell: (e) => (
                       <span>
-                        <StockLink code={e.buy?.code} className="text-rec">{e.buy?.name || '—'}</StockLink>
+                        <StockLink code={e.buy?.code} className="text-txt">{e.buy?.name || '—'}</StockLink>
                         {e.buy?.is_20cm && <Tag tone="warn">20cm</Tag>}
                       </span>
                     ),
@@ -534,7 +534,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
                   {
                     label: '逻辑',
                     className: 'whitespace-normal min-w-[240px]',
-                    cell: (e) => <span className="text-[12px] leading-relaxed">{e.desc || '—'}</span>,
+                    cell: (e) => <span className="text-12 leading-relaxed">{e.desc || '—'}</span>,
                   },
                 ]}
               />
@@ -573,7 +573,7 @@ function Delta({
   const v = (x: number | null) => (x == null ? '—' : `${n1(x)}${unit}`)
 
   return (
-    <span className="text-[11.5px] whitespace-nowrap">
+    <span className="text-12 whitespace-nowrap">
       <span className="text-sub mr-1">{label}</span>
       <span className="num text-txt">{v(s)}</span>
       <span className="text-sub mx-0.5">/</span>
@@ -591,7 +591,7 @@ function Delta({
 
 /** 全局旁白 —— 按换行分段渲染，段落之间留白，便于逐段核对 */
 function Narrative({ text }: { text?: string }) {
-  if (!text) return <span className="text-sub text-[12px]">该日无全局旁白</span>
+  if (!text) return <span className="text-sub text-12">该日无全局旁白</span>
   const paras = text
     .split(/\n+/)
     .map((x) => x.trim())
@@ -603,7 +603,7 @@ function Narrative({ text }: { text?: string }) {
         <p
           // oxlint-disable-next-line react/no-array-index-key -- 段落序号即身份：旁白为纯文本按 \n 切分，段落自身无 id，同文重复段落是合法的（且必须都渲染）。
           key={i}
-          className="text-[12.5px] leading-relaxed border-l-2 border-line-faint pl-2.5 whitespace-pre-wrap"
+          className="text-13 leading-relaxed border-l-2 border-line-faint pl-2.5 whitespace-pre-wrap"
         >
           {p}
         </p>

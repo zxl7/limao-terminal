@@ -30,14 +30,14 @@ export function RootError() {
 
   return (
     <div className="max-w-[640px] mx-auto mt-20 panel">
-      <h1 className="text-[15px] font-semibold text-txt m-0">{title}</h1>
+      <h1 className="text-15 font-semibold text-txt m-0">{title}</h1>
       <p className="txt-sub mt-2">应用遇到了未预期的错误。其他页面仍可正常访问。</p>
 
-      <pre className="mt-4 p-3 bg-line-faint border border-line rounded text-[11px] overflow-auto max-h-[320px] whitespace-pre-wrap">
+      <pre className="mt-4 p-3 bg-line-faint border border-line rounded text-11 overflow-auto max-h-[320px] whitespace-pre-wrap">
         {detail}
       </pre>
 
-      <a href="/" className="inline-block mt-4 text-[13px] text-rec no-underline">
+      <a href="/" className="inline-block mt-4 text-13 text-rec no-underline">
         ← 返回盘中实时
       </a>
     </div>

@@ -58,34 +58,34 @@ export function PageError({ path }: { path: PagePath }) {
     <div className="max-w-[720px] mx-auto mt-10 bg-card border border-line-strong rounded-[var(--radius-sm)] p-5">
       <div className="flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-up flex-none" aria-hidden />
-        <h1 className="text-[15px] font-semibold text-txt m-0">{title}</h1>
-        <code className="ml-auto text-[11px] text-sub head-num">{path}</code>
+        <h1 className="text-15 font-semibold text-txt m-0">{title}</h1>
+        <code className="ml-auto text-11 text-sub head-num">{path}</code>
       </div>
 
-      <p className="text-[12.5px] text-sub mt-2 mb-0 leading-relaxed">{hint}</p>
+      <p className="text-13 text-sub mt-2 mb-0 leading-relaxed">{hint}</p>
 
       <div className="flex items-center gap-2 mt-4">
         <button
           type="button"
           onClick={retryInPlace}
-          className="px-3 py-1.5 text-[12.5px] font-medium rounded-[var(--radius-sm)] bg-up text-white border-0 cursor-pointer hover:opacity-90"
+          className="px-3 py-1.5 text-13 font-medium rounded-[var(--radius-sm)] bg-up text-white border-0 cursor-pointer hover:opacity-90"
         >
           重新加载页面
         </button>
         <Link
           to="/"
-          className="px-3 py-1.5 text-[12.5px] rounded-[var(--radius-sm)] bg-line-faint text-txt no-underline border border-line hover:bg-line"
+          className="px-3 py-1.5 text-13 rounded-[var(--radius-sm)] bg-line-faint text-txt no-underline border border-line hover:bg-line"
         >
           回到盘中实时
         </Link>
-        <span className="text-[11px] text-sub ml-1">左侧其他页面仍可正常访问</span>
+        <span className="text-11 text-sub ml-1">左侧其他页面仍可正常访问</span>
       </div>
 
       <details className="mt-4">
-        <summary className="text-[11.5px] text-sub cursor-pointer select-none">
+        <summary className="text-12 text-sub cursor-pointer select-none">
           错误详情（排查用）
         </summary>
-        <pre className="mt-2 p-3 bg-line-faint border border-line rounded-[var(--radius-sm)] text-[11px] leading-relaxed overflow-auto max-h-[240px] whitespace-pre-wrap text-sub m-0">
+        <pre className="mt-2 p-3 bg-line-faint border border-line rounded-[var(--radius-sm)] text-11 leading-relaxed overflow-auto max-h-[240px] whitespace-pre-wrap text-sub m-0">
           {detail}
         </pre>
       </details>

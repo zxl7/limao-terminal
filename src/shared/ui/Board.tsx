@@ -143,7 +143,7 @@ export function Zone({
           就退化成一行灰色小字。延伸线把标签变成「区域标题」，一眼可辨栏界。 */}
       <div className="flex items-center gap-2 px-0.5 pt-0.5">
         <span className={cn('w-[3px] h-3.5 rounded-[2px] flex-none', dot)} aria-hidden />
-        <span className="text-[11px] font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
+        <span className="text-11 font-semibold tracking-[0.12em] text-sub uppercase whitespace-nowrap">
           {label}
         </span>
         <span className="flex-1 h-px bg-line min-w-2" aria-hidden />

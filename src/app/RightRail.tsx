@@ -20,7 +20,7 @@ export function RightRail() {
       aria-label="辅助信息"
     >
       <div className="flex-none h-[var(--header-height)] flex items-center px-3 border-b border-line bg-head-bg 3xl:bg-card">
-        <span className="text-[12px] font-semibold tracking-[0.1em] text-sub 3xl:text-txt uppercase">
+        <span className="text-12 font-semibold tracking-[0.1em] text-sub 3xl:text-txt uppercase">
           实时速览
         </span>
       </div>
@@ -52,13 +52,13 @@ function Watchlist({ leaders }: { leaders: Leader[] }) {
               className="flex items-center justify-between gap-2 py-1 border-b border-line-faint last:border-0"
             >
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-[11px] text-sub truncate">{l.sector}</span>
-                <span className="text-[13px] text-txt truncate">{l.name}</span>
+                <span className="text-11 text-sub truncate">{l.sector}</span>
+                <span className="text-13 text-txt truncate">{l.name}</span>
                 {l.is_20cm && (
                   <span className="badge bg-rec-soft text-rec">20cm</span>
                 )}
               </div>
-              <span className={`num text-[13px] font-medium ${upTone(l.pct)}`}>
+              <span className={`num text-13 font-medium ${upTone(l.pct)}`}>
                 {fmtPct(l.pct)}
               </span>
             </li>
@@ -85,15 +85,15 @@ function HotSpots({ spots }: { spots?: HotSpot[] }) {
             return (
               <li key={s.sector} className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium text-txt">{s.sector}</span>
+                  <span className="text-13 font-medium text-txt">{s.sector}</span>
                   <span className="badge bg-up-soft text-up">{stocks.length} 只</span>
                 </div>
                 {stocks.length === 0 ? (
-                  <div className="text-[12px] text-sub">—</div>
+                  <div className="text-12 text-sub">—</div>
                 ) : (
                   <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
                     {stocks.map((st) => (
-                      <span key={st.code} className="text-[12px] text-sub">
+                      <span key={st.code} className="text-12 text-sub">
                         <StockLink code={st.code}>{st.name}</StockLink>
                         <span className={`num ${upTone(st.pct)} ml-0.5`}>
                           {fmtPct(st.pct)}
@@ -122,7 +122,7 @@ function Newsflash({ items }: { items: { title: string; plates?: string[] }[] })
           {items.slice(0, 5).map((n) => (
             <li
               key={n.title}
-              className="text-[12px] leading-relaxed text-txt border-b border-line-faint last:border-0 pb-1.5 last:pb-0"
+              className="text-12 leading-relaxed text-txt border-b border-line-faint last:border-0 pb-1.5 last:pb-0"
             >
               {n.title}
               {n.plates && n.plates.length > 0 && (
@@ -138,7 +138,7 @@ function Newsflash({ items }: { items: { title: string; plates?: string[] }[] })
 
 function EmptyRow({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="py-3 text-center text-[12px] text-sub">{children ?? '暂无数据'}</div>
+    <div className="py-3 text-center text-12 text-sub">{children ?? '暂无数据'}</div>
   )
 }
 

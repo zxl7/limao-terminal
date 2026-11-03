@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { ExitPeakSector, ExitPeakStock, ThemeSnapshotItem, Top5HistoryTheme } from '@/shared/api'
 import { analyticsQueries, DataTable, n1, n2, pct } from '@/features/analytics'
-import { Card, CardBadge, EmptyState, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn } from '@/shared/lib'
+import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
+import { cn, rsiWilder } from '@/shared/lib'
 
 export async function loader() {
   await Promise.allSettled([
@@ -79,6 +79,17 @@ export function Component() {
 
   const stock = registry.data?.stock ?? null
   const bars = daily.data?.bars ?? []
+  // 接口按最新在前返回；指标计算必须按交易日正序，避免 RSI 方向倒置。
+  const chartBars = [...bars].reverse()
+  const closeValues = chartBars.map((bar) => bar.close)
+  const evidence = daily.data?.rsi_evidence
+  const serverRsi = evidence?.schema === 'rsi_evidence_v1' && evidence.code === code
+    && evidence.dates.join(',') === chartBars.map((bar) => bar.trade_date).join(',')
+    ? evidence : undefined
+  const rsi6 = serverRsi?.readings['6']?.series ?? rsiWilder(closeValues, 6)
+  const rsi12 = serverRsi?.readings['12']?.series ?? rsiWilder(closeValues, 12)
+  const rsi24 = serverRsi?.readings['24']?.series ?? rsiWilder(closeValues, 24)
+  const rsiLabels = chartBars.map((bar) => bar.trade_date)
 
   return (
     <div className="flex flex-col gap-3">
@@ -183,7 +194,7 @@ export function Component() {
                   {
                     label: '峰值',
                     num: true,
-                    cell: (row) => <span className="num text-rec">{n1(row.zt_count_peak)}</span>,
+                    cell: (row) => <span className="num text-txt">{n1(row.zt_count_peak)}</span>,
                   },
                   {
                     label: '时刻',
@@ -257,7 +268,7 @@ export function Component() {
                   {
                     label: '龙头',
                     cell: (row) => (
-                      <StockLink code={row.leader_code} className="text-rec">
+                      <StockLink code={row.leader_code} className="text-txt">
                         {row.leader ?? '—'}
                       </StockLink>
                     ),
@@ -282,13 +293,13 @@ export function Component() {
             maxLength={6}
             placeholder="输入股票代码，例如 002724"
             className={cn(
-              'w-[260px] max-w-full px-2.5 py-1.5 text-[12.5px] rounded-sm',
+              'w-[260px] max-w-full px-2.5 py-1.5 text-13 rounded-sm',
               'bg-transparent border border-line text-txt placeholder:text-sub',
               'focus:outline-none focus:border-line-strong',
             )}
           />
-          {code && !validCode && <span className="text-[12px] text-warn">请输入6位数字代码</span>}
-          {validCode && <span className="text-[12px] text-sub">查询近20个交易日原始日K与系统事实档</span>}
+          {code && !validCode && <span className="text-12 text-warn">请输入6位数字代码</span>}
+          {validCode && <span className="text-12 text-sub">查询近20个交易日原始日K与系统事实档</span>}
         </div>
       </Card>
 
@@ -316,7 +327,7 @@ export function Component() {
                   {(stock.themes ?? []).map((theme) => (
                     <span key={theme} className="badge border border-rec text-rec">{theme}</span>
                   ))}
-                  {(stock.themes ?? []).length === 0 && <span className="text-sub text-[12px]">题材 —</span>}
+                  {(stock.themes ?? []).length === 0 && <span className="text-sub text-12">题材 —</span>}
                 </div>
                 <DataTable
                   rows={technicalRows(stock.technical)}
@@ -327,7 +338,7 @@ export function Component() {
                     { label: '数值', num: true, cell: (row) => <span className="num text-txt">{row.value}</span> },
                   ]}
                 />
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-sub">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-12 text-sub">
                   <span>首次观察 {stock.first_seen_date ?? '—'}</span>
                   <span>最近观察 {stock.last_seen_ts ?? '—'}</span>
                   <span>日线日期 {stock.daily_asof_date ?? '—'}</span>
@@ -348,20 +359,43 @@ export function Component() {
             ) : bars.length === 0 ? (
               <EmptyState text="近月日K未入库" hint="该查询只读取本地近20个交易日的原始OHLCV" />
             ) : (
-              <DataTable
-                rows={bars}
-                rowKey={(row) => `${row.code}-${row.trade_date}`}
-                dense
-                columns={[
-                  { label: '交易日', cell: (row) => <span className="num text-sub">{row.trade_date}</span> },
-                  { label: '开', num: true, cell: (row) => <span className="num">{n2(row.open)}</span> },
-                  { label: '高', num: true, cell: (row) => <span className="num text-up">{n2(row.high)}</span> },
-                  { label: '低', num: true, cell: (row) => <span className="num text-down">{n2(row.low)}</span> },
-                  { label: '收', num: true, cell: (row) => <span className="num text-txt">{n2(row.close)}</span> },
-                  { label: '成交量(万股)', num: true, cell: (row) => <span className="num text-sub">{scaled(row.volume, 10_000)}</span> },
-                  { label: '成交额(亿)', num: true, cell: (row) => <span className="num text-sub">{scaled(row.amount, 100_000_000)}</span> },
-                ]}
-              />
+              <div className="flex flex-col gap-3">
+                <div className="border border-line rounded-sm p-2">
+                  <div className="text-sub text-12">
+                    {serverRsi ? `统一研究证据 · 截至${serverRsi.asof} · ${serverRsi.sample_count}根 · Wilder · 未复权` : '本地计算预览 · 后端研究证据未提供'}
+                  </div>
+                  <LineChart
+                    labels={rsiLabels}
+                    series={[
+                      { name: 'RSI6', values: rsi6, tone: 'up' },
+                      { name: 'RSI12', values: rsi12, tone: 'mid' },
+                      { name: 'RSI24', values: rsi24, tone: 'lead' },
+                    ]}
+                    height={210}
+                    yMin={0}
+                    yMax={100}
+                    format={(value) => value.toFixed(1)}
+                    refLines={[
+                      { value: 70, label: '70', tone: 'down', dashed: true },
+                      { value: 30, label: '30', tone: 'down', dashed: true },
+                    ]}
+                  />
+                </div>
+                <DataTable
+                  rows={bars}
+                  rowKey={(row) => `${row.code}-${row.trade_date}`}
+                  dense
+                  columns={[
+                    { label: '交易日', cell: (row) => <span className="num text-sub">{row.trade_date}</span> },
+                    { label: '开', num: true, cell: (row) => <span className="num">{n2(row.open)}</span> },
+                    { label: '高', num: true, cell: (row) => <span className="num text-up">{n2(row.high)}</span> },
+                    { label: '低', num: true, cell: (row) => <span className="num text-down">{n2(row.low)}</span> },
+                    { label: '收', num: true, cell: (row) => <span className="num text-txt">{n2(row.close)}</span> },
+                    { label: '成交量(万股)', num: true, cell: (row) => <span className="num text-sub">{scaled(row.volume, 10_000)}</span> },
+                    { label: '成交额(亿)', num: true, cell: (row) => <span className="num text-sub">{scaled(row.amount, 100_000_000)}</span> },
+                  ]}
+                />
+              </div>
             )}
           </Card>
         </Zone>
@@ -373,8 +407,8 @@ export function Component() {
 function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
     <span className="inline-flex items-baseline gap-1">
-      <span className="text-sub text-[12px]">{label}</span>
-      <b className={cn('text-[13px] font-semibold', tone ?? 'text-txt')}>{value}</b>
+      <span className="text-sub text-12">{label}</span>
+      <b className={cn('text-13 font-semibold', tone ?? 'text-txt')}>{value}</b>
     </span>
   )
 }

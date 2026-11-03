@@ -301,8 +301,12 @@ describe('TimelineSlotCard 固定高 / 滚动 / 板块强度排序', () => {
       <TimelineSlotCard slot={buildTimelineSlots(nodes)[0]} topBoard={3} tags={new Map()} reasonByCode={new Map()} />,
     )
     // 分组头（12.5px 加粗）在 DOM 中出现的顺序 = 强度降序
-    const heads = Array.from(container.querySelectorAll('span')).filter(
-      (s) => s.className.includes('text-[12.5px]') && s.className.includes('font-semibold'),
+    // ⚠️ 只在**卡体**里找：字号刻度收敛后（12.5px → text-13）卡头时刻与分组头
+    //    同档同字重，全容器搜会把「10:00」也算成板块。用结构（卡体 = section 最后一个子节点）
+    //    定位，比依赖字号差异稳。
+    const body = (container.querySelector('section') as HTMLElement).lastElementChild as HTMLElement
+    const heads = Array.from(body.querySelectorAll('span')).filter(
+      (s) => s.className.includes('text-13') && s.className.includes('font-semibold'),
     )
     expect(heads.map((h) => h.textContent)).toEqual(['电力', '半导体', '医药', '农业'])
     // 排名徽标 #1 与最强板块同组
@@ -330,8 +334,12 @@ describe('TimelineSlotCard 固定高 / 滚动 / 板块强度排序', () => {
     expect(badge4).toBeTruthy()
     expect((badge4 as HTMLElement).parentElement?.textContent).toContain('农业')
     // 守恒：四组全部渲染（每组 1 个汇总头 + 若干个股行）
-    const heads = Array.from(container.querySelectorAll('span')).filter(
-      (s) => s.className.includes('text-[12.5px]') && s.className.includes('font-semibold'),
+    // ⚠️ 只在**卡体**里找：字号刻度收敛后（12.5px → text-13）卡头时刻与分组头
+    //    同档同字重，全容器搜会把「10:00」也算成板块。用结构（卡体 = section 最后一个子节点）
+    //    定位，比依赖字号差异稳。
+    const body = (container.querySelector('section') as HTMLElement).lastElementChild as HTMLElement
+    const heads = Array.from(body.querySelectorAll('span')).filter(
+      (s) => s.className.includes('text-13') && s.className.includes('font-semibold'),
     )
     expect(heads).toHaveLength(4)
   })

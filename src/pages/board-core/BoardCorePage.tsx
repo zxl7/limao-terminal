@@ -163,11 +163,11 @@ export function Component() {
     <div className="flex flex-col gap-3">
       <Card title="⚡ 今日核心核验" extra={<CardBadge tone={liveLeaders.length ? 'up' : 'neutral'}>{latest.data?.ts?.slice(11, 19) ?? '等待行情快照'}</CardBadge>}>
         {liveLeaders.length ? (
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px]">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-12">
             {liveLeaders.map(({ theme, leader }) => <span key={theme}><b className="text-rec">{leader?.name}</b><span className="text-sub"> · {theme}</span></span>)}
           </div>
         ) : (
-          <p className="text-[11px] text-sub">当前主线题材尚未与历史核心池交集；这表示没有盘中验证，不代表核心票走弱。</p>
+          <p className="text-11 text-sub">当前主线题材尚未与历史核心池交集；这表示没有盘中验证，不代表核心票走弱。</p>
         )}
       </Card>
       {/* ── 视图层：形状（怎么算出来的）+ 分布（今天强票多不多）── */}
@@ -186,15 +186,15 @@ export function Component() {
         {radar ? (
           <div className="grid md:grid-cols-[280px_1fr] gap-4 items-start">
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
+              <div className="text-12 font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
                 <span className="flex items-center gap-1">
                   <Icon name="target" size={13} className="text-up" />
                   {radar.board}
                 </span>
-                <StockLink code={radar.stock.code} className="text-rec">{radar.stock.name}</StockLink>
+                <StockLink code={radar.stock.code} className="text-txt">{radar.stock.name}</StockLink>
               </div>
               <Radar axes={radar.axes} compare={radar.compare} size={230} tone="up" compareTone="sub" />
-              <p className="text-sub text-[11px] mt-1 leading-relaxed">
+              <p className="text-sub text-11 mt-1 leading-relaxed">
                 红色多边形 = 该票四维；灰色 = <b className="text-txt">全部 {radar.poolSize} 只核心票均值</b>。
                 {radar.missing > 0 && (
                   <>
@@ -207,17 +207,17 @@ export function Component() {
             </div>
 
             <div>
-              <div className="text-[12px] font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
+              <div className="text-12 font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
                 <span className="flex items-center gap-1">
                   <Icon name="layers" size={13} className="text-sub" />
                   核心度分布
                 </span>
-                <span className="text-sub text-[11px]">
+                <span className="text-sub text-11">
                   横轴 = core_score 分档 · 纵轴 = 核心票只数 · 输入 = 表格行的展开状态
                 </span>
               </div>
               <BarChart bars={dist.bars} height={180} format={(v) => `${v} 只`} maxBarWidth={30} showValue />
-              <p className="text-sub text-[11px] mt-2 leading-relaxed">
+              <p className="text-sub text-11 mt-2 leading-relaxed">
                 柱高是<b className="text-txt">数量</b>、颜色是<b className="text-txt">分数档位</b>，两个通道各表一件事：
                 <b className="text-up"> 红档 ≥60</b> / <b className="text-mid">蓝档 40~60</b> /
                 <b className="text-txt"> 灰档 &lt;40</b>。
@@ -237,14 +237,14 @@ export function Component() {
             title="🏆 板块核心票"
         extra={
           <span className="flex items-center gap-2">
-            {ts && <span className="text-sub text-[11px] num">{ts.slice(0, 10)}</span>}
+            {ts && <span className="text-sub text-11 num">{ts.slice(0, 10)}</span>}
             <CardBadge tone="neutral">
               {filtered.length}/{boards.length} 板块 · {totalStocks} 票
             </CardBadge>
           </span>
         }
       >
-        <p className="text-sub text-[11.5px] mb-2 leading-relaxed">
+        <p className="text-sub text-12 mb-2 leading-relaxed">
           用法：板块异动先看核心票动没动 —— <span className="text-warn">核心票不动而只有跟风涨 = 假启动</span>。
           四维加权（带动参与 0.30 / 领先 0.25 / 时效 0.25 / 封板硬度 0.20）。
           <span className="text-txt"> 点任意一行可展开近 N 日明细，上方雷达同步切换。</span>
@@ -255,7 +255,7 @@ export function Component() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="搜板块名或个股名 / 代码…"
           className={cn(
-            'w-full mb-2 px-2.5 py-1.5 text-[12.5px] rounded-sm',
+            'w-full mb-2 px-2.5 py-1.5 text-13 rounded-sm',
             'bg-transparent border border-line text-txt placeholder:text-sub',
             'focus:outline-none focus:border-line-strong',
           )}
@@ -270,7 +270,7 @@ export function Component() {
 
         {filtered.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[12.5px]">
+            <table className="w-full border-collapse text-13">
               <thead>
                 <tr className="border-b border-line text-sub">
                   <th className="text-left font-normal py-1.5 px-2 whitespace-nowrap">板块</th>
@@ -301,7 +301,7 @@ export function Component() {
                         <span className="text-sub mr-1">{isOpen ? '▾' : '▸'}</span>
                         {b.board}
                       </td>
-                      <td className="py-1.5 px-2 whitespace-nowrap text-rec">
+                      <td className="py-1.5 px-2 whitespace-nowrap text-txt">
                         <StockLink code={t.code}>{t.name}</StockLink>
                       </td>
                       <td className="py-1.5 px-2 text-right whitespace-nowrap">
@@ -343,10 +343,10 @@ export function Component() {
                     isOpen ? (
                       <tr key={`${b.board}-detail`} className="border-b border-line bg-line-faint">
                         <td colSpan={9} className="px-2 py-2">
-                          <div className="text-sub text-[11.5px] mb-1.5">
+                          <div className="text-sub text-12 mb-1.5">
                             近 {b.days} 日核心票明细（{b.top.length} 只）
                           </div>
-                          <table className="w-full border-collapse text-[11.5px]">
+                          <table className="w-full border-collapse text-12">
                             <thead>
                               <tr className="text-sub border-b border-line">
                                 <th className="text-left font-normal py-1 px-1.5">#</th>

@@ -139,7 +139,11 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
 
   try {
     const res = await fetch(route, {
-      cache: 'no-store',
+      // ⚠️ 2026-10-30：从 no-store 改成 no-cache。
+      //    no-store 会让浏览器完全不缓存 → 每次都整包重下（decision.json 474KB 也是）。
+      //    no-cache 语义仍是「必须回源校验」，但允许携带 If-None-Match：
+      //    数据没变时服务端回 304，前端拿到 0 字节，行为不变而流量大降。
+      cache: 'no-cache',
       signal: ctrl.signal,
       // ⚠️ 2026-10-26 实测：ngrok 免费隧道对**浏览器 UA**（含同源 XHR）会把
       //   `/api/*` 换成 `200 text/html` 的访问警告页，页面因此报「渲染出错」。

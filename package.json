@@ -21,6 +21,7 @@
     "data": "node scripts/check-data-routes.mjs",
     "data:verbose": "node scripts/check-data-routes.mjs --verbose",
     "data:json": "node scripts/check-data-routes.mjs --json",
+    "parity": "node scripts/check-route-parity.mjs",
     "check": "npm run lint && npm run arch && npm run typecheck && npm run test"
   },
   "dependencies": {

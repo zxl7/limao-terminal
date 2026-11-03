@@ -40,7 +40,7 @@ export function SignalsCard() {
       title="⚡ 短线精灵"
       extra={
         data && (
-          <span className="text-[11px] font-normal text-sub">
+          <span className="text-11 font-normal text-sub">
             {visible.length} 条 · {sessionText}
           </span>
         )
@@ -56,30 +56,30 @@ export function SignalsCard() {
               className="pb-[7px] border-b border-line last:border-b-0 last:pb-0"
             >
               <div className="flex items-baseline gap-1.5">
-                <span className="num text-[11px] text-sub flex-none">
+                <span className="num text-11 text-sub flex-none">
                   {s.first_seen ? s.first_seen.slice(0, 5) : '—'}
                 </span>
-                <StockLink code={s.code} className="text-[13px] font-semibold">{s.name}</StockLink>
+                <StockLink code={s.code} className="text-13 font-semibold">{s.name}</StockLink>
                 {s.pct != null ? (
-                  <span className={cn('num text-[13px] font-semibold ml-auto', pctTone(s.pct))}>
+                  <span className={cn('num text-13 font-semibold ml-auto', pctTone(s.pct))}>
                     {fmtPct(s.pct)}
                   </span>
                 ) : (
-                  <span className="num text-[13px] text-sub ml-auto">—</span>
+                  <span className="num text-13 text-sub ml-auto">—</span>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 mt-[3px]">
+              <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {[s.type, ...(s.tags ?? [])].filter(Boolean).map((t) => (
                   <span key={t} className="badge bg-line text-sub">
                     {t}
                   </span>
                 ))}
-                {s.sector && <span className="text-[11px] text-sub">{s.sector}</span>}
-                {s.reason && <span className="text-[11px] text-sub">{s.reason}</span>}
+                {s.sector && <span className="text-11 text-sub">{s.sector}</span>}
+                {s.reason && <span className="text-11 text-sub">{s.reason}</span>}
               </div>
 
-              <div className="num text-[11px] text-sub mt-0.5">
+              <div className="num text-11 text-sub mt-0.5">
                 强度 {(s.strength ?? 0).toFixed(2)}
                 {s.seen_count != null && s.seen_count > 1 && ` ｜ ${s.seen_count} 轮`}
                 {s.flow_yi != null && ` ｜ 资金 ${s.flow_yi} 亿`}
