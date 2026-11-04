@@ -261,7 +261,7 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
     //   `text/plain` 与缺失头一律按 JSON 试解析 —— 轻量服务、测试桩、
     //   甚至部分反向代理都会用 text/plain 回 JSON，一刀切会误杀正常数据。
     //   真的是 HTML 却漏判时，下面的 `res.json()` 也会抛错并统一兜底。
-    const ctype = (res.headers.get('content-type') || '').toLowerCase()
+    const ctype = (res.headers?.get('content-type') || '').toLowerCase()
     if (ctype.includes('html') || ctype.includes('xml')) {
       throw new DataUnavailableError(
         route,
@@ -273,10 +273,10 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
     const data: unknown = await res.json()
     // 只有成功解析 JSON 后才接受健康头；HTML/损坏 JSON 不得短暂点亮绿灯。
     recordFreshness(route, {
-      stale: res.headers.get('X-Data-Stale'),
-      age: res.headers.get('X-Data-Age'),
-      retired: res.headers.get('X-Data-Retired'),
-      producer: res.headers.get('X-Data-Producer'),
+      stale: res.headers?.get('X-Data-Stale') ?? null,
+      age: res.headers?.get('X-Data-Age') ?? null,
+      retired: res.headers?.get('X-Data-Retired') ?? null,
+      producer: res.headers?.get('X-Data-Producer') ?? null,
     })
     if (guard) inspect(route, guard, data)
 

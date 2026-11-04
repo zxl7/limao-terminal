@@ -481,6 +481,10 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache', pattern: '^intraday_exit_peaks_\\d{8}\\.json$', mode: 'latest', cadence: 'intraday',
     desc: '昨日涨停池封单与Top5题材日内峰值（事实留存，不参与裁决）',
   },
+  '/api/data/market-snapshot': {
+    dir: 'cache/snapshot', pattern: '^\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '聚合市场快照（生产代理同源，只读）',
+  },
   '/api/data/theme-snapshot': {
     dir: 'cache/theme_snapshot', pattern: '^theme_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
     desc: '题材冻结快照（按交易日保存的 code→题材映射）',
