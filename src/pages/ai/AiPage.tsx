@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type {
@@ -7,11 +7,13 @@ import type {
   DecisionDossier,
   DossierStock,
   PoolCallFile,
+  ScreenFile,
 } from '@/shared/api'
 import {
+  AiHitLogic,
   AiJudgeDetail,
+  isMarketOnlyBlock,
   analyticsQueries,
-  compareJudgeRows,
   DataTable,
   SegTabs,
   StatPair,
@@ -21,8 +23,9 @@ import {
   n2,
   pct,
 } from '@/features/analytics'
+import { DecisionBoard, ExecutionPanel, ScreenFunnel } from '@/features/wealth'
 import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
-import { cn, stanceText, viewText } from '@/shared/lib'
+import { cn, stanceText } from '@/shared/lib'
 
 /**
  * AI 台账 —— 数据源 `wealth_code/cache/ai_view/` + `ai_decisions.jsonl` + `ai_nav_history.jsonl`。
@@ -73,89 +76,6 @@ const NAV_BASELINE: { value: number; label: string; tone: 'sub'; dashed: boolean
   { value: 1, label: '盈亏分界 1.0', tone: 'sub', dashed: true },
 ]
 
-const ROLE_TONE: Record<string, 'warn' | 'rec' | 'sub'> = {
-  龙头: 'warn',
-  准龙头: 'rec',
-  跟风: 'sub',
-}
-
-function roleOf(row: JudgeRow): '龙头' | '准龙头' | '跟风' | undefined {
-  const role = row.call?.leaderRole ?? row.stock?.leader_role
-  return role === '龙头' || role === '准龙头' || role === '跟风' ? role : undefined
-}
-
-function shortReason(text?: string | null): string | undefined {
-  const line = text?.split(/[；\n]/).map((x) => x.trim()).find(Boolean)
-  return line || undefined
-}
-
-function ChangeBlock({
-  label,
-  empty,
-  tone,
-  summary,
-  children,
-}: {
-  label: string
-  empty: string
-  tone: 'warn' | 'rec' | 'sub'
-  summary?: ReactNode
-  children: ReactNode
-}) {
-  const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : []
-  return (
-    <section className="min-w-0 rounded-sm border border-line bg-card px-2.5 py-2">
-      <div className={cn('mb-1.5 text-12 font-semibold', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-sub')}>
-        {label}
-      </div>
-      {summary && <div className="mb-1.5 text-11 text-sub">{summary}</div>}
-      {items.length ? <div className="flex flex-col gap-1.5">{children}</div> : <div className="text-11 text-sub">{empty}</div>}
-    </section>
-  )
-}
-
-function ChangeRow({
-  title,
-  titleText,
-  tone,
-  pct: pctVal,
-  children,
-}: {
-  title: ReactNode
-  titleText?: string
-  tone: 'warn' | 'rec' | 'sub'
-  /** 个股涨跌幅度（今晨竞价涨幅 %）—— 缺数据时留空，不退化成 0 */
-  pct?: number | null
-  children: ReactNode
-}) {
-  return (
-    <div className="min-w-0 border-l-2 border-line pl-2">
-      <div className="flex items-baseline gap-1.5 min-w-0">
-        <span
-          className={cn('truncate text-12 font-medium', tone === 'warn' ? 'text-warn' : tone === 'rec' ? 'text-rec' : 'text-txt')}
-          title={titleText}
-        >
-          {title}
-        </span>
-        {pctVal != null && (
-          <span
-            className={cn(
-              'num flex-none text-11 font-semibold',
-              pctVal > 0 ? 'text-up' : pctVal < 0 ? 'text-down' : 'text-sub',
-            )}
-          >
-            {pctVal > 0 ? '+' : ''}
-            {pctVal.toFixed(2)}%
-          </span>
-        )}
-      </div>
-      <div className="line-clamp-2 text-11 leading-relaxed text-sub" title={typeof children === 'string' ? children : undefined}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
 export function Component() {
   const view = useQuery(analyticsQueries.aiView())
   const decisions = useQuery(analyticsQueries.aiDecisions())
@@ -164,7 +84,9 @@ export function Component() {
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
   const poolCalls = useQuery(analyticsQueries.decisionPoolCall())
-  const [tab, setTab] = useState<'view' | 'decisions' | 'nav'>('view')
+  /** 全量涨停逐票过筛（近 5 期）—— 回答「48 只涨停为什么只剩这几只」 */
+  const screens = useQuery(analyticsQueries.decisionScreen())
+  const [tab, setTab] = useState<'board' | 'exec' | 'judge' | 'hit' | 'decisions' | 'nav' | 'diag'>('board')
   const [viewDate, setViewDate] = useState<string>('')
 
   /** 判断记录：按日期倒序，默认取最新 */
@@ -186,22 +108,36 @@ export function Component() {
   )
 
   /**
-   * 与所选判断日**同一天**的接力卡（`date === activeView.decision_date`）。
+   * 接力卡（决策档案）——「今日决策」的主体。
    *
-   * ⚠️ 口径：接力卡是**尾盘生成、次日执行** —— `candidates-<D>.json` 里的 `D` 正是
-   *    ai_view 的 `decision_date`（判断日），**不是** `date`（落盘/执行日）。
-   *    对不上时回落到最近一期；个股仍缺失则该行只渲染 AI 判断那一半（⛔ 不编造）。
+   * ## ⛔ 2026-11-04 修「终端还是显示昨天的推荐」
+   *
+   * 两套文件的**命名口径相反**，前端按 `decision_date` 匹配会永远落后一期：
+   *
+   * | 文件 | 文件名里的日期 | 实际含义 |
+   * |---|---|---|
+   * | `ai_view_<D>.json` | `D` = **执行日** | `decision_date = 前一交易日`（预案写作日） |
+   * | `candidates-<D>.json` | `D` = **预案日** | 尾盘 15:31 生成，次日执行 |
+   *
+   * 实证 11-04：`ai_view_2026-11-04.decision_date = 11-03` →
+   *   页面去匹配 `candidates-2026-11-03`（11-03 生成、**今天**执行的那份），
+   *   而今天 15:31 刚落盘的 `candidates-2026-11-04`（**明天**执行）永远不显示。
+   *   ⇒ 用户每天看到的都是「昨天的推荐」。
+   *
+   * ✅ 现口径：**默认取最新一期候选**（就是刚才盘后跑出来的预案）。
+   *    只有当用户**主动**在上方日期下拉里选了某天（`viewDate` 非空）时，
+   *    才回落到「与该判断日匹配」的那一期 —— 那时用户是在回看历史，语义正确。
+   * ⛔ 不要反过来：反过来就又变成「最新一期永远看不到」。
    */
   const dossier = useMemo<DecisionDossier | undefined>(() => {
     const list = (dossiers.data ?? [])
       .map((f) => f.data)
       .filter((x): x is DecisionDossier => !!x)
     if (!list.length) return undefined
-    return (
-      list.find((d) => d.date === activeView?.decision_date) ??
-      [...list].sort((a, b) => b.date.localeCompare(a.date))[0]
-    )
-  }, [dossiers.data, activeView])
+    const latest = [...list].sort((a, b) => b.date.localeCompare(a.date))[0]
+    if (!viewDate) return latest          // 默认：最新一期（今天盘后刚生成）
+    return list.find((d) => d.date === activeView?.decision_date) ?? latest
+  }, [dossiers.data, activeView, viewDate])
 
   /** code → 接力卡标的 + 池别（接力池后写，同 code 以接力池为准） */
   const stockMap = useMemo(() => {
@@ -232,6 +168,21 @@ export function Component() {
       .filter((x): x is PoolCallFile => !!x)
     return list.find((p) => p.trade_date === activeView.date)
   }, [poolCalls.data, activeView])
+
+  /**
+   * 与所选决策日同一天的全量过筛结论。
+   *
+   * ⚠️ 日期键：`screen.date` 与 `candidates.date` 同为**选股业务日**（如 2026-11-03），
+   *    与 `pool_call.trade_date`（执行日）不是一回事，⛔ 不要用执行日去匹配。
+   *    配不上时**不回落**到最近一期 —— 把别天的过筛结论安到今天会误导「为什么没选它」。
+   */
+  const screenFile = useMemo<ScreenFile | undefined>(() => {
+    const list = (screens.data ?? [])
+      .map((f) => f.data)
+      .filter((x): x is ScreenFile => !!x)
+    if (!dossier?.date) return undefined
+    return list.find((s) => s.date === dossier.date)
+  }, [screens.data, dossier])
 
   /**
    * 判断明细行 = **今晨 09:25 终态**（结论）× 接力卡真实字段（依据）+ bias 越权兜底留痕。
@@ -320,255 +271,189 @@ export function Component() {
   const planCount = viewRows.filter((r) => r.view === 'participate').length
   /** 今晨 09:25 实际买入只数（名额内成交） */
   const callCount = callFile?.meta?.participate?.length ?? 0
+  /**
+   * 「命中逻辑」页的数量 = 已参与 + 只缺市场级条件被压住的票。
+   * ⛔ 与 `AiHitLogic` 内同一判据（`isMarketOnlyBlock`），两处必须一致，否则标签数与内容对不上。
+   */
+  const hitCount = useMemo(() => {
+    const views = callFile?.views ?? {}
+    const participated = new Set(callFile?.meta?.participate ?? [])
+    return Object.values(views).filter((v) => participated.has(v.code) || isMarketOnlyBlock(v)).length
+  }, [callFile])
 
-  /** 今日变化只取已落盘预案、09:25裁决与竞价字段；页面不自行推断交易结论。 */
-  const decisionChanges = useMemo(() => {
-    const finalViewOf = (row: JudgeRow) => row.call?.view ?? row.view ?? 'pending'
-    const plannedViewOf = (bias?: string) => ({ focus: 'participate', normal: 'watch', avoid: 'skip' }[bias ?? ''])
-    const roleRows = judgeRows
-      .map((row) => ({ row, role: roleOf(row) }))
-      .filter((item): item is { row: JudgeRow; role: '龙头' | '准龙头' | '跟风' } => !!item.role)
-      .sort((a, b) => compareJudgeRows(a.row, b.row))
-
-    const finalRows = [...judgeRows].sort(compareJudgeRows)
-    const finalCounts = finalRows.reduce<Record<string, number>>((counts, row) => {
-      const finalView = finalViewOf(row)
-      counts[finalView] = (counts[finalView] ?? 0) + 1
-      return counts
-    }, {})
-    const changed = finalRows.filter((row) => {
-      const planned = plannedViewOf(row.bias)
-      return !!row.call && !!planned && planned !== finalViewOf(row)
-    })
-
-    const competition = roleRows.filter(({ row }) => {
-      const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
-      return note.includes('二板') || note.includes('晋级')
-    })
-    const succession = roleRows.filter(({ row }) => {
-      const note = row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note ?? ''
-      return note.includes('断板') || note.includes('接力')
-    })
-    // 竞争与接力证据可能指向同一只票，只保留一次，避免把同一结论重复展示成两条。
-    const competitionRows = [...competition, ...succession].filter(
-      ({ row }, index, list) => list.findIndex((item) => item.row.code === row.code) === index,
-    )
-    const risks = finalRows
-      .map((row) => {
-        const reasons: string[] = []
-        const planned = plannedViewOf(row.bias)
-        const finalView = finalViewOf(row)
-        if (!row.call) reasons.push('今晨裁决冻结件未落盘')
-        if (row.call?.zone === 'above') reasons.push('竞价高于预期区间')
-        if (row.call?.zone === 'below') reasons.push('竞价低于预期区间')
-        if (row.call?.amountYi != null && row.call?.needYi != null && row.call.amountYi < row.call.needYi) reasons.push('竞价量能不足')
-        if (row.call?.mechanicalLeader && planned && planned !== finalView) reasons.push('AI预案与最终裁决不同')
-        return { row, reasons }
-      })
-      .filter((item) => item.reasons.length > 0)
-    return { finalRows, finalCounts, changed, competitionRows, risks, finalViewOf, plannedViewOf }
-  }, [judgeRows])
 
   return (
     <div className="flex flex-col gap-3">
-      {tab === 'view' && activeView && (
+      {/* 页头：日期切换 + 视图切换。
+          ⛔ 不把 tab 塞进卡片标题 —— 「今日决策」要独占整宽才能左右对照。 */}
+      <section className="panel flex flex-wrap items-center gap-2 px-3 py-2">
+        <span className="text-13 font-semibold text-txt">财富密码</span>
+        {viewFiles.length > 1 && (
+          <select
+            value={activeView?.date ?? ''}
+            onChange={(e) => setViewDate(e.target.value)}
+            className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
+          >
+            {viewFiles.map((f) => (
+              <option key={f.date} value={f.date}>
+                {f.date}
+              </option>
+            ))}
+          </select>
+        )}
+        <SegTabs
+          items={[
+            { key: 'board', label: '今日决策' },
+            { key: 'exec', label: '今日执行' },
+            { key: 'judge', label: `判断 (${viewRows.length})` },
+            { key: 'hit', label: `命中逻辑 (${hitCount})` },
+            { key: 'decisions', label: `台账 (${decRows.length})` },
+            { key: 'nav', label: `净值 (${navRows.length})` },
+            { key: 'diag', label: '诊断' },
+          ]}
+          value={tab}
+          onChange={(k) => setTab(k as typeof tab)}
+        />
+        {activeView && (
+          <span className="ml-auto num text-11 text-sub">
+            预案 {activeView.decision_date} · 执行 {activeView.date}
+          </span>
+        )}
+      </section>
+
+      {/* ① 今日决策 = 一天的完整决策链（该不该做 → 什么环境 → 筛掉谁 → 选了什么 → 怎么买） */}
+      {tab === 'board' && (
+        <DecisionBoard dossier={dossier} callFile={callFile} screen={screenFile} />
+      )}
+
+      {/* ② 今日执行 = 09:25 竞价怎么走的（原 /auction 的独有视角，2026-11-04 合并）
+          ⛔ 与「今日决策」分工：决策页回答「明天买什么」，本页回答「今天到底做了没有」。
+            两页曾是同一份档案的两个副本（环境/接力/观察三块重复），现已合并到一处。 */}
+      {tab === 'exec' && (
         <Card
-          title="竞价后决策变化"
-          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>执行日 {activeView.date}</CardBadge>}
+          title="今日执行"
+          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
         >
-          <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
-            <ChangeBlock
-              label="竞价后最终结论"
-              empty="暂无参与标的"
-              tone="warn"
-              summary={<>参与 {decisionChanges.finalCounts.participate ?? 0} · 观察 {decisionChanges.finalCounts.watch ?? 0} · 放弃 {decisionChanges.finalCounts.skip ?? 0} · 待裁决 {decisionChanges.finalCounts.pending ?? 0}</>}
-            >
-              {decisionChanges.finalRows.filter((row) => decisionChanges.finalViewOf(row) === 'participate').slice(0, 3).map((row) => (
-                <ChangeRow
-                  key={row.code}
-                  title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
-                  titleText={row.stock?.name ?? row.code}
-                  tone="warn"
-                  pct={row.call?.gapPct}
-                >
-                  {row.stock?.score == null ? '排序评分缺失' : `排序评分 ${n1(row.stock.score)}`}
-                </ChangeRow>
-              ))}
-            </ChangeBlock>
-            <ChangeBlock label="预案发生变化" empty="预案与今晨裁决一致" tone="rec">
-              {decisionChanges.changed.slice(0, 3).map((row) => {
-                const planned = decisionChanges.plannedViewOf(row.bias)
-                const final = decisionChanges.finalViewOf(row)
-                return (
-                  <ChangeRow
-                    key={row.code}
-                    title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
-                    titleText={row.stock?.name ?? row.code}
-                    tone="rec"
-                    pct={row.call?.gapPct}
-                  >
-                    {`${viewText(planned)} → ${viewText(final)}${row.call?.reason ? ` · ${shortReason(row.call.reason)}` : ''}`}
-                  </ChangeRow>
-                )
-              })}
-            </ChangeBlock>
-            <ChangeBlock label="龙头竞争" empty="暂无二进三或接力竞争证据" tone="rec">
-              {decisionChanges.competitionRows.slice(0, 3).map(({ row, role }) => (
-                <ChangeRow
-                  key={row.code}
-                  title={<StockLink code={row.code}>{`${row.stock?.name ?? row.code} · ${role}`}</StockLink>}
-                  titleText={`${row.stock?.name ?? row.code} · ${role}`}
-                  tone={ROLE_TONE[role]}
-                  pct={row.call?.gapPct}
-                >
-                  {shortReason(row.call?.leaderEvidenceNote ?? row.stock?.leader_evidence?.note) ?? '竞争证据待积累'}
-                </ChangeRow>
-              ))}
-            </ChangeBlock>
-            <ChangeBlock label="风险与分歧" empty="暂无竞价或裁决异常" tone="sub">
-              {decisionChanges.risks.slice(0, 3).map(({ row, reasons }) => (
-                <ChangeRow
-                  key={row.code}
-                  title={<StockLink code={row.code}>{row.stock?.name ?? row.code}</StockLink>}
-                  titleText={row.stock?.name ?? row.code}
-                  tone="sub"
-                  pct={row.call?.gapPct}
-                >
-                  {reasons.join(' · ')}
-                </ChangeRow>
-              ))}
-            </ChangeBlock>
-          </div>
+          <ExecutionPanel dossier={dossier} callFile={callFile} />
         </Card>
       )}
-      {/* 概览窄栏（两轨口径提示） + 明细宽栏（逐笔判断记录，多列需横向空间）。
-          ⛔ 旧版概览通栏独占一整行、明细被压到下方。 */}
-      <ZoneRow className="ai-ledger-layout">
-        <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-1 xl:sticky xl:top-3">
-          <Card
-            title="🤖 AI 独立台账"
-        extra={
-          <CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>
-            AI 轨净值 {lastNav ? n2(lastNav.nav) : '—'}
-          </CardBadge>
-        }
-      >
-        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
-          <StatPair
-            label="累计收益"
-            value={lastNav ? pct((lastNav.nav - 1) * 100) : '—'}
-            tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}
-          />
-          <StatPair
-            label="最大回撤"
-            value={navRows.length ? pct(maxDrawdown * 100) : '—'}
-            tone="down"
-          />
-          <StatPair label="结算日数" value={navRows.length} />
-          <StatPair label="最新结算日" value={lastNav?.trade_date ?? '—'} />
-          <StatPair label="判断日数" value={viewFiles.length} />
-        </div>
-        <div className="border border-line rounded-sm p-2.5 mb-2.5">
-          <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
-          {navRows.length ? (
-            <LineChart
-              series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
-              labels={navRows.map((r) => r.trade_date)}
-              height={200}
-              format={(v) => n2(v)}
-              refLines={NAV_BASELINE}
-            />
-          ) : (
-            <div className="text-sub text-12 py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
-          )}
-        </div>
-      </Card>
-        </Zone>
 
-        <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-2">
-          <Card
-            title="判断明细"
-        extra={
-          <div className="flex items-center gap-2">
-            {viewFiles.length > 1 && (
-              <select
-                value={activeView?.date ?? ''}
-                onChange={(e) => setViewDate(e.target.value)}
-                className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
-              >
-                {viewFiles.map((f) => (
-                  <option key={f.date} value={f.date}>
-                    {f.date}
-                  </option>
-                ))}
-              </select>
-            )}
-            <SegTabs
-              items={[
-                { key: 'view', label: `判断 (${viewRows.length})` },
-                { key: 'decisions', label: `台账 (${decRows.length})` },
-                { key: 'nav', label: `净值 (${navRows.length})` },
-              ]}
-              value={tab}
-              onChange={(k) => setTab(k as typeof tab)}
-            />
-          </div>
-        }
-      >
-        {tab === 'view' && (
-          <>
-            {activeView && (
-              <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">
-                <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span>预案</span>
-                  <span className="num text-txt">{activeView.decision_date}</span>
-                  <span>（AI 盘后写）</span>
-                  <span className="text-sub">|</span>
-                  <span>执行日</span>
-                  <span className="num text-txt">{activeView.date}</span>
-                  <span className="text-sub">|</span>
-                  <span>
-                    预案参与 <span className="num text-txt">{planCount}</span> / 共{' '}
-                    <span className="num text-txt">{viewRows.length}</span>
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-1.5 flex-wrap">
-                  <span>今晨 09:25 裁决</span>
-                  {callFile ? (
-                    <>
-                      <span className="text-sub">|</span>
-                      <span>
-                        取向{' '}
-                        <span className="text-txt">
-                          {stanceText(callFile.stance)}
-                        </span>
-                      </span>
-                      <span className="text-sub">|</span>
-                      <span>
-                        名额 <span className="num text-txt">{callFile.quota}</span>
-                      </span>
-                      <span className="text-sub">|</span>
-                      <span>
-                        实际买入{' '}
-                        <span className="num text-up font-semibold">{callCount}</span> 只
-                      </span>
-                      {callFile.meta?.call_at && (
-                        <span className="num text-sub">· {callFile.meta.call_at}</span>
-                      )}
-                    </>
-                  ) : (
-                    <span>未落盘（当日 09:25 后生成）</span>
-                  )}
-                </div>
+      {/* ③ 诊断 = 全量过筛（调参用，不是下单依据）
+          ⛔ 2026-11-04 用户「全量过筛感觉没有存在必要」：它从决策页移到这里。
+            保留的理由只有一个——复盘调参要看「哪一关卡得最死」。
+            实证 11-04：过筛放行 70 只，后面「最高板薄封」全拦掉，70 只一只没用上。 */}
+      {tab === 'diag' && (
+        <Card
+          title="全量过筛"
+          extra={
+            <CardBadge tone={screenFile ? 'rec' : 'neutral'}>
+              {screenFile ? `通过 ${screenFile.counts.pass} / 涨停 ${screenFile.zt_count}` : '未启用'}
+            </CardBadge>
+          }
+        >
+          <ScreenFunnel screen={screenFile} />
+        </Card>
+      )}
+
+      {tab === 'judge' && (
+        <ZoneRow className="ai-ledger-layout">
+          <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-1 xl:sticky xl:top-3">
+            <Card
+              title="🤖 AI 独立台账"
+              extra={
+                <CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>
+                  AI 轨净值 {lastNav ? n2(lastNav.nav) : '—'}
+                </CardBadge>
+              }
+            >
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
+                <StatPair
+                  label="累计收益"
+                  value={lastNav ? pct((lastNav.nav - 1) * 100) : '—'}
+                  tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}
+                />
+                <StatPair
+                  label="最大回撤"
+                  value={navRows.length ? pct(maxDrawdown * 100) : '—'}
+                  tone="down"
+                />
+                <StatPair label="结算日数" value={navRows.length} />
+                <StatPair label="最新结算日" value={lastNav?.trade_date ?? '—'} />
+                <StatPair label="判断日数" value={viewFiles.length} />
               </div>
-            )}
-            {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘财富密码接力卡真实字段。
-                ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
-            <AiJudgeDetail rows={judgeRows} decisionDate={activeView?.decision_date} />
-          </>
-        )}
+              <div className="border border-line rounded-sm p-2.5 mb-2.5">
+                <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
+                {navRows.length ? (
+                  <LineChart
+                    series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
+                    labels={navRows.map((r) => r.trade_date)}
+                    height={200}
+                    format={(v) => n2(v)}
+                    refLines={NAV_BASELINE}
+                  />
+                ) : (
+                  <div className="text-sub text-12 py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
+                )}
+              </div>
+            </Card>
+          </Zone>
 
-        {tab === 'decisions' && (
+          <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-2">
+            <Card title="判断明细">
+              {activeView && (
+                <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span>预案参与</span>
+                    <span className="num text-txt">{planCount}</span>
+                    <span>/ 共</span>
+                    <span className="num text-txt">{viewRows.length}</span>
+                    <span className="text-sub">|</span>
+                    <span>今晨 09:25 裁决</span>
+                    {callFile ? (
+                      <>
+                        <span className="text-sub">|</span>
+                        <span>
+                          取向 <span className="text-txt">{stanceText(callFile.stance)}</span>
+                        </span>
+                        <span className="text-sub">|</span>
+                        <span>
+                          名额 <span className="num text-txt">{callFile.quota}</span>
+                        </span>
+                        <span className="text-sub">|</span>
+                        <span>
+                          实际买入 <span className="num text-up font-semibold">{callCount}</span> 只
+                        </span>
+                        {callFile.meta?.call_at && (
+                          <span className="num text-sub">· {callFile.meta.call_at}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span>未落盘（当日 09:25 后生成）</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘接力卡真实字段。
+                  ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
+              <AiJudgeDetail rows={judgeRows} decisionDate={activeView?.decision_date} />
+            </Card>
+          </Zone>
+        </ZoneRow>
+      )}
+
+      {/* 竞价命中逻辑 = **命中的票为什么被选中**：方向强度 → 方向内身位 → 量能封板 → 竞价落点。
+          ⛔ 只讲命中，不逐只解释观察/放弃的票。 */}
+      {tab === 'hit' && (
+        <Card
+          title="命中逻辑"
+          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
+        >
+          <AiHitLogic file={callFile} tradeDate={callFile?.trade_date ?? activeView?.date} />
+        </Card>
+      )}
+
+      {tab === 'decisions' && (
+        <Card title="AI 台账" extra={<CardBadge>{decRows.length} 条</CardBadge>}>
           <DataTable<AiDecisionEntry>
             rows={decRows}
             rowKey={(r, i) => `${r.decision_date}-${r.code}-${i}`}
@@ -579,7 +464,9 @@ export function Component() {
                 label: '标的',
                 cell: (r) => (
                   <span>
-                    <StockLink code={r.code} className="text-txt">{r.name || r.code}</StockLink>
+                    <StockLink code={r.code} className="text-txt">
+                      {r.name || r.code}
+                    </StockLink>
                   </span>
                 ),
               },
@@ -606,9 +493,7 @@ export function Component() {
               { label: '仓位', num: true, cell: (r) => (r.position ? r.position : '—') },
               {
                 label: '结算',
-                cell: (r) => (
-                  <Tag tone={r.settled ? 'up' : 'neutral'}>{r.settled ? '已结算' : '未结算'}</Tag>
-                ),
+                cell: (r) => <Tag tone={r.settled ? 'up' : 'neutral'}>{r.settled ? '已结算' : '未结算'}</Tag>,
               },
               { label: '来源', cell: (r) => <span className="text-sub text-12">{r.source || '—'}</span> },
               {
@@ -618,12 +503,12 @@ export function Component() {
               },
             ]}
           />
-        )}
+        </Card>
+      )}
 
-        {tab === 'nav' && (
-          <>
+      {tab === 'nav' && (
+        <Card title="AI 轨净值" extra={<CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>{lastNav ? n2(lastNav.nav) : '—'}</CardBadge>}>
           <div className="border border-line rounded-sm p-2.5 mb-3">
-            <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
             <LineChart
               series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
               labels={navRows.map((r) => r.trade_date)}
@@ -631,9 +516,6 @@ export function Component() {
               format={(v) => n2(v)}
               refLines={NAV_BASELINE}
             />
-            <p className="text-sub text-11 mt-1.5 leading-relaxed">
-              净值起点 1.0，由每日 15:30 结算落盘；当前 {navRows.length} 个结算日，点数增多后趋势更清晰。虚线为盈亏分界。
-            </p>
           </div>
           <DataTable
             rows={navRows}
@@ -646,26 +528,20 @@ export function Component() {
               {
                 label: '成交数',
                 num: true,
-                cell: (r) => (
-                  <span className={r.stock_count === 0 ? 'text-sub' : 'text-txt'}>{r.stock_count}</span>
-                ),
+                cell: (r) => <span className={r.stock_count === 0 ? 'text-sub' : 'text-txt'}>{r.stock_count}</span>,
               },
               {
                 label: '当日均收益',
                 num: true,
                 cell: (r) => (
-                  <span className={r.avg_return_pct >= 0 ? 'text-up' : 'text-down'}>
-                    {pct(r.avg_return_pct)}
-                  </span>
+                  <span className={r.avg_return_pct >= 0 ? 'text-up' : 'text-down'}>{pct(r.avg_return_pct)}</span>
                 ),
               },
               {
                 label: '净值',
                 num: true,
                 cell: (r) => (
-                  <span className={cn('font-semibold num', r.nav >= 1 ? 'text-up' : 'text-down')}>
-                    {n2(r.nav)}
-                  </span>
+                  <span className={cn('font-semibold num', r.nav >= 1 ? 'text-up' : 'text-down')}>{n2(r.nav)}</span>
                 ),
               },
               { label: 'AI 已决策', num: true, cell: (r) => r.decided },
@@ -677,7 +553,9 @@ export function Component() {
                     <span className="flex flex-wrap gap-1">
                       {r.stocks.map((s) => (
                         <Tag key={s.code} tone={s.return_pct >= 0 ? 'up' : 'down'}>
-                          <StockLink code={s.code}>{s.name || s.code} {pct(s.return_pct, 1)}</StockLink>
+                          <StockLink code={s.code}>
+                            {s.name || s.code} {pct(s.return_pct, 1)}
+                          </StockLink>
                         </Tag>
                       ))}
                     </span>
@@ -687,18 +565,15 @@ export function Component() {
               },
             ]}
           />
-          </>
-        )}
+        </Card>
+      )}
 
-        {!view.isLoading && !viewRows.length && !decRows.length && !navRows.length && (
-          <EmptyState
-            text="财富密码尚无数据"
-            hint="wealth_code/cache/ai_view/ 与 ai_decisions.jsonl 未生成"
-          />
-        )}
-      </Card>
-        </Zone>
-      </ZoneRow>
+      {!view.isLoading && !dossier && !viewRows.length && !decRows.length && !navRows.length && (
+        <EmptyState
+          text="财富密码尚无数据"
+          hint="wealth_code/cache/candidates-<日期>.json 与 ai_decisions.jsonl 未生成"
+        />
+      )}
     </div>
   )
 }

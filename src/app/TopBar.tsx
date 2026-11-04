@@ -27,9 +27,9 @@ import { APP_CONFIG } from '@/shared/config'
  *
  * ## ⚠️ 情绪分判色口径（此前用错，已修正）
  *
- * `sentiment_detail.score` 是**有符号加权和（实测 −4…+6）**，不是 0–10 情绪分。
- * 因此**不能**用 `sentimentClass()` 判色 —— 它按 0–10 阈值（≥6 红 / ≤2 绿）判定，
- * 对 −4…+6 的快照分会系统性误判。必须按**定性 label** 走 `sentimentLabelTone()`。
+ * 新快照评分由 feedback_matrix 同轮回填（1–10），待计算时为 null。
+ * 历史快照可能保留旧有符号分；一律按生产 label 走 sentimentLabelTone，
+ * 不在展示层重复计算情绪结论或换算旧分。
  */
 
 /** 缺数据一律 `—`（不是 0）：0 是「真的没有」，`—` 是「没有样本」 */
@@ -258,9 +258,7 @@ function headSemantic(s: '' | 'up' | 'down' | 'mid' | 'flat'): string {
 /**
  * 域内 Tone（来自 `sentimentLabelTone`）→ 顶栏色。
  *
- * ⚠️ 这里刻意**不走** `sentimentClass()`：快照情绪分是有符号加权和（−4…+6），
- *    而 `sentimentClass()` 按 0–10 分阈值判定，两者口径不同。定性 label 才是
- *    判色的正确依据。
+ * 新旧快照都直接按生产 label 判色，不在顶栏重复分档或换算历史分。
  */
 function headFromTone(t: Tone): string {
   if (t === 'up') return 'text-head-up'

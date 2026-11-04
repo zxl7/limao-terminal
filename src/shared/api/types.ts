@@ -226,7 +226,13 @@ export interface PoolNameItem {
 
 export interface SentimentDetail {
   label: string
-  score: number
+  score: number | null
+  source?: string
+  status?: string
+  model?: string | null
+  source_at?: string
+  quality?: string | null
+  inputs_missing?: string[]
   /** 封板率（%） */
   seal_rate: number
 }
@@ -685,6 +691,60 @@ export interface NukeItem {
   breakdown: boolean
 }
 
+/** 单个情绪评分因子（诊断用，不是买卖信号）。 */
+export interface SentimentFactor {
+  key: string
+  label: string
+  /** 对总强度的贡献（已带方向：正=支撑，负=拖累） */
+  value: number
+  /** false = 未取到该输入，⛔ 不等于「观测到 0」 */
+  observed: boolean
+  source?: string
+}
+
+/** 一个评分维度及其下属因子。 */
+export interface SentimentDimension {
+  key: string
+  label: string
+  value: number
+  observed: boolean
+  factors: SentimentFactor[]
+}
+
+/** 支撑 / 拖累摘要。 */
+export interface SentimentDimensionRef {
+  key: string
+  label: string
+  value: number
+}
+
+/**
+ * 情绪分维度诊断。
+ *
+ * 回答「这个分是被什么撑起、被什么拖住」；⛔ 不构成排序或买卖依据。
+ */
+export interface SentimentBreakdown {
+  model?: string
+  /** false = 该模型是整段独立公式，不做因子分解（如 legacy_v2） */
+  decomposable?: boolean
+  score?: number | null
+  label?: string
+  strength?: number | null
+  dimensions?: SentimentDimension[]
+  observed_dimensions?: number
+  observed_factors?: number
+  total_factors?: number
+  /** 观测因子 / 总因子；只是覆盖度描述，不是置信度概率 */
+  coverage?: number | null
+  /** high ≥0.85 / medium ≥0.6 / low / none = 完全无观测 */
+  coverage_grade?: string
+  missing_factors?: string[]
+  support?: SentimentDimensionRef | null
+  drag?: SentimentDimensionRef | null
+  /** decomposable=false 时的说明 */
+  reason?: string
+}
+
 export interface FeedbackMatrix {
   generated_ts: string
   date: string
@@ -729,8 +789,20 @@ export interface FeedbackMatrix {
   promote_codes: string[]
   /** 逐票实时行情（code → 涨幅/封单）· 全量不截断 · 旧快照可能缺该字段 */
   quotes?: Record<string, QuoteItem>
-  sentiment_score: number
+  sentiment_score: number | null
   sentiment_label: string
+  sentiment_model?: string
+  sentiment_quality?: string
+  sentiment_inputs_missing?: string[]
+  /**
+   * 分维度诊断：哪个维度撑起 / 拖住本分。
+   *
+   * 只解释、不裁决 —— ⛔ 不得据此排序或放宽纪律。
+   * `observed=false` 表示该因子**未取到**，不是「观测到 0 的中性证据」。
+   * `legacy_v2` 模型下 `decomposable=false`，本字段无 `dimensions`。
+   */
+  sentiment_breakdown?: SentimentBreakdown | null
+  source_snapshot_ts?: string | null
   regulatory_pressure: number
   trend: FeedbackTrend
   /** 原系统异常态标记（存在时该文件不可用） */
@@ -1051,8 +1123,95 @@ export interface LeaderEvidence {
   note?: string
 }
 
+/**
+ * 次日开盘推测（`relay_forecast_v1` · `wealth_code/core/relay_forecast.py`）。
+ *
+ * ⛔ 口径：模型只承诺「明早大概怎么开、这一档历史真买到的胜率」，
+ *    **不承诺「买哪只赚」**。`by_band` 的样本数（`n`）必须一并展示，
+ *    否则小样本档位会被当成确定结论。
+ */
+export interface DossierForecastBand {
+  n: number
+  win: number
+  win_lb: number
+  avg: number
+}
+
+export interface DossierForecast {
+  schema?: string
+  /** 该票当前板数 */
+  boards?: number
+  /** 距全市场最高板 */
+  gap_to_top?: number
+  factor_count?: number
+  /** 历史分组名，如「差≥2板·封板强(≥3)」 */
+  group?: string
+  group_n?: number
+  /** 同组历史开盘幅度中位 / 四分位（%） */
+  gap_median?: number
+  gap_p25?: number
+  gap_p75?: number
+  /** 历史同组高开 >5% 的占比（%）= 买不到的概率 */
+  p_over5?: number
+  /** 晋级率（%） */
+  promo_rate?: number
+  /** 可成交样本数与真买到时的胜率/均值 */
+  buy_n?: number
+  buy_win?: number
+  buy_win_lb?: number
+  buy_avg?: number
+  /** 各开盘档位的真实胜率（键为「低开>3%」等档名） */
+  by_band?: Record<string, DossierForecastBand>
+  /** 建议档：可等 / 只观察 / 放弃 */
+  verdict?: string
+  reasons?: string[]
+  note?: string
+}
+
+/**
+ * 晋级三问（`promotion_quiz_v1`）—— 「这只票明天凭什么能连板」的三条硬判据。
+ * ⛔ 只作判定，不改评分/顺序/名额/仓位。
+ */
+export interface DossierPromotionQuizItem {
+  ok: boolean
+  why: string
+  [k: string]: unknown
+}
+
+export interface DossierPromotionQuiz {
+  schema?: string
+  /** 通过几问（0–3） */
+  passed: number
+  label?: string
+  items?: Record<string, DossierPromotionQuizItem>
+  unknown?: string[]
+  /** 卡在哪一问 */
+  blocked_by?: string[]
+  note?: string
+}
+
+/** 封板强度闸（`seal_gate_v1`）—— 成交额门槛与封板分档的判定留痕 */
+export interface DossierSealGate {
+  schema?: string
+  grade?: string
+  score?: number | null
+  /** 实际生效的成交额门槛（亿） */
+  floor_used?: number
+  /** 一字 / 换手 / unknown —— 换手板量小＝做局风险 */
+  style?: string
+  theme_mates?: number
+  source?: string
+  reason?: string
+}
+
 export interface DossierStock {
   leader_role?: '龙头' | '准龙头' | '跟风' | null
+  /**
+   * 昨日已在池 ∧ 今日板数更高 → 观察池优先占位（2026-11-04 用户「b 占位」）。
+   * ⛔ 只影响排序先后，不代表买入资格。
+   * （`watch_group` / `watch_reason` 已有定义，此处不重复声明）
+   */
+  carryover_promoted?: boolean
   leader_evidence?: LeaderEvidence
   status_rank?: number
   code: string
@@ -1136,6 +1295,32 @@ export interface DossierStock {
   chip_profit_rate: number
   chip_avg_cost: number
   chip_conc90: number
+  // ── 决策档案用的补充维度（真实存在于候选中，此前未声明类型）────────────────
+  /** 封单占流通市值（%）—— 与 `seal_amt / lt_mktcap` 同源，已由脚本算好 */
+  seal_ratio_pct?: number
+  /** 封板强度闸判定留痕（含一字/换手形态、生效门槛） */
+  seal_gate?: DossierSealGate
+  /** 该方向（炒作题材）内最高板数 */
+  line_top?: number
+  /** 该方向内达到最高板的票名 */
+  line_tops?: string[]
+  /** 身位解释：为什么在这条线上排这个位置 */
+  line_tier_why?: string
+  /** 方向梯队档位（outpool 口径） */
+  line_tier_outpool?: string
+  /** 方向内部排名（1 = 龙一） */
+  dragon_rank?: number
+  /** 该方向龙头名（用于「跟着谁涨」） */
+  dragon_leader_name?: string
+  dragon_leader_boards?: number
+  /** 接力阶段：one_to_two / two_to_three */
+  relay_stage?: string
+  /** 接力情绪：sufficient / insufficient */
+  relay_mood?: string
+  /** 次日开盘推测（含分档真实胜率） */
+  forecast?: DossierForecast
+  /** 晋级三问 */
+  promotion_quiz?: DossierPromotionQuiz
   relay_rank?: number
   watch_rank?: number
   bucket?: string
@@ -1214,6 +1399,89 @@ export interface DecisionDossier {
   diagnostics: DossierDiagnostics
   /** 全局旁白（账户 + 盘面 + 结论，分段文本） */
   global_narrative: string
+  /** 全市场最高板（当日） */
+  market_max_boards?: number | null
+  /**
+   * 市场风格判定（`market_style`）—— 决定「今天该做什么类型」。
+   * `style` 取值：core / follow / hedge / caution / none / neutral。
+   */
+  market_style?: {
+    style?: string
+    label?: string
+    rule?: string
+    trading_rule?: string
+    /** 冰点判定（此时标注只看不买） */
+    ice?: boolean
+    ice_note?: string
+    enabled?: boolean
+    [k: string]: unknown
+  } | null
+}
+
+/**
+ * 全量涨停逐票过筛结论（`daily_screen_v1` · `wealth_code/core/daily_screen.py`）。
+ *
+ * ## 与 `DecisionDossier` 的根本区别
+ *
+ * `DecisionDossier` 是**选股卡产物** —— 只有最终入选的 7 只票。
+ * 本结构是**全市场涨停逐票**的判定台账 —— 回答「48 只涨停里另外 41 只为什么被排除」。
+ * 没有这份数据，「为什么只剩这几只」只能靠反推。
+ *
+ * ⛔ 三档语义不可混：
+ *   · `pass`        —— 各维都过，可以进入后续选池
+ *   · `watch_only`  —— 能看但买不到（如一字厚封），不是坏票
+ *   · `reject`      —— 有硬伤，今天不选（**不是黑名单**，次日重新过筛）
+ */
+export interface ScreenFacts {
+  /** 封板形态：yizi 一字 / turnover 换手 / unknown */
+  style?: string
+  seal_grade?: string
+  seal_score?: number | null
+  seal_ratio_pct?: number | null
+  cje_yi?: number
+  /** 实际生效的成交额门槛（亿） */
+  floor_yi?: number
+  hs?: number | null
+  fbt?: string | null
+  zbc?: number | null
+  carry_cnt?: number | null
+  gene_grade?: string | null
+  promo_rate_hist?: number | null
+  zt_250?: number | null
+  [k: string]: unknown
+}
+
+export interface ScreenStock {
+  code: string
+  name: string
+  boards: number
+  theme: string
+  /** 同题材涨停家数 */
+  theme_members: number
+  verdict: 'pass' | 'watch_only' | 'reject'
+  /** 硬伤（导致 reject） */
+  rejects: string[]
+  /** 只能看不能买的原因 */
+  watch_reasons: string[]
+  /** 支持项 */
+  supports: string[]
+  /** 判不了的维度（缺失数据，⛔ 不当成负面） */
+  unknown: string[]
+  /** 看多细：2 = ≥2 板主看对象，1 = 首板 */
+  priority: number
+  facts: ScreenFacts
+}
+
+export interface ScreenFile {
+  schema?: string
+  date: string
+  /** 当日全量涨停家数 */
+  zt_count: number
+  market_max_boards: number | null
+  counts: { pass: number; watch_only: number; reject: number }
+  /** 拒因 → 家数（按理由原文聚合） */
+  reject_reasons: Record<string, number>
+  screened: ScreenStock[]
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1894,6 +2162,7 @@ export interface EmotionDay {
 
 /** 情绪日档（`cache/short_term/daily/emotion_*.json`）· 周期温度历史原始事实。 */
 export interface EmotionDailySnapshot {
+  sentiment_model?: string
   date: string
   prev_date?: string
   prev_zt_count?: number | null
@@ -2123,6 +2392,47 @@ export interface PoolCallView {
   line_core: { code: string; name: string; boards: number; broken: boolean } | null
   /** 在自身方向内的排名（1 = 龙一） */
   line_rank: number
+  /** 该方向最高板数（用于判断身位差） */
+  line_max_boards?: number
+  /** 该票相对方向最高板的身位差（0 = 就是最高） */
+  gap_to_top?: number
+  /** 全市场最高板 */
+  market_max_boards?: number
+  /** 该方向最高板的票名列表 */
+  line_tops?: string[]
+  /** 方向梯队一句话解释（为何这条线还站得住） */
+  line_tier_why?: string
+  /** 带动家数 */
+  carry_cnt?: number
+  /** 接力阶段：one_to_two / two_to_three / high … */
+  relay_stage?: string
+  /** 该阶段的情绪判断（insufficient / ok …） */
+  relay_mood?: string
+  /** 昨日封板质量（换手 / 封单占流通 / 首封时刻） */
+  seal_quality?: {
+    hs_pct?: number | null
+    seal_ratio_pct?: number | null
+    fbt_hm?: number | null
+    pos10_pct?: number | null
+  } | null
+  /** 是否 20cm 标的（判断竞价涨停幅阈值用） */
+  is_20cm?: boolean
+  /** 题材联动事实（昨日该题材涨停家数、数据完整性） */
+  linkage_facts?: {
+    schema?: string
+    theme?: string
+    eod_status?: string
+    theme_pool_zt_count?: number | null
+    theme_effective_zt_count?: number | null
+    data_quality?: string
+    source_conflict?: boolean
+  } | null
+  /**
+   * 四条件闸缺项（`pipeline_eod.apply_high_win_gate` 的留痕）。
+   * 只含「情绪」= **纯市场级**被压住（个股与方向成立，属冻结非否决）；
+   * 掺入题材龙/量能/梯队等 = 个股级，不在「命中」范畴。
+   */
+  high_win_gate?: string[] | null
   /** 终态：participate 参与 / watch 观察 / skip 放弃 */
   view: string
   /** 买入名额序（1 起；仅 participate 有，其余为 null） */
@@ -2144,13 +2454,76 @@ export interface PoolCallFile {
   meta: {
     caliber: string
     stance: string
+    /** 名义名额 */
     quota: number
+    /** 生效名额（被市场环境压过之后，可能是 0） */
+    effective_quota?: number
     pool_size: number
     /** 实际成交（名额内）的 code 列表 */
     participate: string[]
     /** 裁决执行时刻 */
     call_at: string
+    /** 今晨情绪体检（昨涨停池竞价红开与量能），用于解释「为什么没买」 */
+    market_open?: {
+      enabled?: boolean
+      pool_size?: number
+      quoted?: number
+      coverage?: number
+      red_open_count?: number
+      red_open_ratio?: number
+      leader_count?: number
+      leader_red_open_count?: number
+      leader_red_open_ratio?: number
+      leader_volume_median_ratio?: number
+      leader_volume_pass_ratio?: number
+      ready?: boolean
+      reason?: string
+    }
+    market_open_relief?: boolean
+    /**
+     * 昨日连板 · 今晨竞价溢价榜（2026-11-04 用户）。
+     *
+     * ⛔ 纯读数：不参与名额裁断。只回答「昨天连板那批票，今早是溢价接还是折价跑」。
+     * ⛔ 首板不入榜 —— 首板次日没有获利盘兑现压力，溢价说明不了连板情绪。
+     */
+    premium_board?: AuctionPremiumBoard
   }
+}
+
+/** 竞价溢价单票读数 */
+export interface AuctionPremiumRow {
+  code: string
+  name: string
+  boards: number
+  theme: string
+  /** 同题材昨日涨停家数（含首板，线宽本身就是强度） */
+  theme_hot: number
+  amount_yi: number | null
+  /** 竞价涨幅（%）· 缺报价为 null，不拿 0 冒充 */
+  gap_pct: number
+  verdict: 'premium' | 'flat' | 'discount'
+}
+
+/** 昨日连板 · 今晨竞价溢价榜 */
+export interface AuctionPremiumBoard {
+  schema: string
+  prev_date: string
+  trade_date: string
+  min_boards: number
+  count: number
+  premium_count: number
+  flat_count: number
+  discount_count: number
+  premium_ratio: number | null
+  avg_gap: number | null
+  median_gap: number | null
+  by_boards: Record<
+    string,
+    { count: number; premium_count: number; avg_gap: number | null; median_gap: number | null; names: string[] }
+  >
+  rows: AuctionPremiumRow[]
+  /** 报价缺失的票名（⛔ 不是平开，是没数据） */
+  no_quote: string[]
 }
 
 export interface AiDecisionEntry {

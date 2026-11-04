@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { sentimentClass } from '@/shared/lib'
-import { Card, Kpi, KpiStrip, StockLink } from '@/shared/ui'
+import { useRouteFreshness } from '@/shared/hooks'
+import { Card, Kpi, KpiStrip, StockLink, AgeBadge } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { defenseTone, feedbackTone } from '../model/labels'
 
@@ -28,6 +29,7 @@ import { defenseTone, feedbackTone } from '../model/labels'
  */
 export function FeedbackCard() {
   const { data: fb, isPending, isError } = useQuery(marketQueries.feedback())
+  const freshness = useRouteFreshness('/api/market/feedback')
 
   /** 晋级率动态阀门（前 10 交易日截尾均值，缺失回退 25 —— 与原系统一致） */
   const gate = fb?.trend?.promotion_gate_10d ?? 25
@@ -54,6 +56,8 @@ export function FeedbackCard() {
     >
       {isError && <p role="status" className="text-11 text-warn">{fb ? '反馈更新失败，保留上次数据' : '反馈加载失败'}</p>}
       {fb?.generated_ts && <div className="num text-11 text-sub mb-2">数据时间 {fb.generated_ts}</div>}
+      <div className="mb-2"><AgeBadge freshness={freshness} /></div>
+      {fb?.sentiment_quality === 'partial' && <p role="status" className="text-11 text-warn mb-2">情绪分为部分数据评分，缺失 {fb.sentiment_inputs_missing?.length ?? '—'} 项输入；不等同于完整盘面。</p>}
       {fb?.market_missing && <p role="status" className="text-11 text-warn mb-2">两市成交额或全市场涨跌家数缺失，情绪分未包含量能与广度修正。</p>}
       {fb && !fb.error ? (
         <>

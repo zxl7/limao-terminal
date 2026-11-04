@@ -117,6 +117,93 @@ function inspect(route: string, schema: ZodType, data: unknown): void {
 
 // ────────────────────────────────────────────────────────────────
 
+// ────────────────────────────────────────────────────────────────
+// 数据新鲜度副作用通道（数据基座 · 工件 F）
+//
+// serve.py / vite 插件在响应头注入 X-Data-*；本通道把这些信息收集起来，
+// 供 <AgeBadge> / 数据新鲜度面板订阅，不改动 getJson 的返回类型
+// （对所有调用方零侵入，契约守卫用同一套机制）。
+// ────────────────────────────────────────────────────────────────
+
+/** 某路由产物的新鲜度快照 */
+export interface RouteFreshness {
+  /** 是否过期（null=不检查：retired / manual / on-demand） */
+  stale: boolean | null
+  /** 距文件 mtime 的秒数 */
+  ageSec: number | null
+  /** 是否已停更（无写入方） */
+  retired: boolean | null
+  /** 数据写入方（ASCII，可能为空） */
+  producer: string | null
+  /** 最近请求失败时不得沿用上次健康状态 */
+  error?: boolean
+  /** 采集时间戳 */
+  at: number
+}
+
+export const freshnessByRoute = new Map<string, RouteFreshness>()
+let freshnessVersion = 0
+const freshnessListeners = new Set<() => void>()
+
+function bumpFreshnessVersion(): void {
+  freshnessVersion += 1
+  for (const l of freshnessListeners) l()
+}
+
+/** 订阅新鲜度变化；返回取消订阅函数 */
+export function subscribeFreshness(listener: () => void): () => void {
+  freshnessListeners.add(listener)
+  return () => {
+    freshnessListeners.delete(listener)
+  }
+}
+
+/** 当前新鲜度版本（useSyncExternalStore 的 snapshot） */
+export function getFreshnessVersion(): number {
+  return freshnessVersion
+}
+
+function headerTri(v: string | null): boolean | null {
+  if (v === '1') return true
+  if (v === '0') return false
+  return null
+}
+
+function headerNum(v: string | null): number | null {
+  if (v == null || !/^\d+(?:\.\d+)?$/.test(v.trim())) return null
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+/** getJson 内部调用：把响应新鲜度头收进副作用通道（仅变更时触发订阅） */
+export function recordFreshness(
+  route: string,
+  raw: { stale: string | null; age: string | null; retired: string | null; producer: string | null },
+): void {
+  const next: RouteFreshness = {
+    stale: headerTri(raw.stale),
+    ageSec: headerNum(raw.age),
+    retired: headerTri(raw.retired),
+    producer: raw.producer || null,
+    at: Date.now(),
+  }
+  const prev = freshnessByRoute.get(route)
+  if (
+    prev &&
+    prev.stale === next.stale &&
+    prev.ageSec === next.ageSec &&
+    prev.retired === next.retired &&
+    prev.producer === next.producer &&
+    !prev.error
+  ) {
+    freshnessByRoute.set(route, next)
+    bumpFreshnessVersion()
+    return
+  }
+  freshnessByRoute.set(route, next)
+  bumpFreshnessVersion()
+}
+
 export interface GetJsonOptions {
   timeoutMs?: number
   /** 传入则做结构守卫校验（失败不阻塞） */
@@ -184,12 +271,23 @@ export async function getJson<T>(route: string, options: GetJsonOptions = {}): P
     }
 
     const data: unknown = await res.json()
+    // 只有成功解析 JSON 后才接受健康头；HTML/损坏 JSON 不得短暂点亮绿灯。
+    recordFreshness(route, {
+      stale: res.headers.get('X-Data-Stale'),
+      age: res.headers.get('X-Data-Age'),
+      retired: res.headers.get('X-Data-Retired'),
+      producer: res.headers.get('X-Data-Producer'),
+    })
     if (guard) inspect(route, guard, data)
 
     // ⚠️ 返回**原始对象**，绝不用 schema 解析结果：
     //    zod 默认 strip 未知键，用解析结果会静默丢弃原系统新增字段。
     return data as T
   } catch (e) {
+    freshnessByRoute.set(route, {
+      stale: null, ageSec: null, retired: null, producer: null, error: true, at: Date.now(),
+    })
+    bumpFreshnessVersion()
     if (e instanceof DataUnavailableError) throw e
     const detail =
       e instanceof DOMException && e.name === 'AbortError'

@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROUTES, HEALTH_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from './src/shared/api/routes.ts'
-import { readRoute, healthPayload, resolveDataRoot } from './scripts/lib/read-route.mjs'
+import { readRoute, healthPayload, freshnessHeaders, resolveDataRoot } from './scripts/lib/read-route.mjs'
 import { parseDataQuery, readDataQuery } from './scripts/lib/data-query.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -21,10 +21,19 @@ const DATA_ROOT = resolveDataRoot(__dirname, DEFAULT_DATA_ROOT, DATA_ROOT_ENV)
 // 避免「页面能看、体检说没数据」这类因实现漂移产生的互相矛盾。
 // ────────────────────────────────────────────────────────────────
 
-function sendJson(res: import('node:http').ServerResponse, code: number, body: unknown) {
+function sendJson(
+  res: import('node:http').ServerResponse,
+  code: number,
+  body: unknown,
+  extraHeaders?: Record<string, string>,
+) {
   res.statusCode = code
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
+  // 数据基座（工件 F）：注入新鲜度头，使前端 AgeBadge / 新鲜度面板在 dev 也能工作
+  if (extraHeaders) {
+    for (const [k, v] of Object.entries(extraHeaders)) res.setHeader(k, v)
+  }
   res.end(JSON.stringify(body))
 }
 
@@ -70,7 +79,7 @@ function dataApiPlugin(): Plugin {
         }
 
         try {
-          sendJson(res, 200, readRoute(DATA_ROOT, def))
+          sendJson(res, 200, readRoute(DATA_ROOT, def), freshnessHeaders(def, DATA_ROOT))
         } catch (e) {
           // 数据缺失是**可预期状态**，不是异常：盘前大量文件尚未生成
           sendJson(res, 404, {

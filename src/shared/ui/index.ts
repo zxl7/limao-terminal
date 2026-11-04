@@ -5,6 +5,7 @@
  * 如果它只对「行情」有意义（如连板天梯卡），它属于 features/market/components。
  */
 export { Card, CardBadge } from './Card'
+export { AgeBadge } from './AgeBadge'
 export { EmptyState, StagePlaceholder } from './EmptyState'
 export { Board, BoardItem, BoardWide, Zone, ZoneRow } from './Board'
 export { Kpi, KpiStrip } from './Kpi'

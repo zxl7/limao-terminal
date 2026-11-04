@@ -48,6 +48,16 @@ export { DossierView } from './components/DossierView'
 // AI 台账「判断明细」= AI 判断 × 尾盘财富密码接力卡真实字段（区间/量能/指标/标签/理由）
 export { AiJudgeDetail, compareJudgeRows, type JudgeCall, type JudgeRow } from './components/AiJudgeDetail'
 
+// 财富密码「竞价命中逻辑」= 命中的票为什么被选中（方向强度 → 身位 → 量能封板 → 落点）
+export {
+  AiHitLogic,
+  buildThemeStrength,
+  isMarketOnlyBlock,
+  MARKET_LEVEL_CONDITIONS,
+  type AiHitLogicProps,
+  type ThemeStrength,
+} from './components/AiHitLogic'
+
 // 自动化任务台账解析（`config/tasks.yaml` 原文 → 条目 · 只解析所需子集）
 export { parseTaskLedger } from './lib/task-ledger'
 

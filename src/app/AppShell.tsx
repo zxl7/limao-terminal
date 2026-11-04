@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router'
 import { TideAlgorithmStrip } from '@/features/market'
 import { TopBar } from './TopBar'
 import { RightRail } from './RightRail'
+import { DataFreshnessPanel } from './DataFreshnessPanel'
 import { Sidebar, TopNavFallback } from './Sidebar'
 import { preloadPage } from './lazyRoute'
 import type { PagePath } from './pages'
@@ -94,7 +95,9 @@ export const TABS: readonly TabDef[] = [
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
-  { to: '/auction', label: '竞价决策', group: '决策' },
+  // ⛔ 2026-11-04 合并：原「竞价决策」(`/auction`) 已并入「财富密码」(`/ai`) 的
+  //    「今日执行」tab —— 两页曾是同一份决策档案的两个副本（环境/接力/观察三块
+  //    完全重复）。导航不再单列；路由 `/auction` 保留可直达，避免旧链接失效。
   { to: '/execution-audit', label: '执行审计', group: '决策' },
 
   // ── 段4 · 题材与资金（日频）──
@@ -150,6 +153,7 @@ export function AppShell() {
         {/* 主内容区：≥3xl 与 RightRail 并排 */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain px-4 lg:px-5 3xl:px-6 py-3">
+            <div className="mb-3"><DataFreshnessPanel /></div>
             <TideAlgorithmLayer />
             <Outlet />
           </main>

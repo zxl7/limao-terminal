@@ -162,31 +162,39 @@ export function readRoute(dataRoot, def) {
  * @param {string} dataRoot 数据根目录（绝对路径）
  * @param {Array<[string, object]>} fileRoutes 形如 [['/api/market/latest', {file, desc}], ...]
  */
+/** 与 readRoute 的名称排序和 limit 选择一致；只探测匹配的实际文件，绝不使用目录 mtime。 */
+function routeProbe(dataRoot, def) {
+  const base = path.join(dataRoot, def.dir ?? '')
+  let candidates = []
+  if (def.dir && def.dirPattern && def.file) {
+    const re = new RegExp(def.dirPattern)
+    const dirs = (safeReaddir(base) ?? []).filter((name) => {
+      try { return re.test(name) && fs.statSync(path.join(base, name)).isDirectory() } catch { return false }
+    }).sort()
+    candidates = (def.mode === 'all' ? (def.limit ? dirs.slice(-def.limit) : dirs) : dirs.slice(-1))
+      .map((name) => path.join(base, name, def.file))
+  } else if (def.file) {
+    candidates = [path.join(dataRoot, def.file)]
+  } else if (def.dir && def.pattern) {
+    const re = new RegExp(def.pattern)
+    const files = (safeReaddir(base) ?? []).filter((name) => re.test(name)).sort()
+    candidates = (def.mode === 'all' ? (def.limit ? files.slice(-def.limit) : files) : files.slice(-1))
+      .map((name) => path.join(base, name))
+  }
+  const file = candidates.at(-1)
+  if (!file) return null
+  try { return fs.statSync(file).isFile() ? file : null } catch { return null }
+}
+
 export function healthPayload(dataRoot, fileRoutes) {
   const now = Date.now()
   return {
     data_root: dataRoot,
     ts: new Date().toISOString(),
     files: fileRoutes.map(([route, def]) => {
-      // 目录型路由：新鲜度取「目录内**mtime 最新**文件」的 mtime。
-      // ⛔ 不能按文件名字典序取 at(-1)：历史日期命名不保证单调，会取到旧文件。
+      // 与生产代理一致：探测返回范围中按名称排序的最后一期，缺失不回退旧文件。
       const target = def.file ?? def.dir
-      const abs = path.join(dataRoot, target)
-      let probe = abs
-      if (!def.file && def.dir) {
-        const names = safeReaddir(abs) ?? []
-        const candidates = names
-          .map((name) => {
-            try {
-              return { name, mtimeMs: fs.statSync(path.join(abs, name)).mtimeMs }
-            } catch {
-              return null
-            }
-          })
-          .filter(Boolean)
-          .sort((a, b) => a.mtimeMs - b.mtimeMs)
-        if (candidates.length) probe = path.join(abs, candidates.at(-1).name)
-      }
+      const probe = routeProbe(dataRoot, def)
       try {
         const st = fs.statSync(probe)
         return {
@@ -214,6 +222,48 @@ export function healthPayload(dataRoot, fileRoutes) {
         }
       }
     }),
+  }
+}
+
+/**
+ * cadence → 过期阈值（秒）。与 `common/data_catalog.py::STALE_SEC` 保持一致。
+ * null = 不检查（retired / manual / on-demand）。
+ */
+const STALE_SEC = { intraday: 1800, daily: 172800, manual: null, 'on-demand': null }
+
+/**
+ * 计算某路由产物的新鲜度响应头（与 serve.py `route_freshness` 对齐）。
+ *
+ * 开发期由 vite 中间件注入，使前端 <AgeBadge> / 数据新鲜度面板在本地也能工作，
+ * 与生产（serve.py 注入 X-Data-*）行为一致。命名刻意对齐：
+ *   X-Data-Age / X-Data-Stale / X-Data-Retired / X-Data-Producer
+ *
+ * @param {object} def 路由定义（routes.ts 的 RouteDef）
+ * @param {string} dataRoot 数据根目录（绝对路径）
+ * @returns {Record<string,string>} 要注入的响应头
+ */
+export function freshnessHeaders(def, dataRoot) {
+  const target = def.file ?? def.dir
+  if (!target) return {}
+  const probe = routeProbe(dataRoot, def)
+  try {
+    const st = fs.statSync(probe)
+    const age = Math.round((Date.now() - st.mtimeMs) / 1000)
+    const staleSec = def.retired ? null : STALE_SEC[def.cadence] ?? null
+    const isStale = staleSec == null ? null : age > staleSec
+    return {
+      'X-Data-Age': String(age),
+      'X-Data-Stale': isStale == null ? '' : isStale ? '1' : '0',
+      'X-Data-Retired': def.retired ? '1' : '0',
+      'X-Data-Producer': '',
+    }
+  } catch {
+    return {
+      'X-Data-Age': '',
+      'X-Data-Stale': '',
+      'X-Data-Retired': def.retired ? '1' : '0',
+      'X-Data-Producer': '',
+    }
   }
 }
 

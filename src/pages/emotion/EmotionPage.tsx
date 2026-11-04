@@ -140,10 +140,11 @@ export function Component() {
         const liveRow = {
           ...(existingIndex >= 0 ? dailyRows[existingIndex] : { date: today }),
           date: today,
-          sentiment_score: current.sentiment_detail?.score ?? null,
-          sentiment_label: current.sentiment_detail?.label ?? current.sentiment ?? null,
+          sentiment_score: current.sentiment_detail?.source === 'feedback_matrix' ? current.sentiment_detail.score : null,
+          sentiment_label: current.sentiment_detail?.source === 'feedback_matrix' ? current.sentiment_detail.label : null,
           zt_count: liveZt?.total ?? current.total_zt ?? null,
-          nuke_count: current.broken?.count ?? null,
+          sentiment_model: current.sentiment_detail?.model ?? undefined,
+          nuke_count: feedback.data?.date === today ? feedback.data.nuke_count : null,
           generated_ts: current.ts,
         }
         if (existingIndex >= 0) dailyRows[existingIndex] = liveRow

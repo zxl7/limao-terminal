@@ -42,6 +42,7 @@ import type {
   RelayEffect,
   LearningConfig,
   PoolCallFile,
+  ScreenFile,
   PromoBacktest,
   RuleConfigFile,
   ShortSpiritConfig,
@@ -152,6 +153,8 @@ export interface RouteTypeMap {
   '/api/decision/manifest': DecisionManifest
   /** 09:25 池内裁决终态（`view` 定音 + 买入名额序 · ⛔ 非昨日预案 `bias`） */
   '/api/decision/pool-call': DatedFile<PoolCallFile>[]
+  /** 全量涨停逐票过筛（pass/watch_only/reject + 理由链 · 回答「为什么只剩这几只」） */
+  '/api/decision/screen': DatedFile<ScreenFile>[]
 
   // ── 八、AI 判断平行台账 ──
   '/api/ai/view': DatedFile<AiViewFile>[]
@@ -369,6 +372,12 @@ export const api = {
    *    展示「今晨实际怎么做的」必须用本路由。
    */
   decisionPoolCall: () => fetchRoute('/api/decision/pool-call'),
+  /**
+   * 全量涨停逐票过筛结论（近 5 期）。
+   * ⛔ 与 `decisionCandidates` 不可互替：候选只有**入选**的票，本路由是**全市场涨停逐票**的
+   *    pass / watch_only / reject + 理由链 —— 回答「48 只涨停为什么只剩这几只」。
+   */
+  decisionScreen: () => fetchRoute('/api/decision/screen'),
 
   // ── 八、AI 判断平行台账 ──
   /** AI 判断（参与/放弃/观察 + 理由） */

@@ -160,7 +160,9 @@ export function buildCycleTemperature(
     return {
       date: row.date,
       sentiment: sentimentValues[index],
-      sentimentMa3: ma3(sentimentValues, index),
+      sentimentMa3: dailyRows.slice(Math.max(0, index - 2), index + 1)
+        .every((day) => (day.sentiment_model ?? 'legacy_v2') === (row.sentiment_model ?? 'legacy_v2'))
+        ? ma3(sentimentValues, index) : null,
       phase: phaseOfScore(sentimentValues[index]),
       promoteRate: finite(row.promote_rate),
       ztCount: zt?.total ?? null,

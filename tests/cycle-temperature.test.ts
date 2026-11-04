@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildCycleTemperature, phaseOfScore } from '@/features/analytics'
+import { FeedbackMatrixSchema } from '@/shared/api/schemas'
+import { buildTideState } from '@/features/market/lib/tide'
 
 const zt = (date: string, total: number, zbc: number) => ({
   data: {
@@ -91,6 +93,68 @@ describe('周期温度总览内核', () => {
       { date: '2026-10-14' } as never,
       [],
     )).not.toThrow()
+  })
+
+  it('反馈解析保留模型与缺失质量，不把空分判成冰点', () => {
+    const parsed = FeedbackMatrixSchema.parse({
+      sentiment_score: null, sentiment_model: 'continuous_v3',
+      sentiment_quality: 'partial', sentiment_inputs_missing: ['idx_avg'],
+      source_snapshot_ts: '2026-11-04T10:00:00+08:00',
+    })
+    expect(parsed.sentiment_model).toBe('continuous_v3')
+    expect(parsed.sentiment_inputs_missing).toEqual(['idx_avg'])
+    expect(buildTideState(parsed as never).regime).toBe('unknown')
+  })
+
+  it('诊断解析保留维度/覆盖率，未观测因子不被当成 0 证据', () => {
+    const parsed = FeedbackMatrixSchema.parse({
+      sentiment_score: 5.3, sentiment_model: 'continuous_v3',
+      sentiment_breakdown: {
+        model: 'continuous_v3', decomposable: true,
+        score: 5.3, label: '修复', strength: 0.4125,
+        observed_dimensions: 9, observed_factors: 9, total_factors: 12,
+        coverage: 0.75, coverage_grade: 'medium',
+        missing_factors: ['market_amount_yi', 'breadth_ratio', 'regulatory_pressure'],
+        dimensions: [{
+          key: 'loss', label: '亏钱效应', value: -2.235, observed: true,
+          factors: [{ key: 'loss', label: '核按钮/真破位', value: -2.25, observed: true, source: 'quotes+ma' }],
+        }],
+        support: { key: 'expansion', label: '涨停扩张', value: 2 },
+        drag: { key: 'loss', label: '亏钱效应', value: -2.235 },
+      },
+    })
+    const bd = parsed.sentiment_breakdown
+    expect(bd?.coverage_grade).toBe('medium')
+    expect(bd?.total_factors).toBe(12)
+    expect(bd?.missing_factors).toHaveLength(3)
+    expect(bd?.dimensions?.[0].factors[0].observed).toBe(true)
+  })
+
+  it('诊断结构不符时显式报错，不静默当成有效解释', () => {
+    const bad = FeedbackMatrixSchema.safeParse({
+      sentiment_breakdown: { dimensions: [{ key: 'loss', label: '亏钱效应', value: 'not-a-number', observed: true, factors: [] }] },
+    })
+    expect(bad.success).toBe(false)
+  })
+
+  it('旧模型诊断可无维度，decomposable=false 也合规', () => {
+    const parsed = FeedbackMatrixSchema.parse({
+      sentiment_breakdown: { model: 'legacy_v2', decomposable: false, reason: 'legacy_v2 为整段独立公式，不做因子分解' },
+    })
+    expect(parsed.sentiment_breakdown?.decomposable).toBe(false)
+    expect(parsed.sentiment_breakdown?.dimensions).toBeUndefined()
+  })
+
+  it('新旧评分保留原值，但 MA3 不跨模型边界混算', () => {
+    const result = buildCycleTemperature([
+      { date: '2026-11-02', sentiment_score: 1 },
+      { date: '2026-11-03', sentiment_score: 10 },
+      { date: '2026-11-04', sentiment_score: 6, sentiment_model: 'continuous_v3' },
+      { date: '2026-11-05', sentiment_score: 6.5, sentiment_model: 'continuous_v3' },
+      { date: '2026-11-06', sentiment_score: 7, sentiment_model: 'continuous_v3' },
+    ], [], null, [])
+    expect(result.cycle.map((row) => row.sentiment)).toEqual([1, 10, 6, 6.5, 7])
+    expect(result.cycle.map((row) => row.sentimentMa3)).toEqual([null, null, null, null, 6.5])
   })
 
   it('阶段映射保持冰点、退潮、修复、升温、高潮顺序', () => {

@@ -91,17 +91,9 @@ export function ebbTone(severity: string | null | undefined): Tone {
 /**
  * 快照情绪定性（`latest.sentiment_detail.label`）→ 色调。
  *
- * ## ⚠️ 本项目有两套「情绪分」，阈值完全不同，套错就把意思反过来
- *
- * | 来源 | 字段 | 量纲 | 分档 |
- * |---|---|---|---|
- * | 盘中快照 | `latest.sentiment_detail.score` | **有符号加权求和**，实测 −4…+6 | 亢奋 ≥5 / 偏强 ≥3 / 修复 ≥1 / 分歧 ≥−1 / 退潮 <−1 |
- * | 反馈矩阵 | `feedback.sentiment_score` | **0–10** | `shared/lib/semantic.ts::sentimentClass`（≥6 红 / ≤2 绿） |
- *
- * 拿 `sentimentClass(-1)` 去判快照分，会把「分歧」判成「退潮绿」——
- * 数值恰好落进 0–10 口径的 ≤2 档。故此处**按 label 分档**而非按数值：
- * label 是脚本（`intraday_pulse.py::compute_sentiment`）已定性的结果，
- * 展示层重算阈值必然与其漂移。
+ * 新快照由 feedback_matrix 同轮回填 continuous_v3（1–10），采集未完成时分数为空。
+ * 历史快照仍保留旧有符号分，禁止在展示层换算或覆盖历史。
+ * 此处始终消费产侧标签，不在组件内重复评分阈值。
  */
 export function sentimentLabelTone(label: string | null | undefined): Tone {
   if (!label) return 'neutral'

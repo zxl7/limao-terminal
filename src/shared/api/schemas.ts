@@ -56,7 +56,13 @@ const CountNames = z.object({
 
 const SentimentDetail = z.object({
   label: s.optional(),
-  score: n.optional(),
+  score: nOrNull.optional(),
+  source: s.optional(),
+  status: s.optional(),
+  model: s.nullable().optional(),
+  source_at: s.optional(),
+  quality: s.nullish(),
+  inputs_missing: z.array(s).optional(),
   // ⚠️ 必须 nullable：早段封板率未统计时为 null（与「0%」是两回事）
   seal_rate: nOrNull.optional(),
 })
@@ -187,7 +193,7 @@ const EbbInfo = z.object({
   signals: z.array(s).optional(),
   max_board: n.optional(),
   total_zt: n.optional(),
-  sentiment_score: n.optional(),
+  sentiment_score: nOrNull.optional(),
   sentiment_label: s.optional(),
 })
 
@@ -338,6 +344,52 @@ export const ShortSpiritSignalsSchema = z.object({
 // FeedbackMatrix —— /api/market/feedback
 // ════════════════════════════════════════════════════════════════
 
+/**
+ * 情绪诊断 —— 后端 `sentiment_breakdown`。
+ *
+ * 只做结构守卫：真实校验的是「后端是否还在用同一套字段口径」。
+ * ⛔ 不校验因子数量、不校验覆盖率达到某个值：那是业务判断，不是契约。
+ */
+const SentimentFactorSchema = z.object({
+  key: s,
+  label: s,
+  value: n,
+  observed: b,
+  source: s.optional(),
+})
+
+const SentimentDimensionSchema = z.object({
+  key: s,
+  label: s,
+  value: n,
+  observed: b,
+  factors: z.array(SentimentFactorSchema),
+})
+
+const SentimentDimensionRefSchema = z.object({
+  key: s,
+  label: s,
+  value: n,
+})
+
+export const SentimentBreakdownSchema = z.object({
+  model: s.optional(),
+  decomposable: b.optional(),
+  score: nOrNull.optional(),
+  label: s.optional(),
+  strength: nOrNull.optional(),
+  dimensions: z.array(SentimentDimensionSchema).optional(),
+  observed_dimensions: n.optional(),
+  observed_factors: n.optional(),
+  total_factors: n.optional(),
+  coverage: nOrNull.optional(),
+  coverage_grade: s.optional(),
+  missing_factors: z.array(s).optional(),
+  support: SentimentDimensionRefSchema.nullish(),
+  drag: SentimentDimensionRefSchema.nullish(),
+  reason: s.optional(),
+})
+
 export const FeedbackMatrixSchema = z.object({
   generated_ts: s.optional(),
   date: s.optional(),
@@ -392,8 +444,13 @@ export const FeedbackMatrixSchema = z.object({
       }),
     )
     .optional(),
-  sentiment_score: n.optional(),
+  sentiment_score: nOrNull.optional(),
   sentiment_label: s.optional(),
+  sentiment_model: s.optional(),
+  sentiment_quality: s.optional(),
+  sentiment_inputs_missing: z.array(s).optional(),
+  sentiment_breakdown: SentimentBreakdownSchema.nullish(),
+  source_snapshot_ts: s.nullish(),
   regulatory_pressure: n.optional(),
   trend: z
     .object({
@@ -597,7 +654,7 @@ export const RotationDataSchema = z.object({
     .optional(),
   market_context: z
     .object({
-      sentiment_score: n.optional(),
+      sentiment_score: nOrNull.optional(),
       nuke_count: n.optional(),
       promote_rate: n.optional(),
       outflow_top: z.array(SectorFlowFull).optional(),
@@ -839,7 +896,7 @@ const DecisionDossierSchema = z.object({
   regime: s.optional(),
   environment: z
     .object({
-      sentiment_score: n.optional(),
+      sentiment_score: nOrNull.optional(),
       sentiment_label: s.optional(),
       promote_rate: n.optional(),
       nuke_count: n.optional(),
@@ -858,7 +915,7 @@ const DecisionDossierSchema = z.object({
       indices: z.array(IndexQuote).optional(),
       avg_index_pct: n.optional(),
       sentiment: s.optional(),
-      sentiment_score: n.optional(),
+      sentiment_score: nOrNull.optional(),
       total_zt: n.optional(),
     })
     .catchall(z.unknown())
@@ -930,6 +987,7 @@ export const EmotionDailySchema = z.array(
         prev_max_boards: nOrNull.optional(),
         sentiment_score: nOrNull.optional(),
         sentiment_label: s.nullish(),
+        sentiment_model: s.optional(),
         generated_ts: s.optional(),
       })
       .nullable()

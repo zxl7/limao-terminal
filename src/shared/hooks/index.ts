@@ -6,3 +6,4 @@
  */
 export { useNow } from './useNow'
 export { useContractIssues, useContractIssueCount } from './useContractIssues'
+export { useRouteFreshness, useRouteFreshnesses } from './useRouteFreshness'

@@ -249,6 +249,18 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'wealth_code/cache', pattern: '^pool_call-\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 3, cadence: 'daily',
     desc: '09:25 池内裁决终态（昨日预案 bias × 今晨竞价 → view 定音 + 买入名额序 + 竞价涨幅/量能）',
   },
+  /**
+   * 全量过筛逐票结论（`wealth_code/core/daily_screen.py` 产出）。
+   *
+   * 与 `candidates` 的区别：`candidates` 只有**入选**的票（选股卡产物），
+   * 本路由是**全市场涨停逐票**的 pass / watch_only / reject 结论 + 理由链 ——
+   * 回答「今天 48 只涨停里，为什么只剩这几只」。
+   * `ENABLE_DAILY_SCREEN=0` 时该文件不更新，前端按「未启用」降级。
+   */
+  '/api/decision/screen': {
+    dir: 'cache/daily_screen', pattern: '^screen_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 5, cadence: 'daily',
+    desc: '全量涨停逐票过筛结论（pass/watch_only/reject + 理由链 + 拒因分布）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 八、AI 判断平行台账（2026-09-10 用户定 · 两本独立账）

@@ -23,6 +23,10 @@ export {
   subscribeContractIssues,
   getContractVersion,
   type ContractIssue,
+  freshnessByRoute,
+  subscribeFreshness,
+  getFreshnessVersion,
+  type RouteFreshness,
 } from './client'
 
 // 契约守卫

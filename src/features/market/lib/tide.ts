@@ -37,7 +37,7 @@ export interface TideState {
 export function buildTideState(
   fb: FeedbackMatrix | null | undefined,
 ): TideState {
-  if (!fb || fb.error) {
+  if (!fb || fb.error || fb.sentiment_score == null || !Number.isFinite(fb.sentiment_score)) {
     return {
       regime: 'unknown',
       phase: 'unknown',
@@ -46,7 +46,7 @@ export function buildTideState(
       action: '等待反馈矩阵恢复后再判断环境',
       tone: 'neutral',
       evidence: [],
-      caveat: fb?.error || '反馈矩阵未生成',
+      caveat: fb?.error || (fb ? '情绪评分缺失，原始风险指标仍应独立查看' : '反馈矩阵未生成'),
     }
   }
 

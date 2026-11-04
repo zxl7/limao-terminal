@@ -27,7 +27,8 @@ export interface RouteDefLike {
    * 解析交给消费方 —— 见 `src/features/analytics/lib/task-ledger.ts`）。
    */
   format?: 'json' | 'jsonl' | 'text'
-  cadence?: 'intraday' | 'daily' | 'manual'
+  retired?: boolean
+  cadence?: 'intraday' | 'daily' | 'manual' | 'on-demand'
   desc?: string
 }
 
@@ -51,6 +52,8 @@ export declare function healthPayload(
     size: number
   }>
 }
+
+export declare function freshnessHeaders(def: RouteDefLike, dataRoot: string): Record<string, string>
 
 /** 解析数据根目录：环境变量优先，其次相对 projectRoot 的默认路径 */
 export declare function resolveDataRoot(

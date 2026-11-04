@@ -316,30 +316,62 @@ export function Component() {
             </div>
 
             {/* ── 涨停股清单 ── */}
-            <div>
-              <div className="text-12 text-sub mb-1">当日涨停股（{expanded.zt_stocks?.length ?? 0}）</div>
-              <DataTable
-                rows={tradableStocks(expanded.zt_stocks)}
-                rowKey={(r) => r.code}
-                dense
-                empty="无涨停股明细"
-                columns={[
-                  {
-                    label: '个股',
-                    cell: (r) => (
-                      <span>
-                        <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
+            {/* ⛔ 2026-11-04 修「显示不全」三连：
+                ① 标题原用 `zt_stocks.length`（含 688），列表却走 `tradableStocks` 滤掉 688
+                   → 「说 20 只只显示 10 只」，看着像数据缺失。
+                   现标题与列表**同一个数组**，数字必然一致。
+                ② 688 被静默丢弃 → 界面必须说明「另有 N 只科创板（无权限）」，
+                   否则用户以为系统漏抓了。
+                ③ `zt_stocks` 源头硬截断 20 只（`intraday_pulse.py` `[:20]`），
+                   `zt_count` 却是真实家数 → 两者不等时明确标出「仅列前 N 只」。
+             */}
+            {(() => {
+              const all = expanded.zt_stocks ?? []
+              const shown = tradableStocks(all)
+              const starCount = all.length - shown.length
+              const capped = expanded.zt_count > all.length
+              return (
+                <div>
+                  <div className="mb-1 flex flex-wrap items-baseline gap-x-2 text-12 text-sub">
+                    <span>
+                      当日涨停股（<span className="num text-txt">{shown.length}</span>
+                      {capped && <span className="num"> / {expanded.zt_count}</span>}）
+                    </span>
+                    {starCount > 0 && (
+                      <span className="text-11" title="科创板无交易权限，不计入可买列表">
+                        另有 {starCount} 只科创板
                       </span>
-                    ),
-                  },
-                  {
-                    label: '涨幅',
-                    num: true,
-                    cell: (r) => <span className="text-up font-semibold">{n1(r.pct)}%</span>,
-                  },
-                ]}
-              />
-            </div>
+                    )}
+                    {capped && (
+                      <span className="text-11" title="数据源仅落前 20 只成分">
+                        源仅存 {all.length} 只
+                      </span>
+                    )}
+                  </div>
+                  <DataTable
+                    rows={shown}
+                    rowKey={(r) => r.code}
+                    dense
+                    empty="无涨停股明细"
+                    columns={[
+                      {
+                        label: '个股',
+                        cell: (r) => (
+                          <span>
+                            <StockLink code={r.code} className="text-txt">{r.name}</StockLink>
+                          </span>
+                        ),
+                      },
+                      {
+                        label: '涨幅',
+                        num: true,
+                        cell: (r) => <span className="text-up font-semibold">{n1(r.pct)}%</span>,
+                      },
+                    ]}
+                  />
+                </div>
+              )
+            })()}
           </div>
 
           {/* ── 定性结论（原系统生成，不做改写）── */}

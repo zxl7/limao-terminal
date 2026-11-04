@@ -269,6 +269,18 @@ export const analyticsQueries = {
       refetchInterval: livePollMs,
       staleTime: 60_000,
     }),
+  /**
+   * 全量涨停逐票过筛结论（近 5 期）。
+   *
+   * ⛔ 与 `decisionCandidates` 不可互替：候选只有入选的票，本路由是全量逐票
+   *    pass / watch_only / reject + 理由链 —— 「48 只涨停为什么只剩这几只」只能从这读。
+   */
+  decisionScreen: () =>
+    queryOptions({
+      queryKey: ['decision', 'screen'] as const,
+      queryFn: api.decisionScreen,
+      staleTime: DAILY_STALE,
+    }),
 
   // ══════════════ AI 判断平行台账 ══════════════
   /** AI 判断（参与/放弃/观察） */
