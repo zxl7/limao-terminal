@@ -99,7 +99,8 @@ describe('AppShell 导航渲染', () => {
     expect(nav.querySelector('a[href="/data"]')?.textContent).toContain('数据底座')
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
-    const realtimeTo = ['/', '/timeline', '/mainline', '/effect', '/flow', '/reflow', '/rotation']
+    // 2026-11-03：财富密码（/ai）提到时间轴之后，实时段变 8 项
+    const realtimeTo = ['/', '/timeline', '/ai', '/mainline', '/effect', '/flow', '/reflow', '/rotation']
     const actual = Array.from(links)
       .slice(0, realtimeTo.length)
       .map((a) => a.getAttribute('href'))
@@ -114,10 +115,10 @@ describe('AppShell 导航渲染', () => {
     expect(priority.map((a) => a.textContent?.replace('★', '').trim())).toEqual([
       '盘中实时',
       '日内时间轴',
+      '财富密码',
       '主线题材',
       '情绪周期',
       '连板日观察',
-      'AI竞价',
       'AI尾盘潜伏',
       '数据底座',
     ])

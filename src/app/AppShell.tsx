@@ -72,6 +72,10 @@ export const TABS: readonly TabDef[] = [
   // ── 段1 · 实时（cadence=intraday）· 按短线交易优先级 ──
   { to: '/', label: '盘中实时', end: true, group: '实时', priority: true },
   { to: '/timeline', label: '日内时间轴', group: '实时', priority: true },
+  // ⚠️ 页面级例外（2026-11-03 用户要求）：「AI竞价」更名「财富密码」并提到时间轴之下 ——
+  //    它读的是 09:25 裁决与次日预案（日频），cadence 并非 intraday；放进实时段是
+  //    **按使用时机**做的导航决策（每天开盘前后第一个要看的就是它），与 /timeline 同理。
+  { to: '/ai', label: '财富密码', group: '实时', priority: true },
   { to: '/mainline', label: '主线题材', group: '实时', priority: true },
   { to: '/effect', label: '赚钱效应', group: '实时' },
   { to: '/flow', label: '资金流向', group: '实时' },
@@ -86,7 +90,6 @@ export const TABS: readonly TabDef[] = [
   { to: '/gene', label: '股性基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
-  { to: '/ai', label: 'AI竞价', group: '决策', priority: true },
   { to: '/ambush', label: 'AI尾盘潜伏', group: '决策', priority: true },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },

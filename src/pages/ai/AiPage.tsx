@@ -692,7 +692,7 @@ export function Component() {
 
         {!view.isLoading && !viewRows.length && !decRows.length && !navRows.length && (
           <EmptyState
-            text="AI竞价尚无数据"
+            text="财富密码尚无数据"
             hint="wealth_code/cache/ai_view/ 与 ai_decisions.jsonl 未生成"
           />
         )}

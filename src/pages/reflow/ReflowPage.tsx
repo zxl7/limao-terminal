@@ -119,8 +119,11 @@ function tagTone(t: PhaseTone): 'neutral' | 'up' | 'down' | 'rec' | 'warn' {
   return t
 }
 
-/** 表格里的周期格：主标签 + 第 N 天，title 带上判定依据 */
-function PhaseCell({ c }: { c: RotationCandidate }) {
+/**
+ * 表格里的周期格：主标签 + 第 N 天，title 带上判定依据。
+ * 导出给测试直接渲染（避免为验一个标签去造整页数据）。
+ */
+export function PhaseCell({ c }: { c: RotationCandidate }) {
   const p = phaseOf(c)
   if (!p) {
     return (
@@ -324,12 +327,14 @@ export function Component() {
             质量最差（不追）；<b className="text-txt">分歧</b> = 掉 30% 以上，历史上 2/3 会回流，
             但方向只能等次日竞价定；<b className="text-txt">退潮</b> = 反抽没过前高，线走完了。
           </p>
-          {/* ⚠️ 口径必须写明：相位用的是「该题材历史成分股今日涨停数」，
-              和涨停家数图（选股宝官方归属家数）不是同一个口径，一票可能被归到别的题材，
-              所以这里的数会偏大。不写清楚，用户会看到两个不一样的数字。 */}
+          {/* ⚠️ 口径必须写明（2026-11-03 用户拍板「先按选股宝走」）：
+              相位家数 = **当日被选股宝归到这条线、且今日涨停**的票数，
+              与涨停家数图同源。此前用的是「历史成员今天有几只涨停」，
+              会把照明/造纸/园林混进「大消费」，两套数打架时无从查起。 */}
           <p className="text-sub text-11 mt-0.5 leading-relaxed">
-            家数口径：按<b className="text-txt">该题材历史成分股今日涨停数</b>计，
-            可能高于官方归属家数（同一只票可能被划到别的题材）。
+            家数口径：按<b className="text-txt">选股宝题材归属</b>（今天属于这条线、且今日涨停）计，
+            与上面涨停家数图同源。仅在题材快照里对不上这条线时，才退回「历史成员今天有几只涨停」
+            估算 —— 那种行会标<b className="text-txt">估算</b>，数偏高，只作参考。
           </p>
         </div>
 

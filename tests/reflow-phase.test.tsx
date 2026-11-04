@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import path from 'node:path'
 import { ROUTES, FILE_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from '@/shared/api'
+import type { RotationCandidate } from '@/shared/api'
 // eslint-disable-next-line
 import { readRoute, healthPayload, resolveDataRoot } from '../scripts/lib/read-route.mjs'
 
@@ -124,4 +125,63 @@ describe('题材回流 · 周期相位契约', () => {
     const c = await renderPage()
     expect(c.textContent).toContain('未取到')
   }, 30_000)
+})
+
+/**
+ * ## 家数口径契约（2026-11-03 用户拍板「先按选股宝走」）
+ *
+ * 相位家数改口径后，同一张表里可能同时存在两种来源：
+ * - `snapshot_plates` = 当日被选股宝归到这条线、且今日涨停 → **主口径**，与涨停家数图同源；
+ * - `pool_codes`      = 快照里对不上这条线，退回「历史成员今天有几只涨停」→ 偏高。
+ *
+ * ⛔ 两者必须**在屏幕上可区分**。不可区分 = 用户拿着一个偏高 30% 的数做决策，
+ * 而界面没有任何提示。这是本项目「数据必须可追溯」的最低要求。
+ */
+describe('周期格 · 家数口径必须可区分', () => {
+  const cand = (phase: Record<string, unknown> | null): RotationCandidate =>
+    ({
+      theme: '短剧/互动影游',
+      confidence: 0.5,
+      confidence_factors: {},
+      cooled_days: 1,
+      phase_v2: phase,
+    }) as unknown as RotationCandidate
+
+  const PHASE = {
+    schema: 'theme_phase_v1',
+    phase: 'start',
+    phase_cn: '启动',
+    day_n: 1,
+    peak: 29,
+    peak_idx: 8,
+    prev: 0,
+    cur: 29,
+    days: 9,
+    quality: 'full',
+    reason: '家数 29 是窗口最高',
+    action: '可参与',
+    src: 'snapshot_plates',
+  }
+
+  it('主口径（选股宝归属）不标「估算」', async () => {
+    const { PhaseCell } = await import('@/pages/reflow/ReflowPage')
+    const { container } = render(<PhaseCell c={cand(PHASE)} />)
+    expect(container.textContent).toContain('启动')
+    expect(container.textContent).not.toContain('估算')
+  })
+
+  it('兜底口径必须在屏幕上标「估算」', async () => {
+    const { PhaseCell } = await import('@/pages/reflow/ReflowPage')
+    const { container } = render(<PhaseCell c={cand({ ...PHASE, src: 'pool_codes' })} />)
+    expect(container.textContent).toContain('估算')
+  })
+
+  it('⛔ 相位缺失写「未取到」，不许默认成任一相位', async () => {
+    const { PhaseCell } = await import('@/pages/reflow/ReflowPage')
+    const { container } = render(<PhaseCell c={cand(null)} />)
+    expect(container.textContent).toContain('未取到')
+    for (const word of ['启动', '发酵', '高潮', '分歧', '退潮', '回流']) {
+      expect(container.textContent, `缺数据却渲染了「${word}」`).not.toContain(word)
+    }
+  })
 })
