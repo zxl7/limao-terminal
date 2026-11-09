@@ -250,6 +250,22 @@ export const ROUTES: Record<string, RouteDef> = {
     desc: '09:25 池内裁决终态（昨日预案 bias × 今晨竞价 → view 定音 + 买入名额序 + 竞价涨幅/量能）',
   },
   /**
+   * 池内台账 · **当日收盘结算**（`scripts/pool_ledger.py` 每日 16:00 产出）。
+   *
+   * 这是全系统唯一直接回答「**今天这些票到底赚没赚**」的数据：
+   * 口径 = 09:25 竞价价买 → 当日收盘卖，逐票一行，一字板与竞价封死**不计入统计**。
+   *
+   * ⚠️ 与 `pool-call` 的分工（都按执行日对齐）：
+   *   · `pool-call` = 09:25 的**事前**裁决（买不买、为什么）；
+   *   · `pool-ledger` = 收盘后的**事后**结算（买了会怎样、实际怎样）。
+   *   ⛔ 台账缺当日 K 线时脚本 `exit 2` **不落盘**，所以「今天没有这份文件」= 收盘行情还没到，
+   *      不是「今天没票」——前端必须按这个语义降级，不能显示成 0 收益。
+   */
+  '/api/decision/pool-ledger': {
+    dir: 'cache/pool_ledger', pattern: '^\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 20, cadence: 'daily',
+    desc: '池内台账（竞价价买→当日收盘卖的逐票结算 + 按裁决/今开分档汇总）',
+  },
+  /**
    * 全量过筛逐票结论（`wealth_code/core/daily_screen.py` 产出）。
    *
    * 与 `candidates` 的区别：`candidates` 只有**入选**的票（选股卡产物），
@@ -260,6 +276,18 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/decision/screen': {
     dir: 'cache/daily_screen', pattern: '^screen_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'all', limit: 5, cadence: 'daily',
     desc: '全量涨停逐票过筛结论（pass/watch_only/reject + 理由链 + 拒因分布）',
+  },
+  /**
+   * 竞价三环影子 · 逐日留痕对照表（2026-11-05 A 档落地）。
+   *
+   * 由 `scripts/sector_gap_daily_trace.py` 每天重算近 N 日窗口（幂等，无 append 状态）。
+   * ⚠️ 这是**研究留痕**，不是裁决产物：`linked_would_cut` 只表示「若开守卫会被砍」，
+   *    09:25 的 view/zone/quota/仓位从不读取它。页面必须把这一点写在最上面。
+   * 两套收益并列：当日收盘（评估代理） / 次交易日收盘（账本 T+1 结算口径代理）。
+   */
+  '/api/decision/sector-gap-trace': {
+    file: 'cache/sector_gap_trace/daily_trace.json', cadence: 'daily',
+    desc: '竞价三环影子逐日留痕（影子标记 × T+1 结算对账 · 恒不改裁决）',
   },
 
   // ══════════════════════════════════════════════════════════════
@@ -278,6 +306,21 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/ai/nav': {
     file: 'wealth_code/cache/ai_nav_history.jsonl', format: 'jsonl', cadence: 'daily',
     desc: 'AI 轨净值台账（首行由当日 15:30 接力卡 settle 落 · 早于该时点为空属正常）',
+  },
+
+  /**
+   * 回测战绩快照（`scripts/build_backtest_summary.py` 合成，唯一出口）。
+   *
+   * 由三份回放产物压成一份稳定 schema，指标（胜率/日均/复利/回撤/Sharpe/t 值/盈亏比）
+   * 全部在 Python 侧算好，前端只显示 —— ⛔ 不在前端重算，否则口径会双轨。
+   *
+   * ⚠️ 里面**并列**三套收益口径（策略=当日收盘 / T+1=次日收盘 / T+1 最保守=次日开盘）。
+   *    ⛔ 禁止相加、相减或互相换算：差额来自 A 股 T+1 制度，不是策略退化。
+   * ⚠️ 研究产物，**不是每日增量**：`generated_at` 是快照时刻，可能落后于当日台账。
+   */
+  '/api/research/backtest': {
+    file: 'cache/research/backtest_summary.json', cadence: 'manual',
+    desc: '回测战绩（三口径指标 + 逐层阶梯 + 逐日净值 + 真实台账战绩）',
   },
 
   // ══════════════════════════════════════════════════════════════

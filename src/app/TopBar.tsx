@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { marketQueries, sentimentLabelTone, type Tone } from '@/features/market'
+import { ebbTone, marketQueries, sentimentLabelTone, type Tone } from '@/features/market'
 import { bjTimeString, cn, fmtPct, isFrozenSnapshot, sessionName, sortLadderDesc, upcls } from '@/shared/lib'
 import { useContractIssues, useNow } from '@/shared/hooks'
 import { APP_CONFIG } from '@/shared/config'
@@ -151,7 +151,7 @@ export function TopBar() {
 
       {/* 退潮预警 —— 决策权重最高的一条，常驻可见 */}
       {ebb && (
-        <span className="flex-none whitespace-nowrap text-11 font-semibold text-head-warn">
+        <span className={cn('flex-none whitespace-nowrap text-11 font-semibold', headFromTone(ebbTone(ebb.severity, ebb.risk_level)))}>
           {ebb.severity}
         </span>
       )}

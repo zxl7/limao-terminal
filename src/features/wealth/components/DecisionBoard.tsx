@@ -1,36 +1,39 @@
-import type { DecisionDossier, PoolCallFile, ScreenFile } from '@/shared/api'
+import type { DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { BuyPlan } from './BuyPlan'
 import { EnvPanel } from './EnvPanel'
 import { PickCard } from './PickCard'
+import { PoolLedgerCard } from './PoolLedgerCard'
+import { TodayVerdict } from './TodayVerdict'
 
 /**
- * 财富密码决策档案 —— 一天的完整决策链，**五行**自上而下。
+ * 财富密码决策档案 —— 按用户的**四个真问题**排，不再按数据表排。
  *
- *   ① 环境结论（整排·两行）  —— 今天允不允许出手、为什么没买
- *   ② 明日标的（整排）       —— 明天怎么下单
- *   ③ 接力池（整排）         —— 可接力的票，逐票六维
- *   ④ 观察池（整排）         —— 待确认的票
+ * ## 2026-11-06 用户原话
  *
- * ⛔ 全量过筛**不在此页**（2026-11-04 用户「感觉没有存在必要」）：
- *    它是**调参诊断层**，不是下单依据。今天实证——过筛放行 70 只，
- *    后面被「最高板薄封」全拦掉，70 只一只没用上；而 `通过 70` 这个数字
- *    摆在决策页只会让人误以为「有 70 个机会」。已移到 AI 页独立「诊断」tab。
+ * 「不要那些看不懂的指标，其他的你看着优化一下，总之目的方便我看
+ *  **买什么、赚没赚、为什么买、为什么没买**」
  *
- * ## 2026-11-04 用户定的布局
+ * 于是版面顺序直接对回这四句话：
  *
- * 原布局是「顶部决策条 + 左 34% 窄栏 + 右双池 + 底部买点表」。用户要求：
- *   · 「财富密码下面的这个横条就不要了」
- *   · 「环境体检和全量过筛横向放一排，环境占左、过筛占右」
- *   · 「下面横排明日标的」「再下面接力池」「再下面观察池」
+ * | 屏上位置 | 回答 | 组件 |
+ * |---|---|---|
+ * | ① 今天 | **买了没有 / 为什么是这个结果** | `TodayVerdict` |
+ * | ② 今日账本 | **赚没赚**（09:25 竞价价买 → 收盘卖） | `PoolLedgerCard` |
+ * | ③ 今晨竞价 | 昨天涨停那批今早还有没有人接（读数层） | `EnvPanel` |
+ * | ④ 明日标的 | **买什么**（竞价区间 / 竞价额 / 结论） | `BuyPlan` |
+ * | ⑤ 接力池 / 观察池 | 逐票为什么是它 | `PickCard` |
  *
- * ⛔ 横条删的是**那一整排版面**，不是数据 —— 「取向 / 名额 N→M / 实际买入」是
- *    「今天该不该出手」的唯一锚点，删掉整页就失去判断起点。已压进
- *    `EnvPanel` 卡内首行（一行小字），信息不丢、不占版面。
- * ⛔ 三个整排区一律**单排铺满**，不再分左右栏 —— 卡片横向排布本身就是对照，
- *    窄栏会让每行只放得下 1 张卡，反而更难比。
+ * ## 与前一版的差别（⛔ 别默默改回去）
+ *
+ * · 「环境体检」不再占整排：出手结论并入 ①，读数只留两个红开计数（③）。
+ *   —— 原来一半内容是 `/emotion` 整页已有的东西，另一半是看不懂的比率。
+ * · 账本从「不存在」变成第 ② 块：它是全页唯一的事后证据，
+ *   没有它，用户永远只能看到「准备买什么」，看不到「买了会怎样」。
+ * · 全量过筛仍**不在此页**（调参诊断层，2026-11-04 已移到 AI 页「诊断」tab）。
+ *
+ * ⛔ 三个池区一律**单排铺满**，不分左右窄栏 —— 卡片横向排布本身就是对照。
  */
-
 function PoolSection({
   title,
   badge,
@@ -75,12 +78,14 @@ function PoolSection({
 export function DecisionBoard({
   dossier,
   callFile,
-  // ⛔ `screen` 已不再在此页渲染（移到 AI 页「诊断」tab）。
-  //    保留参数只为不破坏既有调用方与测试；`void` 掉避免 lint 报未使用。
+  ledger,
   screen: _screen,
 }: {
   dossier?: DecisionDossier
   callFile?: PoolCallFile
+  /** 与 `callFile.trade_date` 同日的收盘结算；取不到就是「未落盘」，⛔ 不回落昨日 */
+  ledger?: PoolLedger
+  // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
   screen?: ScreenFile
 }) {
   if (!dossier) {
@@ -98,17 +103,38 @@ export function DecisionBoard({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* ① 环境体检（整排） —— 用户「第一排就放环境体检，拉整排，尽量压缩高度」 */}
-      <Card title="环境体检" extra={<CardBadge>{dossier.date}</CardBadge>}>
-        <EnvPanel dossier={dossier} callFile={callFile} />
+      {/* ① 今天：买了没有 + 为什么是这个结果（全页第一眼） */}
+      <TodayVerdict dossier={dossier} callFile={callFile} ledger={ledger} />
+
+      {/* ② 今日账本：09:25 竞价价买 → 当日收盘卖（赚没赚） */}
+      <PoolLedgerCard
+        ledger={ledger}
+        participateCount={callFile?.meta?.participate?.length ?? 0}
+        effectiveQuota={callFile?.meta?.effective_quota ?? callFile?.quota}
+      />
+
+      {/* ③ 今晨竞价：读数层（只留两个能读出结论的计数） */}
+      <Card title="今晨竞价" extra={<CardBadge>{callFile?.trade_date ?? '未落盘'}</CardBadge>}>
+        <EnvPanel callFile={callFile} />
       </Card>
 
-      {/* ② 明日标的（整排） —— 「明天怎么下单」压成一张可横向对比的表 */}
-      <Card title="明日标的" extra={<CardBadge>{relay.length + watch.length} 只</CardBadge>}>
+      {/* ④ 明日标的：买什么、竞价落在哪、要多少钱。
+          ⚠️ 日期口径：`dossier` 是**今天盘后写的预案**，执行日是**次一交易日** ——
+              与上方 ①②③（今日执行日）不是同一天，⛔ 必须在卡头标明，否则会把
+              「明天该买的」当成「今天买了什么」读。 */}
+      <Card
+        title="明日标的"
+        extra={
+          <span className="flex items-baseline gap-2">
+            <CardBadge>{relay.length + watch.length} 只</CardBadge>
+            <CardBadge tone="rec">预案 {dossier.date} · 次一交易日执行</CardBadge>
+          </span>
+        }
+      >
         <BuyPlan relay={relay} watch={watch} />
       </Card>
 
-      {/* ③ 接力池（整排） */}
+      {/* ⑤ 接力池 */}
       <PoolSection
         title="接力池"
         badge={`${relay.length} 只`}
@@ -118,7 +144,7 @@ export function DecisionBoard({
         emptyText="今日无可接力标的 —— 接力池留空是允许的结论"
       />
 
-      {/* ④ 观察池（整排） */}
+      {/* ⑥ 观察池 */}
       <PoolSection
         title="观察池"
         badge={`${watch.length} 只`}
@@ -127,7 +153,6 @@ export function DecisionBoard({
         marketMaxBoards={dossier.market_max_boards}
         emptyText="无观察标的"
       />
-
     </div>
   )
 }

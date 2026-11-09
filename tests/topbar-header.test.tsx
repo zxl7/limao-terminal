@@ -26,6 +26,12 @@ import type { ComponentType, ReactNode } from 'react'
 import path from 'node:path'
 import { ROUTES, FILE_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from '@/shared/api'
 import { isFrozenSnapshot } from '@/shared/lib'
+import { MarketSnapshotSchema } from '@/shared/api/schemas'
+import { EbbBanner } from '@/features/market/components/EbbBanner'
+import { TideCard } from '@/features/market/components/TideCard'
+import { buildTideState } from '@/features/market/lib/tide'
+import { ebbTone } from '@/features/market/model/labels'
+import type { EbbInfo } from '@/shared/api/types'
 // eslint-disable-next-line
 import { readRoute, healthPayload, resolveDataRoot, type RouteDefLike } from '../scripts/lib/read-route.mjs'
 
@@ -183,6 +189,93 @@ describe('顶栏 header · 盘中情绪维度承载（原盘中页指挥条迁�
     } finally {
       globalThis.fetch = original
     }
+  })
+})
+
+describe('风险口径 · 全市场与接力分离', () => {
+  const legacy: EbbInfo = {
+    severity: '情绪转弱', signals: ['晋级率偏低'], max_board: 3, total_zt: 60,
+    sentiment_score: null, sentiment_label: '分歧',
+  }
+
+  it.each(['market', 'relay', 'mixed'] as const)('契约接受 %s 范围与空情绪分，保留新旧字段', (scope) => {
+    const ebb = { ...legacy, risk_scope: scope, risk_level: 'warning', market_effect: 'strong' }
+    expect(MarketSnapshotSchema.parse({ ebb }).ebb).toEqual(ebb)
+    expect(MarketSnapshotSchema.parse({ ebb: legacy }).ebb).toEqual(legacy)
+  })
+
+  it.each([
+    ['接力转弱', 'mid'], ['接力风险预警', 'warn'],
+    ['大盘承压', 'mid'], ['大盘风险预警', 'warn'],
+    ['情绪转弱', 'mid'], ['退潮预警', 'warn'],
+    ['high', 'down'], ['severe', 'down'], ['medium', 'warn'], ['mid', 'warn'],
+  ] as const)('新旧 severity「%s」判色兼容', (severity, tone) => {
+    expect(ebbTone(severity)).toBe(tone)
+  })
+
+  it.each(['strong', 'positive', 'neutral', 'weak', 'unknown'] as const)('赚钱效应 %s 可解析，非法枚举不放行', (effect) => {
+    expect(MarketSnapshotSchema.safeParse({ ebb: { ...legacy, market_effect: effect } }).success).toBe(true)
+    for (const field of ['market_effect', 'risk_scope', 'risk_level']) {
+      expect(MarketSnapshotSchema.safeParse({ ebb: { ...legacy, [field]: 'invalid' } }).success).toBe(false)
+    }
+  })
+
+  it('结构化风险等级优先于文案', () => {
+    expect(ebbTone('旧文案', 'warning')).toBe('warn')
+    expect(ebbTone('退潮预警', 'weak')).toBe('mid')
+  })
+
+  it.each([
+    ['relay', 'weak', '接力转弱', 'text-head-mid'],
+    ['relay', 'warning', '接力风险预警', 'text-head-warn'],
+    ['market', 'weak', '大盘承压', 'text-head-mid'],
+    ['mixed', 'warning', '大盘风险预警', 'text-head-warn'],
+    [undefined, undefined, '情绪转弱', 'text-head-mid'],
+    [undefined, undefined, '退潮预警', 'text-head-warn'],
+  ] as const)('顶栏与通栏按 %s / %s 独立展示风险', async (scope, level, severity, color) => {
+    const original = globalThis.fetch
+    const ebb = { ...legacy, severity, risk_scope: scope, risk_level: level, market_effect: 'strong' }
+    globalThis.fetch = (async () => new Response(JSON.stringify({ ebb }), {
+      headers: { 'Content-Type': 'application/json' },
+    })) as typeof fetch
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+    try {
+      const c = await renderTopBar()
+      expect(c.querySelector('header')?.textContent).toContain(severity)
+      expect([...c.querySelectorAll('span')].find((s) => s.textContent === severity)?.className).toContain(color)
+      const banner = render(<QueryClientProvider client={client}><EbbBanner /></QueryClientProvider>)
+      await waitFor(() => expect(banner.container.textContent).toContain(severity))
+      const text = banner.container.textContent ?? ''
+      expect(text).toContain('全市场赚钱效应：强')
+      expect(text).toContain('接力情绪分—')
+      expect(text).toContain('判断依据：1 项')
+      expect(text).not.toMatch(/负反馈|全局情绪|\/10/)
+      if (scope === 'relay') expect(text).toContain('风险范围：接力')
+    } finally {
+      client.clear()
+      globalThis.fetch = original
+    }
+  })
+
+  it('无预警不占位，旧数据缺少市场效应时不伪造结论', async () => {
+    const client = new QueryClient()
+    client.setQueryData(['market', 'latest'], { ebb: null })
+    const view = render(<QueryClientProvider client={client}><EbbBanner /></QueryClientProvider>)
+    expect(view.container.textContent).toBe('')
+    client.setQueryData(['market', 'latest'], { ebb: legacy })
+    await waitFor(() => expect(view.container.textContent).toContain(legacy.severity))
+    expect(view.container.textContent).not.toContain('全市场赚钱效应')
+    expect(view.container.textContent).toContain('判断依据：1 项')
+    view.unmount()
+    client.clear()
+  })
+
+  it('潮位文案限定接力而不改变周期算法', () => {
+    const tide = buildTideState(null)
+    const view = render(<TideCard tide={tide} window={[]} />)
+    expect(view.container.textContent).toContain('接力情绪周期，不代表全市场赚钱效应')
+    expect(view.container.textContent).toContain('接力环境处理')
+    expect(view.getByLabelText('接力情绪周期多日样本')).toBeTruthy()
   })
 })
 

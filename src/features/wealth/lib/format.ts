@@ -17,6 +17,19 @@ export function pctText(v: unknown, digits = 1): string {
   return num(v, digits, '%')
 }
 
+/**
+ * **带正负号**的百分比：收益类数字必须带号（`+3.20%` / `−9.60%`）。
+ *
+ * ⛔ 与 `pctText` 分工：`pctText` 用于「占比 / 比率」（换手 8.8%、胜率 51.9%），
+ *    那些带 `+` 号反而怪；本函数只用于**盈亏**，让「赚了还是亏了」不用读颜色就能看出来。
+ * ⚠️ 用 ASCII `-` 而不是 `−`：`toFixed` 的输出要能和 `+` 对齐，波浪号会让数字列参差。
+ */
+export function signedPct(v: unknown, digits = 2): string {
+  if (v === null || v === undefined || v === '' || Number.isNaN(Number(v))) return '—'
+  const n = Number(v)
+  return `${n > 0 ? '+' : ''}${n.toFixed(digits)}%`
+}
+
 /** 比例 0–1 → 百分数。用于 `history_relay_prob`。 */
 export function ratioText(v: unknown, digits = 1): string {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '—'

@@ -91,11 +91,12 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 30 个 Tab（含实时段 8 个与数据底座）', () => {
+  it('导航渲染出全部 31 个 Tab（含实时段 8 个与数据底座）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
-    expect(links.length).toBe(30)
+    // 2026-11-05：决策段新增「竞价留痕」(/sector-gap) → 30 → 31
+    expect(links.length).toBe(31)
     expect(nav.querySelector('a[href="/data"]')?.textContent).toContain('数据底座')
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）

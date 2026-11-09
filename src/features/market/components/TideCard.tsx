@@ -19,7 +19,8 @@ export function TideCard({ tide, window }: { tide: TideState; window: TideWindow
   ] as const
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center gap-1.5 text-12" aria-label="情绪周期阶段">
+      <p className="text-12 text-sub">接力情绪周期，不代表全市场赚钱效应</p>
+      <div className="flex flex-wrap items-center gap-1.5 text-12" aria-label="接力情绪周期阶段">
         {phases.map(([phase, label], index) => (
           <span key={phase} className="flex items-center gap-1.5">
             {index > 0 && <span className="text-sub">→</span>}
@@ -31,11 +32,11 @@ export function TideCard({ tide, window }: { tide: TideState; window: TideWindow
       </div>
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
         <span className="inline-flex items-baseline gap-1">
-          <span className="text-sub text-12">当前阶段</span>
+          <span className="text-sub text-12">接力阶段</span>
           <b className={cn('text-13 font-semibold', TEXT_TONE[tide.tone])}>{tide.label}</b>
         </span>
         <span className="inline-flex items-baseline gap-1">
-          <span className="text-sub text-12">环境处理</span>
+          <span className="text-sub text-12">接力环境处理</span>
           <b className="text-sub text-13 font-semibold">{tide.action}</b>
         </span>
       </div>
@@ -57,11 +58,11 @@ function TideWindowTable({ rows }: { rows: TideWindowDay[] }) {
   return (
     <div className="overflow-x-auto border-t border-line-faint pt-2">
       <div className="text-11 text-sub mb-1">近 5 个已归档交易日</div>
-      <table className="w-full text-12 whitespace-nowrap" aria-label="情绪周期多日样本">
+      <table className="w-full text-12 whitespace-nowrap" aria-label="接力情绪周期多日样本">
         <thead className="text-sub text-11">
           <tr>
             <th className="py-1 text-left font-normal">日期</th>
-            <th className="px-2 text-right font-normal">情绪分</th>
+            <th className="px-2 text-right font-normal">接力情绪分</th>
             <th className="px-2 text-right font-normal">涨停</th>
             <th className="px-2 text-right font-normal">昨涨停溢价</th>
             <th className="px-2 text-right font-normal">晋级率</th>

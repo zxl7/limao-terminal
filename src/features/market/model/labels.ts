@@ -70,11 +70,13 @@ export const TONE_TEXT_HEAD: Record<Tone, string> = {
  * 教训：**字符串枚举类字段必须回数据源核实际取值**，不能照着「应该长什么样」写。
  * 英文分支保留是为了兼容早期归档快照，不是冗余。
  */
-export function ebbTone(severity: string | null | undefined): Tone {
+export function ebbTone(severity: string | null | undefined, riskLevel?: 'weak' | 'warning'): Tone {
+  if (riskLevel === 'warning') return 'warn'
+  if (riskLevel === 'weak') return 'mid'
   if (!severity) return 'neutral'
-  // 当前口径（显示文案）
-  if (severity.includes('退潮')) return 'warn'
-  if (severity.includes('转弱')) return 'mid'
+  // 当前及历史口径（显示文案）
+  if (severity.includes('预警') || severity.includes('退潮')) return 'warn'
+  if (severity.includes('转弱') || severity.includes('承压')) return 'mid'
   // 历史口径（英文枚举）
   switch (severity) {
     case 'high':

@@ -148,7 +148,9 @@ function HitCard({
   blocked: boolean
 }) {
   const sq = view.seal_quality
-  const fbt = typeof sq?.fbt_hm === 'number' ? String(sq.fbt_hm).padStart(4, '0') : null
+  // ⚠️ 变量名不能叫 `fbt`：vite 的 react-compiler 插件会把它当 fbt 宏冲突，
+  //    每次 HMR 刷一屏 'Support local variables named fbt' 警告，看着像启动失败。
+  const fbtTxt = typeof sq?.fbt_hm === 'number' ? String(sq.fbt_hm).padStart(4, '0') : null
   const lf = view.linkage_facts
   const volOk =
     typeof view.amount_yi === 'number' && typeof view.need_yi === 'number'
@@ -244,11 +246,11 @@ function HitCard({
           {volOk != null && (
             <span className={cn('ml-1', volOk ? 'text-up' : 'text-down')}>{volOk ? '达标' : '不足'}</span>
           )}
-          {fbt && (
+          {fbtTxt && (
             <>
               <span className="text-sub"> · 昨首封 </span>
               <span className="num">
-                {fbt.slice(0, 2)}:{fbt.slice(2, 4)}
+                {fbtTxt.slice(0, 2)}:{fbtTxt.slice(2, 4)}
               </span>
             </>
           )}

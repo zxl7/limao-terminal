@@ -3,25 +3,24 @@ import type { DossierStock } from '@/shared/api'
 import { cn } from '@/shared/lib'
 import { StockLink } from '@/shared/ui'
 import { Tag } from '@/features/analytics'
-import { boardsText, fbtText, num, pctText, ratioText, styleText, watchGroupText, yiText } from '../lib/format'
+import { boardsText, fbtText, num, pctText, styleText, watchGroupText, yiText } from '../lib/format'
 
 /**
- * 单票决策卡 —— 六个分析维度压在**一张卡**里。
+ * 单票决策卡 —— **四维**（方向 / 身位 / 封板 / 晋级），一屏扫完。
  *
- * ## 为什么不是六个小方块（2026-11-04 用户「小卡太多了」）
+ * ## 2026-11-06 用户「不要那些看不懂的指标」
  *
- * 第一版把六维各包一层 `border`，加上外层卡片共 **7 道边框**。视觉上变成
- * 「卡片里塞了 6 张卡」，边框抢戏、层级反而变浅；更要命的是每格宽度随内容浮动，
- * **同一维度在不同票上位置不一样**，横向扫比时眼睛每次都要重新定位。
+ * 原来六维里有两维是**内部推导量**，不是盘面事实，删掉：
  *
- * 现改为**规格清单（spec list）**：
- *   · 左列标签定宽对齐 → 六维在每张票上落在同一 x 位置，可纵向扫读
- *   · 主值一列右对齐、加粗 → 差异一眼可见
- *   · 细节压成同行小字 → 不丢维度，但不另起一层
- *   · 整卡只剩 1 道边框
+ * | 删掉 | 为什么删 |
+ * |---|---|
+ * | **资金**（主力当日/5 日净流入、获利盘比例） | 主力净流入是算法估算值，同一只票不同软件能差出一倍；盘中盯盘根本不会看它 |
+ * | **三问**（`passed/3` + 「卡在晋级率」） | 它只是把「晋级率/历史高度/地位」再算成 1 个分数，信息已在前两维里；`passed/3` 这种形态没人会拿来做决定 |
+ * | **情绪校准**（`history_relay_prob`） | 同高度晋级率再乘一个情绪系数，多一层推导、少一层可信度 |
+ * | **该档真买到胜率 + n=** | 样本常是 5~7 个，读起来像结论，其实是噪声 |
  *
- * ⛔ 维度本身一个没减（用户：「维度没问题」）。
- * ⛔ 缺字段渲染 `—`，不回落成 0。
+ * ⛔ 留下的一律是**能在盘面上直接看到的事**：几板、差几板、多少家同题材、
+ *    成交额、换手、封单占流通、首封时间、炸板次数、同高度晋级率。
  */
 
 /** 规格清单的一行：标签 | 主值 | 同行细节 */
@@ -91,26 +90,19 @@ export function PickCard({
   const gapToMarket =
     marketMaxBoards != null && s.boards ? Number(marketMaxBoards) - Number(s.boards) : null
 
-  /** 情绪校准后的接力概率（0–1）与原始同高度晋级率（%） */
-  const calibProb = s.history_relay_prob
+  /**
+   * 同高度晋级率（%）与样本数。
+   * ⛔ 只取 `win_rate` 原值 —— `history_relay_prob`（情绪校准后）与三问总分都不上卡，
+   *    那是**推导量**，多一层计算少一层可信度（2026-11-06 用户「不要看不懂的指标」）。
+   */
   const rawWin = quiz?.items?.win_rate?.value
   const rawWinN = quiz?.items?.win_rate?.samples
-  /**
-   * 三问的键名 → 中文。
-   * ⛔ 直接把 `blocked_by` 的键拼进文案会漏出 `win_rate` 这种内部字段名（实测已泄漏）。
-   */
-  const QUIZ_KEY_CN: Record<string, string> = {
-    win_rate: '晋级率',
-    promote: '历史高度',
-    status: '地位',
-  }
-  const quizFail = (quiz?.blocked_by ?? []).map((k) => QUIZ_KEY_CN[k] ?? k).join('·')
 
   const sealRatio =
     s.seal_ratio_pct ??
     (s.seal_amt != null && s.lt_mktcap ? (Number(s.seal_amt) / Number(s.lt_mktcap)) * 100 : null)
 
-  /** 量能与封板的细节合成一行 */
+  /** 封板质量细节：全是盘面上直接看得到的事实 */
   const sealDetail = [
     s.hs != null ? `换手${pctText(s.hs, 1)}` : null,
     sealRatio != null ? `封单占流通${pctText(sealRatio, 1)}` : null,
@@ -125,6 +117,14 @@ export function PickCard({
     Array.isArray(exp?.expected_range) && exp.expected_range.length === 2
       ? `${num(exp.expected_range[0], 1)}%~${num(exp.expected_range[1], 1)}%`
       : '—'
+
+  /**
+   * 「明天开得高不高、买不买得到」——把 `p_over5` 翻成人话。
+   * ⛔ 不显示 p25~p75、不显示该档胜率与 n=：前者是分位带，后者样本常 5~7 个，
+   *    摆在卡上像结论，其实是噪声。
+   */
+  const buyHint =
+    fc?.p_over5 == null ? '—' : fc.p_over5 >= 50 ? '多半买不进' : fc.p_over5 >= 30 ? '看运气' : '基本能买到'
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 rounded-sm border border-line bg-card px-2.5 py-2">
@@ -153,7 +153,7 @@ export function PickCard({
         </span>
       </div>
 
-      {/* ── 六维规格清单（无内边框 · 标签定宽对齐，可跨票纵向扫读）─────── */}
+      {/* ── 四维规格清单（无内边框 · 标签定宽对齐，可跨票纵向扫读）─────── */}
       <div className="flex flex-col gap-[3px]">
         <SpecRow
           label="方向"
@@ -168,35 +168,13 @@ export function PickCard({
         />
 
         <SpecRow
-          label="股性"
-          main={rawWin == null ? ratioText(calibProb, 1) : pctText(rawWin, 1)}
-          mainTone={rawWin == null ? 'sub' : Number(rawWin) >= 40 ? 'up' : Number(rawWin) >= 30 ? 'warn' : 'down'}
-          details={[
-            `同高度样本 ${rawWinN ?? '—'}`,
-            `情绪校准 ${ratioText(calibProb, 1)}`,
-            s.history_relay_stock_samples ? `个股样本 ${s.history_relay_stock_samples}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-          title={s.history_relay_note || '主值＝历史同高度晋级率；「情绪校准」为叠加情绪后的概率'}
-        />
-
-        <SpecRow
-          label="量能"
-          main={s.cje_yi == null ? '—' : `${num(s.cje_yi, 2)} 亿`}
-          mainTone={(s.cje_yi ?? 0) >= 5 ? 'up' : (s.cje_yi ?? 0) >= 3 ? 'warn' : 'down'}
-          details={sealDetail}
-          title={`封板形态 ${styleText(seal?.style)}；生效门槛 ${num(seal?.floor_used, 1)} 亿`}
-        />
-
-        <SpecRow
           label="身位"
           main={gapToMarket == null ? '—' : gapToMarket === 0 ? '最高板' : `差 ${gapToMarket} 板`}
           mainTone={gapToMarket == null ? 'sub' : gapToMarket === 0 ? 'up' : gapToMarket >= 2 ? 'down' : 'warn'}
           details={[
             `带动 ${s.carry_cnt ? `${s.carry_cnt} 家` : '—'}`,
-            s.ladder_has_complete ? `梯队完整 ${s.ladder_grade || ''}` : `梯队不完整 ${s.ladder_grade || ''}`,
             s.relay_stage === 'one_to_two' ? '1进2' : s.relay_stage === 'two_to_three' ? '2进3' : null,
+            s.leader_role ?? null,
           ]
             .filter(Boolean)
             .join(' · ')}
@@ -204,22 +182,25 @@ export function PickCard({
         />
 
         <SpecRow
-          label="资金"
-          main={s.main_flow_yi == null ? '—' : `${num(s.main_flow_yi, 2)} 亿`}
-          mainTone={(s.main_flow_yi ?? 0) > 0 ? 'up' : (s.main_flow_yi ?? 0) < 0 ? 'down' : 'sub'}
-          details={[
-            `5日 ${s.main_flow_5d_yi == null ? '—' : `${num(s.main_flow_5d_yi, 2)} 亿`}`,
-            `获利盘 ${s.chip_profit_rate == null ? '—' : pctText(s.chip_profit_rate, 1)}`,
-          ].join(' · ')}
-          title="主力净流入：当日 / 近 5 日；获利盘＝当前价位获利筹码比例"
+          label="封板"
+          main={s.cje_yi == null ? '—' : `${num(s.cje_yi, 2)} 亿`}
+          mainTone={(s.cje_yi ?? 0) >= 5 ? 'up' : (s.cje_yi ?? 0) >= 3 ? 'warn' : 'down'}
+          details={sealDetail}
+          title={`封板形态 ${styleText(seal?.style)}；生效门槛 ${num(seal?.floor_used, 1)} 亿`}
         />
 
         <SpecRow
-          label="三问"
-          main={quiz ? `${quiz.passed}/3` : '—'}
-          mainTone={!quiz ? 'sub' : quiz.passed >= 3 ? 'up' : quiz.passed >= 2 ? 'warn' : 'down'}
-          details={quiz ? [quiz.label, quizFail ? `卡在${quizFail}` : '全过'].filter(Boolean).join(' · ') : ''}
-          title={quiz?.note || '晋级三问：晋级率 / 历史高度 / 地位'}
+          label="晋级率"
+          main={pctText(rawWin, 1)}
+          mainTone={rawWin == null ? 'sub' : Number(rawWin) >= 40 ? 'up' : Number(rawWin) >= 30 ? 'warn' : 'down'}
+          details={
+            rawWin == null
+              ? '无同高度样本'
+              : `同高度 ${rawWinN ?? '—'} 次${
+                  s.history_relay_stock_samples ? ` · 本股 ${s.history_relay_stock_samples} 次` : ''
+                }`
+          }
+          title="同高度历史晋级率原值（⛔ 不含情绪加权、不折成三问总分）"
         />
       </div>
 
@@ -228,29 +209,12 @@ export function PickCard({
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-sm bg-hover px-2 py-1 text-11">
           <span className="text-sub">明早</span>
           <span className="num text-txt">
-            中位 <span className="font-semibold">{num(fc.gap_median, 1)}%</span>
-            <span className="text-sub">
-              （{num(fc.gap_p25, 1)}~{num(fc.gap_p75, 1)}%）
-            </span>
+            预计开 <span className="font-semibold">{num(fc.gap_median, 1)}%</span>
           </span>
-          <span className="num text-warn">{num(fc.p_over5, 0)}% 买不到</span>
-          <span className="num text-sub">
-            这档买到胜率{' '}
-            <span
-              className={cn(
-                'font-semibold',
-                (fc.buy_win ?? 0) >= 45 ? 'text-up' : (fc.buy_win ?? 0) >= 35 ? 'text-warn' : 'text-down',
-              )}
-            >
-              {pctText(fc.buy_win, 1)}
-            </span>
-            {fc.buy_n != null && <span className="text-sub">（n={fc.buy_n}）</span>}
+          <span className="num text-warn">
+            {buyHint}
+            {fc.p_over5 != null && <span className="text-sub">（高开过半概率 {num(fc.p_over5, 0)}%）</span>}
           </span>
-          {fc.group && (
-            <span className="truncate text-sub" title={`同组 ${fc.group_n ?? '—'} 个历史样本`}>
-              {fc.group}
-            </span>
-          )}
           {fc.verdict && (
             <span
               className={cn(
@@ -261,6 +225,7 @@ export function PickCard({
                     ? 'border-down text-down'
                     : 'border-line text-sub',
               )}
+              title={(fc.reasons ?? []).join('；')}
             >
               {fc.verdict}
             </span>

@@ -62,6 +62,7 @@ export const PAGE_LOADERS = {
   '/institution': () => import('@/pages/institution/InstitutionPage'),
   '/auction': () => import('@/pages/auction/AuctionPage'),
   '/execution-audit': () => import('@/pages/execution-audit/ExecutionAuditPage'),
+  '/sector-gap': () => import('@/pages/sector-gap/SectorGapPage'),
 
   // ── 题材与资金（日频）──
   '/eruption': () => import('@/pages/eruption/EruptionPage'),

@@ -3,7 +3,6 @@ import { Outlet, useLocation } from 'react-router'
 import { TideAlgorithmStrip } from '@/features/market'
 import { TopBar } from './TopBar'
 import { RightRail } from './RightRail'
-import { DataFreshnessPanel } from './DataFreshnessPanel'
 import { Sidebar, TopNavFallback } from './Sidebar'
 import { preloadPage } from './lazyRoute'
 import type { PagePath } from './pages'
@@ -99,6 +98,8 @@ export const TABS: readonly TabDef[] = [
   //    「今日执行」tab —— 两页曾是同一份决策档案的两个副本（环境/接力/观察三块
   //    完全重复）。导航不再单列；路由 `/auction` 保留可直达，避免旧链接失效。
   { to: '/execution-audit', label: '执行审计', group: '决策' },
+  // 竞价三环影子留痕（只观察、不裁决）——与「回测」并列，但不混算账户战绩
+  { to: '/sector-gap', label: '竞价留痕', group: '决策' },
 
   // ── 段4 · 题材与资金（日频）──
   { to: '/eruption', label: '题材爆发史', group: '题材' },
@@ -153,7 +154,6 @@ export function AppShell() {
         {/* 主内容区：≥3xl 与 RightRail 并排 */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain px-4 lg:px-5 3xl:px-6 py-3">
-            <div className="mb-3"><DataFreshnessPanel /></div>
             <TideAlgorithmLayer />
             <Outlet />
           </main>

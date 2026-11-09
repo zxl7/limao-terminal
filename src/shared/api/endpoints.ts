@@ -15,6 +15,7 @@ import { DataUnavailableError, getJson, withQuery } from './client'
 import { SCHEMAS } from './schemas'
 import type {
   AccountNavEntry,
+  BacktestSummary,
   AmbushPullbackSettlementEntry,
   AmbushPullbackSignalEntry,
   AmbushWeightedPnlEntry,
@@ -42,7 +43,9 @@ import type {
   RelayEffect,
   LearningConfig,
   PoolCallFile,
+  PoolLedger,
   ScreenFile,
+  SectorGapTrace,
   PromoBacktest,
   RuleConfigFile,
   ShortSpiritConfig,
@@ -153,11 +156,16 @@ export interface RouteTypeMap {
   '/api/decision/manifest': DecisionManifest
   /** 09:25 池内裁决终态（`view` 定音 + 买入名额序 · ⛔ 非昨日预案 `bias`） */
   '/api/decision/pool-call': DatedFile<PoolCallFile>[]
+  /** 池内台账（竞价价买→当日收盘卖 · 逐票结算 · 回答「今天到底赚没赚」） */
+  '/api/decision/pool-ledger': DatedFile<PoolLedger>[]
   /** 全量涨停逐票过筛（pass/watch_only/reject + 理由链 · 回答「为什么只剩这几只」） */
   '/api/decision/screen': DatedFile<ScreenFile>[]
+  '/api/decision/sector-gap-trace': SectorGapTrace
 
   // ── 八、AI 判断平行台账 ──
   '/api/ai/view': DatedFile<AiViewFile>[]
+  /** 回测战绩（三口径指标 + 逐层阶梯 + 逐日净值 + 真实台账对照） */
+  '/api/research/backtest': BacktestSummary
   '/api/ai/decisions': AiDecisionEntry[]
   '/api/ai/nav': AiNavEntry[]
 
@@ -364,6 +372,8 @@ export const api = {
   decisionZtPool: () => fetchRoute('/api/decision/zt-pool'),
   /** 存档清单（完整性 / gaps） */
   decisionManifest: () => fetchRoute('/api/decision/manifest'),
+  /** 竞价三环影子逐日留痕（只读对账 · 恒不改裁决） */
+  sectorGapTrace: () => fetchRoute('/api/decision/sector-gap-trace'),
   /**
    * 09:25 池内裁决**终态**（近 3 期）。
    *
@@ -372,6 +382,21 @@ export const api = {
    *    展示「今晨实际怎么做的」必须用本路由。
    */
   decisionPoolCall: () => fetchRoute('/api/decision/pool-call'),
+  /**
+   * 池内台账 · 当日收盘结算（近 20 期）。
+   *
+   * 「09:25 竞价价买 → 当日收盘卖」的逐票结果，是**唯一**能回答
+   * 「今天推的这些票到底赚没赚」的数据。⛔ 与 `decisionPoolCall`（事前裁决）分开读，
+   * 两者按 `trade_date` / `date` 同为**执行日**对齐。
+   * ⚠️ 当日 16:00 才落盘；更早读到的是昨日，属正常时序。
+   */
+  decisionPoolLedger: () => fetchRoute('/api/decision/pool-ledger'),
+  /**
+   * 回测战绩快照（研究产物，`cadence: manual`）。
+   * ⛔ 内含三套**并列**收益口径，禁止前端换算；指标全部后端算好，前端只显示。
+   * ⚠️ `generated_at` 可能落后于当日台账，缺文件按「未生成」降级，⛔ 不拿旧快照冒充新数据。
+   */
+  researchBacktest: () => fetchRoute('/api/research/backtest'),
   /**
    * 全量涨停逐票过筛结论（近 5 期）。
    * ⛔ 与 `decisionCandidates` 不可互替：候选只有**入选**的票，本路由是**全市场涨停逐票**的

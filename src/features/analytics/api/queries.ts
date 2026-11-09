@@ -270,6 +270,34 @@ export const analyticsQueries = {
       staleTime: 60_000,
     }),
   /**
+   * 池内台账 · 当日收盘结算（近 20 期）。
+   *
+   * 口径 = **09:25 竞价价买 → 当日收盘卖**。⛔ 与 `decisionPoolCall` 不可互替：
+   * 前者是**事后赚没赚**，后者是**事前买不买**。两者同按执行日对齐。
+   * ⚠️ 当日 16:00 由 `scripts/pool_ledger.py` 落盘，更早读到的是昨日 —— 属正常时序，
+   *    页面按「今日台账未落盘」降级，⛔ 不拿昨日数据冒充今日。
+   */
+  decisionPoolLedger: () =>
+    queryOptions({
+      queryKey: ['decision', 'pool-ledger'] as const,
+      queryFn: api.decisionPoolLedger,
+      refetchInterval: livePollMs,
+      staleTime: 60_000,
+    }),
+  /**
+   * 回测战绩快照（研究产物，手工触发刷新）。
+   *
+   * ⛔ 内含三套**并列**收益口径（策略=当日收盘 / T+1=次日收盘 / T+1 最保守=次日开盘），
+   *    差额来自 A 股 T+1 制度 —— 禁止相加、相减或互相换算，也不得与当日台账混算。
+   * ⚠️ `cadence: manual`：不轮询，只按进入页面取一次；`generated_at` 即快照时刻。
+   */
+  researchBacktest: () =>
+    queryOptions({
+      queryKey: ['research', 'backtest'] as const,
+      queryFn: api.researchBacktest,
+      staleTime: 5 * 60_000,
+    }),
+  /**
    * 全量涨停逐票过筛结论（近 5 期）。
    *
    * ⛔ 与 `decisionCandidates` 不可互替：候选只有入选的票，本路由是全量逐票
@@ -621,6 +649,15 @@ export const analyticsQueries = {
     queryOptions({
       queryKey: ['promo', 'backtest'] as const,
       queryFn: api.promoBacktest,
+      staleTime: DAILY_STALE,
+    }),
+
+  // ══════════════ 竞价三环影子留痕（2026-11-05 A 档）══════════════
+  /** 日频、盘后重算；⛔ 影子只留痕不裁决，本页不进账户战绩 */
+  sectorGapTrace: () =>
+    queryOptions({
+      queryKey: ['sector-gap', 'trace'] as const,
+      queryFn: api.sectorGapTrace,
       staleTime: DAILY_STALE,
     }),
 } as const

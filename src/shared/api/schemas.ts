@@ -88,17 +88,31 @@ const SectorFlowLite = z.object({
   is_focus: b.optional(),
 })
 
-const SectorRisk = z.object({
+const SectorRiskSourceState = z.object({
+  ok: b.nullish(),
+  complete: b.nullish(),
+  stale: b.nullish(),
+  status: s.nullish(),
+  asof: s.nullish(),
+  error: s.nullish(),
+  reference_only: b.nullish(),
+  age_seconds: n.nullish(),
+})
+
+const SectorRiskState = SectorRiskSourceState.extend({
+  sources: z.object({
+    breadth: SectorRiskSourceState.nullish(),
+    flow: SectorRiskSourceState.nullish(),
+  }).nullish(),
+})
+
+const SectorRisk = SectorRiskState.extend({
   threshold: n.optional(),
   declining: z.array(SectorFlowLite).optional(),
   focus_declining: z.array(SectorFlowLite).optional(),
-  count: n.optional(),
+  count: nOrNull.optional(),
   inflow_top: z.array(SectorFlowLite).optional(),
   outflow_top: z.array(SectorFlowLite).optional(),
-  ok: b.optional(),
-  stale: b.optional(),
-  asof: s.optional(),
-  error: s.optional(),
 })
 
 /** ⚠️ stocks 是**字符串数组**（实测），不是对象数组 —— 曾是最容易写错的一处 */
@@ -189,6 +203,9 @@ const ThemeTop = z.object({
 })
 
 const EbbInfo = z.object({
+  risk_scope: z.enum(['market', 'relay', 'mixed']).optional(),
+  risk_level: z.enum(['weak', 'warning']).optional(),
+  market_effect: z.enum(['strong', 'positive', 'neutral', 'weak', 'unknown']).optional(),
   severity: s.optional(),
   signals: z.array(s).optional(),
   max_board: n.optional(),
@@ -652,8 +669,8 @@ export const RotationDataSchema = z.object({
       }),
     )
     .optional(),
-  market_context: z
-    .object({
+  market_context: SectorRiskState
+    .extend({
       sentiment_score: nOrNull.optional(),
       nuke_count: n.optional(),
       promote_rate: n.optional(),

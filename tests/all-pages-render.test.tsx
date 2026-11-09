@@ -90,6 +90,8 @@ const PAGES: ReadonlyArray<[name: string, importer: () => Promise<unknown>]> = [
   ['ambush', () => import('@/pages/ambush/AmbushPage')],
   ['trade', () => import('@/pages/trade/TradePage')],
   ['backtest', () => import('@/pages/backtest/BacktestPage')],
+  // 竞价三环影子留痕（只读对账页，2026-11-05 新增）——数据源缺失时必须走空态
+  ['sector-gap', () => import('@/pages/sector-gap/SectorGapPage')],
   ['institution', () => import('@/pages/institution/InstitutionPage')],
   ['auction', () => import('@/pages/auction/AuctionPage')],
   ['data', () => import('@/pages/data/DataPage')],
@@ -268,5 +270,61 @@ describe('/timeline 页 · 盘中默认跟随最新交易日', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+/**
+ * 财富密码「今天」tab —— 真实数据下的四个问题（2026-11-06 用户定的版面）。
+ *
+ * ⛔ 只断言「渲染得出这些块」，不断言具体数值：数值随交易日变化，
+ *    把某天的收益写死在测试里，第二天就会变成红叉（而系统其实是对的）。
+ */
+describe('财富密码真实数据：四问必须同屏', () => {
+  it('今天 / 账本 / 为什么 三块都在，且口径写明', async () => {
+    const mod = (await import('@/pages/ai/AiPage')) as { Component?: ComponentType }
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchInterval: false, gcTime: 0 } },
+    })
+    const Page = mod.Component!
+    const wrap = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    const { container } = render(<Page />, { wrapper: wrap })
+    await waitFor(() => {
+      expect(client.isFetching()).toBe(0)
+    })
+
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+
+    // ① 买了没有（二选一，⛔ 不许既不说买了也不说空仓）
+    expect(text).toMatch(/今天空仓|今天买了|今晨裁决未落盘/)
+    // ② 赚没赚：账本块 + 口径写死
+    expect(text).toContain('今日账本')
+    expect(text).toMatch(/09:25 竞价价买 → 当日收盘卖|今日收盘结算未落盘/)
+    // ③ 为什么（白话，不是比率）
+    expect(text).toMatch(/为什么没买|为什么买这几只/)
+  })
+
+  it('默认锚定「有 09:25 裁决的执行日」，不停在次一交易日的预案上', async () => {
+    /**
+     * 实证 2026-11-06 16:30：盘后 `ai_view_2026-11-09.json` 先落盘（执行日 = 下周一），
+     * 而 `pool_call` / `pool_ledger` 最新只到 11-06。若默认取「最新一期」，
+     * 页面会停在那个还没到竞价时刻的未来日 → 今日账本与裁决全是空。
+     */
+    const mod = (await import('@/pages/ai/AiPage')) as { Component?: ComponentType }
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchInterval: false, gcTime: 0 } },
+    })
+    const Page = mod.Component!
+    const wrap = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    )
+    const { container } = render(<Page />, { wrapper: wrap })
+    await waitFor(() => {
+      expect(client.isFetching()).toBe(0)
+    })
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ')
+    // 只要出现过「该执行日尚无 09:25 裁决」，说明默认落在了未来日 —— 那是 bug 回归
+    expect(text).not.toContain('该执行日尚无 09:25 裁决')
   })
 })

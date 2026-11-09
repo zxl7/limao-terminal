@@ -7,6 +7,7 @@ import type {
   DecisionDossier,
   DossierStock,
   PoolCallFile,
+  PoolLedger,
   ScreenFile,
 } from '@/shared/api'
 import {
@@ -23,7 +24,7 @@ import {
   n2,
   pct,
 } from '@/features/analytics'
-import { DecisionBoard, ExecutionPanel, ScreenFunnel } from '@/features/wealth'
+import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel } from '@/features/wealth'
 import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, stanceText } from '@/shared/lib'
 
@@ -61,6 +62,10 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.decisionCandidates())
   // 「判断」一栏取**今晨 09:25 裁决终态**（实际怎么做），而非昨日盘后预案
   await queryClient.ensureQueryData(analyticsQueries.decisionPoolCall())
+  // 收盘结算（竞价价买→收盘卖）—— 「今天到底赚没赚」的唯一来源
+  await queryClient.ensureQueryData(analyticsQueries.decisionPoolLedger())
+  // 回测战绩（三口径指标 + 逐层阶梯）—— 「这套打法历史上赚不赚、稳不稳」
+  await queryClient.ensureQueryData(analyticsQueries.researchBacktest())
   return null
 }
 
@@ -84,9 +89,13 @@ export function Component() {
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
   const poolCalls = useQuery(analyticsQueries.decisionPoolCall())
+  /** 池内台账（近 20 期）—— 「今天到底赚没赚」的唯一来源（09:25 竞价价买 → 收盘卖） */
+  const poolLedgers = useQuery(analyticsQueries.decisionPoolLedger())
   /** 全量涨停逐票过筛（近 5 期）—— 回答「48 只涨停为什么只剩这几只」 */
   const screens = useQuery(analyticsQueries.decisionScreen())
-  const [tab, setTab] = useState<'board' | 'exec' | 'judge' | 'hit' | 'decisions' | 'nav' | 'diag'>('board')
+  /** 回测战绩快照（研究产物，手工刷新；三口径并列，⛔ 不轮询） */
+  const backtest = useQuery(analyticsQueries.researchBacktest())
+  const [tab, setTab] = useState<'board' | 'exec' | 'judge' | 'hit' | 'decisions' | 'nav' | 'bt' | 'diag'>('board')
   const [viewDate, setViewDate] = useState<string>('')
 
   /** 判断记录：按日期倒序，默认取最新 */
@@ -98,7 +107,38 @@ export function Component() {
         .sort((a, b) => b.date.localeCompare(a.date)),
     [view.data],
   )
-  const activeView = viewFiles.find((f) => f.date === viewDate) ?? viewFiles[0]
+  /** 已有 09:25 裁决的执行日集合（近 3 期） */
+  const callDates = useMemo(() => {
+    const s = new Set<string>()
+    for (const f of poolCalls.data ?? []) {
+      const d = f.data?.trade_date
+      if (d) s.add(d)
+    }
+    return s
+  }, [poolCalls.data])
+
+  /**
+   * 当前展示的判断日。
+   *
+   * ## ⛔ 默认**不能**取「最新一期」—— 盘后会把次一交易日的预案提前写出来
+   *
+   * 实证 2026-11-06 16:30：`ai_view_2026-11-09.json` 已经存在（`decision_date = 11-06`），
+   * 而 `pool_call` / `pool_ledger` 最新只到 11-06。若默认取最新：
+   *   · 「今天买了没」→ 显示「今晨裁决未落盘」
+   *   · 「今日账本」→ 显示「未落盘」
+   * 用户收盘后打开页面，**今天的结算一个字都看不到**，看到的是一个还没到竞价时刻的未来日。
+   *
+   * ✅ 现口径：默认锚定**最近一期已经有 09:25 裁决的执行日**（= 真正在跑的那天）；
+   *    用户主动在日期下拉里选了某天时，才按所选展示（那是回看/预览，语义正确）。
+   *    「明日标的」不受影响 —— 它单独取最新一期候选（`dossier`），即刚写的次日预案。
+   */
+  const activeView = useMemo(
+    () =>
+      viewDate
+        ? (viewFiles.find((f) => f.date === viewDate) ?? viewFiles[0])
+        : (viewFiles.find((f) => callDates.has(f.date)) ?? viewFiles[0]),
+    [viewFiles, viewDate, callDates],
+  )
 
   /** 判断条目展开为行（code 是 Record 的 key，需要提上来） */
   const viewRows = useMemo(
@@ -168,6 +208,21 @@ export function Component() {
       .filter((x): x is PoolCallFile => !!x)
     return list.find((p) => p.trade_date === activeView.date)
   }, [poolCalls.data, activeView])
+
+  /**
+   * 与所选执行日**同一天**的收盘结算（`pool_ledger.date`）。
+   *
+   * ⛔ 与 `callFile` 一样**无 fallback**：台账当日 16:00 才落盘，配不上就该显示「未落盘」。
+   *    用昨日结算顶替 = 把别天的收益安到今天头上，正是 11-06 那次
+   *    「基线把 +2.56% 虚报成 +13.22%」的同型错误（缺的那笔往往就是当天唯一那笔）。
+   */
+  const ledger = useMemo<PoolLedger | undefined>(() => {
+    if (!activeView?.date) return undefined
+    const list = (poolLedgers.data ?? [])
+      .map((f) => f.data)
+      .filter((x): x is PoolLedger => !!x)
+    return list.find((l) => l.date === activeView.date)
+  }, [poolLedgers.data, activeView])
 
   /**
    * 与所选决策日同一天的全量过筛结论。
@@ -303,12 +358,16 @@ export function Component() {
         )}
         <SegTabs
           items={[
-            { key: 'board', label: '今日决策' },
-            { key: 'exec', label: '今日执行' },
+            // 2026-11-06 用户四问：「买什么 / 赚没赚 / 为什么买 / 为什么没买」
+            // → 默认 tab 就叫「今天」，里面 ①结论 ②账本 ③今晨竞价 ④明日标的 ⑤⑥两池
+            { key: 'board', label: '今天' },
+            { key: 'exec', label: '竞价现场' },
             { key: 'judge', label: `判断 (${viewRows.length})` },
-            { key: 'hit', label: `命中逻辑 (${hitCount})` },
+            { key: 'hit', label: `为什么选它 (${hitCount})` },
             { key: 'decisions', label: `台账 (${decRows.length})` },
             { key: 'nav', label: `净值 (${navRows.length})` },
+            // 回测战绩：三套收益口径（策略=当日收盘 / T+1=次日收盘 / T+1 最保守）
+            { key: 'bt', label: '回测' },
             { key: 'diag', label: '诊断' },
           ]}
           value={tab}
@@ -317,13 +376,15 @@ export function Component() {
         {activeView && (
           <span className="ml-auto num text-11 text-sub">
             预案 {activeView.decision_date} · 执行 {activeView.date}
+            {/* 盘后会提前写出次一交易日预案，那天还没到竞价时刻 → 明说，别让人以为系统坏了 */}
+            {!callFile && <span className="ml-2 text-warn">该执行日尚无 09:25 裁决</span>}
           </span>
         )}
       </section>
 
       {/* ① 今日决策 = 一天的完整决策链（该不该做 → 什么环境 → 筛掉谁 → 选了什么 → 怎么买） */}
       {tab === 'board' && (
-        <DecisionBoard dossier={dossier} callFile={callFile} screen={screenFile} />
+        <DecisionBoard dossier={dossier} callFile={callFile} ledger={ledger} screen={screenFile} />
       )}
 
       {/* ② 今日执行 = 09:25 竞价怎么走的（原 /auction 的独有视角，2026-11-04 合并）
@@ -331,7 +392,7 @@ export function Component() {
             两页曾是同一份档案的两个副本（环境/接力/观察三块重复），现已合并到一处。 */}
       {tab === 'exec' && (
         <Card
-          title="今日执行"
+          title="竞价现场"
           extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
         >
           <ExecutionPanel dossier={dossier} callFile={callFile} />
@@ -505,6 +566,9 @@ export function Component() {
           />
         </Card>
       )}
+
+      {/* 回测战绩：三套口径并列（⛔ 不混账），回答「这套打法历史上赚不赚、赚得稳不稳」 */}
+      {tab === 'bt' && <BacktestCard data={backtest.data} />}
 
       {tab === 'nav' && (
         <Card title="AI 轨净值" extra={<CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>{lastNav ? n2(lastNav.nav) : '—'}</CardBadge>}>

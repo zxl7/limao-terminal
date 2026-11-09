@@ -31,19 +31,21 @@ function seed(client: QueryClient, key: readonly string[], data: unknown) {
 }
 
 describe('首页数据状态不能伪装成无风险', () => {
-  it('板块采集失败时区分上次完整快照与部分数据', () => {
+  it('板块采集失败时仅显示原始更新时间，保留数据可用性判断', () => {
     const stale = mount(<SectorFlowCard />, marketQueries.latest().queryKey, {
       sector_risk: { ok: false, stale: true, asof: '2026-09-28T14:20:00+08:00',
         inflow_top: [{ name: '机器人', pct: 1, flow_yi: 3 }], outflow_top: [], declining: [], count: 0 },
     })
-    expect(screen.getByText(/展示 14:20:00 的完整板块快照/)).toBeInTheDocument()
+    expect(screen.getByText('板块资金更新：09-28 14:20:00')).toBeInTheDocument()
+    expect(screen.queryByText(/采集不完整|快照年龄|过期|参考/)).not.toBeInTheDocument()
     expect(screen.getByText('机器人')).toBeInTheDocument()
     stale.unmount()
 
     mount(<SectorFlowCard />, marketQueries.latest().queryKey, {
       sector_risk: { ok: false, stale: false, inflow_top: [], outflow_top: [], declining: [] },
     })
-    expect(screen.getByText('板块数据采集不完整，以下仅为已取得的部分数据。')).toBeInTheDocument()
+    expect(screen.getByText('板块资金更新：未更新')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(screen.getByText('主力流入数据暂不可用')).toBeInTheDocument()
     expect(screen.getByText('弱势板块数据暂不可用')).toBeInTheDocument()
   })

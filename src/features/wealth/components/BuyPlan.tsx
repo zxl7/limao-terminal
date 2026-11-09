@@ -2,16 +2,25 @@ import type { DossierStock } from '@/shared/api'
 import { cn } from '@/shared/lib'
 import { StockLink } from '@/shared/ui'
 import { DataTable } from '@/features/analytics'
-import { boardsText, num, pctText, yiText } from '../lib/format'
+import { boardsText, num, yiText } from '../lib/format'
 
 /**
- * 明日买点矩阵 —— 把「明天怎么下单」压成一张可横向对比的表。
+ * 明日买点矩阵 —— 把「明天怎么下单」压成一张表。
  *
- * ⛔ 三列口径不可混：
- *   · 预期区间   —— 竞价涨幅落在哪一档算正常
- *   · 量能线     —— 竞价成交额下限（低开但没钱＝不接）
- *   · 买不到概率 —— 历史同组高开 >5% 的占比，这才是「看得见吃不着」的量化
- *   ⛔ `buy_win` 是**这一档真买到时**的胜率，不是全样本晋级率。
+ * ## 2026-11-06 用户「不要那些看不懂的指标」，从 10 列砍到 6 列
+ *
+ * 砍掉的四列及其理由（都是**统计推导量**，不是下单要用的事实）：
+ *
+ * | 砍掉 | 原来长什么样 | 为什么砍 |
+ * |---|---|---|
+ * | 超预期线 | `≥3.2% · 0.51 亿` | 与「计划区间」是同一件事的两端，看区间就够 |
+ * | 明早中位 | `9.8%` | 与「买不到概率」重复表达同一件事 |
+ * | 买不到 | `66%`（`p_over5`） | 名字像结论、实际是历史分组占比，且样本常 5~7 个 |
+ * | 该档真买到 | `28.6% n=7` | 与上一列互为条件概率，两列并排必被误读成「胜率 28.6%」 |
+ *
+ * 留下的六列全部是**下单当下要用的**：买谁、几板、什么方向、竞价落在哪个区间、
+ * 需要多少钱、明天到底做不做（含一句理由）。
+ * ⛔ 区间用二元数组 `expected_range`（`[下沿, 上沿]`），⛔ 不可直接插值。
  */
 export function BuyPlan({
   relay,
@@ -29,7 +38,7 @@ export function BuyPlan({
     <DataTable
       rows={rows}
       rowKey={(r) => `${r.bucket}-${r.s.code}`}
-      empty="本期无候选"
+      empty="本期无候选 —— 接力池留空是允许的结论，不是数据缺失"
       columns={[
         {
           label: '标的',
@@ -58,7 +67,7 @@ export function BuyPlan({
           cell: ({ s }) => <span className="text-12">{s.core_theme || s.theme || '—'}</span>,
         },
         {
-          label: '预期竞价区间',
+          label: '竞价落在',
           num: true,
           cell: ({ s }) => {
             const r = s.expectation?.expected_range
@@ -70,82 +79,32 @@ export function BuyPlan({
           },
         },
         {
-          label: '量能线',
+          label: '竞价额要够',
           num: true,
           cell: ({ s }) => <span className="num text-txt">{yiText(s.expectation?.auction_amount_min_yi)}</span>,
         },
         {
-          label: '超预期线',
-          num: true,
-          cell: ({ s }) => (
-            <span className="num text-sub">
-              {s.expectation?.super_gap_min != null ? `≥${num(s.expectation.super_gap_min, 1)}%` : '—'}
-              {s.expectation?.auction_amount_super_yi != null && s.expectation.auction_amount_super_yi > 0
-                ? ` · ${yiText(s.expectation.auction_amount_super_yi)}`
-                : ''}
-            </span>
-          ),
-        },
-        {
-          label: '明早中位',
-          num: true,
-          cell: ({ s }) => (
-            <span className="num text-txt">{num(s.forecast?.gap_median, 1)}%</span>
-          ),
-        },
-        {
-          label: '买不到',
-          num: true,
-          cell: ({ s }) => {
-            const v = s.forecast?.p_over5
-            return (
-              <span
-                className={cn('num', v == null ? 'text-sub' : v >= 50 ? 'text-down' : v >= 30 ? 'text-warn' : 'text-txt')}
-              >
-                {v == null ? '—' : `${num(v, 0)}%`}
-              </span>
-            )
-          },
-        },
-        {
-          label: '该档真买到',
-          num: true,
-          cell: ({ s }) => {
-            const w = s.forecast?.buy_win
-            return (
-              <span className="flex items-baseline gap-1">
-                <span
-                  className={cn(
-                    'num font-semibold',
-                    w == null ? 'text-sub' : w >= 45 ? 'text-up' : w >= 35 ? 'text-warn' : 'text-down',
-                  )}
-                >
-                  {pctText(w, 1)}
-                </span>
-                {s.forecast?.buy_n != null && (
-                  <span className="num text-11 text-sub">n={s.forecast.buy_n}</span>
-                )}
-              </span>
-            )
-          },
-        },
-        {
-          label: '建议',
+          label: '明日结论',
+          className: 'whitespace-normal min-w-[260px]',
           cell: ({ s }) => {
             const v = s.forecast?.verdict
+            const why = s.forecast?.reasons?.[0]
             if (!v) return <span className="text-sub">—</span>
             return (
-              <span
-                className={cn(
-                  'rounded-sm border px-1 text-11',
-                  v === '可等'
-                    ? 'border-up text-up'
-                    : v === '放弃'
-                      ? 'border-down text-down'
-                      : 'border-line text-sub',
-                )}
-              >
-                {v}
+              <span className="flex flex-col gap-0.5">
+                <span
+                  className={cn(
+                    'w-fit rounded-sm border px-1 text-11',
+                    v === '可等'
+                      ? 'border-up text-up'
+                      : v === '放弃'
+                        ? 'border-down text-down'
+                        : 'border-line text-sub',
+                  )}
+                >
+                  {v}
+                </span>
+                {why && <span className="text-11 leading-snug text-sub">{why}</span>}
               </span>
             )
           },

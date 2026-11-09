@@ -303,20 +303,32 @@ export interface SectorFlowLite {
   source_ts?: number
 }
 
-export interface SectorRisk {
+export interface SectorRiskSourceState {
+  ok?: boolean | null
+  complete?: boolean | null
+  stale?: boolean | null
+  status?: string | null
+  asof?: string | null
+  error?: string | null
+  reference_only?: boolean | null
+  age_seconds?: number | null
+}
+
+export interface SectorRiskState extends SectorRiskSourceState {
+  sources?: {
+    breadth?: SectorRiskSourceState | null
+    flow?: SectorRiskSourceState | null
+  } | null
+}
+
+export interface SectorRisk extends SectorRiskState {
   /** 弱势板块判定阈值（如 -2.5） */
   threshold: number
   declining: SectorFlowLite[]
   focus_declining: SectorFlowLite[]
-  count: number
+  count: number | null
   inflow_top: SectorFlowLite[]
   outflow_top: SectorFlowLite[]
-  ok: boolean
-  /** 本轮采集失败时沿用同交易日最近一次完整结果。 */
-  stale?: boolean
-  /** 完整板块快照的生成时间。 */
-  asof?: string
-  error?: string
 }
 
 /** 连板天梯：一组同板数的股票（⚠️ 仅股票名，非对象） */
@@ -399,11 +411,14 @@ export interface Leader {
 
 /** 退潮/情绪转弱信号 */
 export interface EbbInfo {
+  risk_scope?: 'market' | 'relay' | 'mixed'
+  risk_level?: 'weak' | 'warning'
+  market_effect?: 'strong' | 'positive' | 'neutral' | 'weak' | 'unknown'
   severity: string
   signals: string[]
   max_board: number
   total_zt: number
-  sentiment_score: number
+  sentiment_score: number | null
   sentiment_label: string
 }
 
@@ -1650,7 +1665,7 @@ export interface AvoidanceItem {
   upgrade_hint: string
 }
 
-export interface RotationMarketContext {
+export interface RotationMarketContext extends SectorRiskState {
   sentiment_score: number
   nuke_count: number
   promote_rate: number
@@ -2481,6 +2496,64 @@ export interface PoolCallFile {
     }
     market_open_relief?: boolean
     /**
+     * 环境防守腿（`wealth_code/core/defense_gate.py`）。
+     *
+     * ⛔ `env.hits` 是**已排版好的白话句子**（如「今天开盘昨天涨停的票只有 27% 红开」），
+     *    「今天为什么没买」在 meta 层只有一个权威来源就是它 ——
+     *    ⛔ 不要用 `hit_count` 或阈值数字二次拼装，拼出来的是指标，不是原因。
+     *    命中 ≥5 条 → 名额压到 0；≥3 条 → 压到 1 只。
+     */
+    defense?: {
+      enabled?: boolean
+      env?: {
+        level?: string
+        hits?: string[]
+        hit_count?: number
+        notes?: string[]
+      }
+      /** 各条防守腿拦下的票（有值说明是「个股级」拦，不是环境级） */
+      distribution_blocked?: Array<{ code: string; name?: string; note?: string }>
+      distribution_thin_late_blocked?: Array<{ code: string; name?: string; note?: string }>
+      sector_drain_blocked?: Array<{ code: string; name?: string; note?: string }>
+      position_blocked?: Array<{ code: string; name?: string; note?: string }>
+      /** 每条题材线的态度（一字顶板 / 强开可打 / 破预期）+ 一句话判词 */
+      anchor?: {
+        enabled?: boolean
+        lines?: Record<
+          string,
+          {
+            code: string
+            name: string
+            boards: number
+            attitude: string
+            label: string
+            gap: number
+            note: string
+          }
+        >
+      }
+    }
+    /**
+     * 复核通道统计（`two_pool.recheck_class`）：观察票里有多少进了可完整裁决的 state。
+     */
+    recheck?: {
+      enabled?: boolean
+      state_full_required?: boolean
+      observed?: number
+      state_entered?: number
+      participated?: string[]
+    }
+    /** 名额策略留痕：名义 → 生效、均分上限。⛔ 展示只读，不重算。 */
+    slot_policy?: {
+      min_two_slots?: boolean
+      min_two_slots_applied?: boolean
+      requested_quota?: number
+      effective_quota?: number
+      participate_count?: number
+      even_cap?: number | null
+      allocation_count?: number
+    }
+    /**
      * 昨日连板 · 今晨竞价溢价榜（2026-11-04 用户）。
      *
      * ⛔ 纯读数：不参与名额裁断。只回答「昨天连板那批票，今早是溢价接还是折价跑」。
@@ -2524,6 +2597,115 @@ export interface AuctionPremiumBoard {
   rows: AuctionPremiumRow[]
   /** 报价缺失的票名（⛔ 不是平开，是没数据） */
   no_quote: string[]
+}
+
+/**
+ * 池内台账 · 当日收盘结算（`cache/pool_ledger/<date>.json` · `scripts/pool_ledger.py`）。
+ *
+ * ## 这份数据唯一要回答的事
+ *
+ * 「**今天这些票，09:25 买了、拿到收盘，到底赚没赚**」——全系统唯一一处把
+ * 「事前裁决」和「事后结算」放在同一行里的数据。
+ *
+ * ⛔ 三条不可误读的口径：
+ *   1. `au_ret` = **09:25 竞价价买 → 当日收盘卖**。这才是「照单全买会怎样」；
+ *      `oc_ret`（开盘价买）与 `chg_pct`（昨收→收盘）只是对照，三者不可混用。
+ *   2. `one_word`（一字板）与 `sealed_auction`（竞价已封死）**买不进**，
+ *      `tradable=false` 且**不计入任何汇总** —— 把买不进的涨停算成收益是虚报。
+ *   3. 文件缺失 = **当日收盘 K 线尚未落盘**（脚本 `exit 2` 不写半截文件），
+ *      不是「今天没票」，更不是 0 收益。
+ */
+export interface PoolLedger {
+  date: string
+  generated_at: string
+  source: Record<string, string>
+  coverage: {
+    pool: number
+    quoted: number
+    kline: number
+    /** 池内票在竞价快照里查不到（采集漏采，⛔ 与「没竞价」不是一回事） */
+    missing_quotes: string[]
+    missing_kline: string[]
+  }
+  stance: string
+  quota: number
+  effective_quota: number
+  summary: {
+    pool: number
+    /** 可成交只数（剔除一字与竞价封死） */
+    tradable: number
+    one_word: number
+    sealed_auction: number
+    /** 当日封板的只数 */
+    sealed: number
+    /** 主口径：竞价价买 → 当日收盘卖 */
+    auction_buy_close_sell: PoolLedgerAgg
+    /** T+1 口径：竞价价买 → **次日**收盘卖（次日 K 线未落盘时 n=0） */
+    auction_buy_next_close_sell?: PoolLedgerAgg
+    by_view: Record<string, PoolLedgerAgg>
+    by_gap_band: Record<string, PoolLedgerAgg>
+    /** 按 DEV（今开 − 该票自身质量预期）分档；旧冻结件无 DEV 字段时为空 */
+    by_dev_band?: Record<string, PoolLedgerAgg>
+  }
+  rows: PoolLedgerRow[]
+}
+
+/** 一组票的收益汇总（均值为百分数） */
+export interface PoolLedgerAgg {
+  n: number
+  avg: number
+  med: number
+  /** 胜率（%） */
+  win: number
+  max: number
+  min: number
+}
+
+/** 台账单票结算行 */
+export interface PoolLedgerRow {
+  code: string
+  name: string
+  boards: number
+  /** 涨停幅度：10 / 20（判「竞价封死」用） */
+  limit_up_pct: number
+  /** 今开幅度（%），由竞价价 / 昨收算出 */
+  gap_pct: number | null
+  auction_price: number | null
+  prev_close: number | null
+  open: number | null
+  high: number | null
+  low: number | null
+  close: number | null
+  /** 竞价成交额（亿） */
+  amount_yi: number | null
+  /** 当日所需竞价额下限（亿） */
+  need_yi: number | null
+  theme: string
+  /** 09:25 裁决：participate / watch / skip */
+  view: string
+  /** 复核等级：state / restricted / hard */
+  recheck_class: string
+  /** 裁决理由原文（已是白话，直接展示，⛔ 不要二次拼装） */
+  reason: string
+  /** 当日涨幅（昨收→收盘，%） */
+  chg_pct: number | null
+  /** ⭐ 竞价价买 → 收盘卖（%）＝ 这份数据的主口径 */
+  au_ret: number | null
+  /** 开盘价买 → 收盘卖（%） */
+  oc_ret: number | null
+  /** T+1 口径：竞价价买 → **次日**收盘卖（%）；次日未落盘 → null，⛔ 不用当日收盘顶 */
+  t1_ret?: number | null
+  /** T+1 卖出的那一天（YYYY-MM-DD） */
+  t1_date?: string | null
+  /** DEV = 今开 − 该票自身质量预期（09:25 冻结件里的 gap_vs_expected）；旧件无此字段 → null */
+  dev?: number | null
+  one_word: boolean
+  sealed_auction: boolean
+  sealed: boolean
+  /** 是否可成交（一字/竞价封死为 false，不计入汇总） */
+  tradable: boolean
+  /** 竞价价与开盘价的偏离（pct）；>0.5 值得怀疑数据错配 */
+  price_mismatch: number | null
 }
 
 export interface AiDecisionEntry {
@@ -3372,4 +3554,211 @@ export interface IntradayLimitUpStock {
   sector?: string | null
 }
 
+/**
+ * 竞价三环影子 · 逐日留痕（`scripts/sector_gap_daily_trace.py` 产出）。
+ *
+ * ⚠️ 这不是裁决产物：`would_cut` 只是「若开守卫会被砍」的平行标记，
+ *    09:25 主链从不读取。两套收益并列，禁止混算进账户战绩。
+ */
+export interface SectorGapStat {
+  n: number
+  covered: number
+  mean: number | null
+  median: number | null
+  win_rate: number | null
+  zt: number
+}
+export interface SectorGapPair {
+  same_close: SectorGapStat
+  t1_close: SectorGapStat
+}
+export interface SectorGapSummary {
+  n_tradable: number
+  n_v0: number
+  n_cut: number
+  n_keep: number
+  n_veto: number
+  n_veto_strict: number
+  n_abstain: number
+  v0: SectorGapPair
+  cut: SectorGapPair
+  keep: SectorGapPair
+  veto: SectorGapPair
+  veto_strict: SectorGapPair
+  abstain: SectorGapPair
+  cut_better_days: number
+  cut_worse_days: number
+  cut_better_dates: string[]
+  cut_worse_dates: string[]
+}
+export interface SectorGapDay {
+  date: string
+  prev: string
+  n_quotes: number
+  n_prev_zt: number
+  coverage: number
+  theme_src: string
+  n_tradable: number
+  n_v0: number
+  price_mismatch: number
+  cut_codes: string[]
+  v0: SectorGapPair
+  cut: SectorGapPair
+  keep: SectorGapPair
+  veto: SectorGapPair
+  veto_strict: SectorGapPair
+  abstain: SectorGapPair
+  delta_t1_pct: number | null
+}
+export interface SectorGapRow {
+  date: string
+  code: string
+  name: string
+  gap: number
+  E: number | null
+  DEV: number | null
+  zone: string
+  theme: string | null
+  theme_src: string | null
+  gap_vs_theme: number | null
+  theme_gap_med: number | null
+  upper_gap_med: number | null
+  credits_n: number | null
+  credits_known: number | null
+  veto: boolean
+  status: string | null
+  isolated: boolean
+  would_cut: boolean
+  R_pct: number | null
+  ret_same_close: number
+  ret_t1_close: number | null
+  t1_date: string | null
+  zt_today: boolean
+}
+export interface SectorGapTrace {
+  schema: 'sector_gap_daily_trace_v1'
+  generated_at: string
+  window: {
+    start: string | null
+    end: string | null
+    nominal_days: number
+    active_days: number
+    dropped: Array<{ date: string; reason: string }>
+  }
+  caliber: {
+    strategy: string
+    same_close: string
+    t1_close: string
+    excluded: string
+    warning: string
+    shadow: string
+  }
+  summary: SectorGapSummary
+  days: SectorGapDay[]
+  rows: SectorGapRow[]
+}
+
 export type { RelayEffect, RelayStock } from './relayEffect'
+
+/**
+ * 回测战绩（`scripts/build_backtest_summary.py` 合成 · `/api/research/backtest`）。
+ *
+ * ⛔ 三条不可误读：
+ *   1. `records[]` 是**并列的三套收益口径**（策略=当日收盘 / T+1=次日收盘 / T+1 最保守=次日开盘）。
+ *      差额来自 A 股 T+1 制度，⛔ 禁止相加、相减或互相换算。
+ *   2. 全部指标由 Python 侧算好（`sharpe` / `t` / `mdd` / `pl_ratio`），前端**只显示不重算**，
+ *      否则同一指标会出现两套口径。
+ *   3. 快照是**研究产物**（`generated_at`），可能落后于当日台账；缺文件按「未生成」降级。
+ */
+export interface BacktestSummary {
+  generated_at: string
+  version: string
+  window: { start: string; end: string; days: number }
+  records: BacktestRecord[]
+  layers: BacktestLayer[]
+  live: BacktestLive
+  caveats: string[]
+}
+
+/** 一套收益口径的完整指标 + 逐日净值 */
+export interface BacktestRecord {
+  id: string
+  label: string
+  /** 买入→卖出时点 */
+  sub: string
+  note: string
+  /** 是否为现行主口径（策略口径＝当日收盘） */
+  primary: boolean
+  metrics: BacktestMetrics
+  equity: { date: string; ret: number; nav: number; n: number }[]
+}
+
+export interface BacktestMetrics {
+  days: number
+  picks: number
+  /** 日胜率（%） */
+  day_win: number
+  /** 单笔胜率（%） */
+  pick_win: number
+  /** 日均收益（%） */
+  day_avg: number
+  /** 单笔均收益（%） */
+  pick_avg: number
+  /** 单笔中位（%） */
+  pick_med: number
+  /** 期末复利（%） */
+  compound: number
+  /** 最大回撤（%，负数） */
+  mdd: number
+  /** 年化 Sharpe（252 日） */
+  sharpe: number | null
+  /** 日均的 t 值（df = days−1）；|t|<2 视为不显著 */
+  t: number | null
+  /** 盈利日/亏损日的均值 */
+  gain_avg: number | null
+  loss_avg: number | null
+  /** 盈亏比 = |gain_avg / loss_avg| */
+  pl_ratio: number | null
+}
+
+/** 逐层阶梯：每加一条判据，两个口径各变成多少 */
+export interface BacktestLayer {
+  key: string
+  label: string
+  note: string
+  close: BacktestLayerCell
+  t1: BacktestLayerCell
+  /** 本层相对上一层的复利增量（策略口径，pct）；首层为 null */
+  delta_close: number | null
+}
+
+export interface BacktestLayerCell {
+  days: number | null
+  picks: number | null
+  day_win: number | null
+  pick_win: number | null
+  day_avg: number | null
+  compound: number | null
+  mdd: number | null
+}
+
+/** 真实台账战绩（池内全买逐日）—— ⛔ 不是策略业绩，是「照单全收」的对照 */
+export interface BacktestLive {
+  days: number
+  day_win?: number | null
+  day_avg?: number | null
+  /** 算术累加（%，非复利） */
+  cum?: number | null
+  /** 这些天里真正成交的笔数 */
+  traded?: number | null
+  rows: {
+    date: string
+    pool: number | null
+    tradable: number | null
+    avg: number | null
+    win: number | null
+    n: number | null
+    t1_avg: number | null
+    participate: number
+  }[]
+}

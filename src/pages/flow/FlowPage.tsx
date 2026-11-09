@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { queryClient } from '@/shared/api'
 import type { RotationData, SectorFlowFull, SectorFundPool } from '@/shared/api'
 import { DataTable, SegTabs, Tag, n1, n2, pct } from '@/features/analytics'
-import { marketQueries } from '@/features/market'
+import { marketQueries, SectorRiskStatus } from '@/features/market'
 import { analyticsQueries } from '@/features/analytics'
 import {
   BarList,
@@ -248,6 +248,7 @@ export function Component() {
       >
         {tab === 'today' && (
           <div className="flex flex-col gap-3">
+            <SectorRiskStatus label="板块资金" state={mc?.sources?.flow ?? mc} />
             {/* 双向榜置顶：先看对冲关系，再看四档拆分明细 */}
             <div>
               <SectionHead icon="upRight" title="当日资金对决" hint="零线居中 · 右红为流入 / 左绿为流出" />

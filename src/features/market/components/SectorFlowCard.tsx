@@ -3,11 +3,16 @@ import { cn, fmtPct, fmtYi } from '@/shared/lib'
 import { BarList, Card, type BarListItem } from '@/shared/ui'
 import { marketQueries } from '../api/queries'
 import { pctTone } from '../model/labels'
+import { SectorRiskStatus } from './SectorRiskStatus'
 
 /** 板块资金与弱势板块均来自主快照，不额外请求或重算后台强弱口径。 */
 export function SectorFlowCard() {
-  const { data } = useQuery(marketQueries.latest())
-  const risk = data?.sector_risk
+  const query = useQuery(marketQueries.latest())
+  const risk = query.data?.sector_risk
+  const flowState = risk?.sources?.flow ?? risk
+  const breadthState = risk?.sources?.breadth ?? risk
+  const flowAvailable = flowState?.complete ?? (flowState?.ok || flowState?.stale)
+  const breadthAvailable = breadthState?.complete ?? (breadthState?.ok || breadthState?.stale)
 
   // 分别取上游两侧榜单，避免合并降序截断后流出板块全部消失。
   const flowGroups = [
@@ -29,17 +34,13 @@ export function SectorFlowCard() {
 
   return (
     <Card title="💰 板块资金与弱势板块" extra={<span className="text-11 font-normal text-sub">主力净额 · 亿元</span>}>
-      {risk?.stale ? (
-        <p role="status" className="m-0 mb-2 text-11 text-warn">本轮采集不完整，展示 {risk.asof?.slice(11, 19) ?? '上次'} 的完整板块快照。</p>
-      ) : risk?.ok === false ? (
-        <p role="status" className="m-0 mb-2 text-11 text-warn">板块数据采集不完整，以下仅为已取得的部分数据。</p>
-      ) : null}
+      <SectorRiskStatus label="板块资金" state={flowState} />
       <div className="space-y-2.5">
         {flowGroups.map((group) => (
           <div key={group.label} role="group" aria-label={group.label}>
             <div className="mb-1.5 flex items-center justify-between text-11">
               <span className={cn('font-medium', group.tone)}>{group.label}</span>
-              <span className="text-sub">{risk?.ok || risk?.stale ? `前 ${group.items.length} 项` : '数据未齐'}</span>
+              <span className="text-sub">{flowAvailable ? `前 ${group.items.length} 项` : '数据未齐'}</span>
             </div>
             <BarList
               items={group.items}
@@ -48,7 +49,7 @@ export function SectorFlowCard() {
               bipolar
               barHeight={16}
               labelWidth={112}
-              emptyText={risk?.ok || risk?.stale ? `暂无${group.label}数据` : `${group.label}数据暂不可用`}
+              emptyText={flowAvailable ? `暂无${group.label}数据` : `${group.label}数据暂不可用`}
             />
           </div>
         ))}
@@ -62,6 +63,7 @@ export function SectorFlowCard() {
             {risk?.count != null && ` · ${risk.count} 个`}
           </span>
         </div>
+        <SectorRiskStatus label="弱势板块" state={breadthState} />
         {declining.length > 0 ? (
           <div className="grid grid-cols-1 gap-1 min-[480px]:grid-cols-2">
             {declining.map((s) => (
@@ -78,7 +80,7 @@ export function SectorFlowCard() {
           </div>
         ) : (
           <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-11 text-sub">
-            {risk?.stale ? '上次完整快照暂无达到阈值的弱势板块' : risk?.ok ? '当前快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
+            {breadthAvailable ? '该时点快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
           </p>
         )}
       </div>
