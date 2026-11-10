@@ -199,17 +199,33 @@ export function PoolLedgerCard({
   const [today] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()))
   const buyList = (
     <div className="flex flex-col gap-2">
-      <div className="text-11 text-sub">系统买入名单 · 09:25 冻结裁决，非券商成交 · 当前涨跌幅为昨收对比，非持仓收益</div>
+      <div className="text-11 text-sub">
+        系统买入名单 · 09:25 冻结裁决，非券商成交 · 已结算显示「竞价价买→收盘卖」，未结算显示实时快照（昨收对比，非持仓收益）
+      </div>
       {!callFile ? <div className="text-12 text-sub">该执行日裁决未落盘，不使用昨日名单</div> : !picks.length ? <div className="text-12 text-sub">该执行日系统无参与票</div> : picks.map((code) => {
         const quote = callFile.trade_date === today && quotes?.date === today ? quotes.quotes[code] : undefined
         const stamp = quote && new Date(quote.ts)
         const clock = stamp && Number.isFinite(stamp.getTime()) ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(stamp) : ''
         const valid = quote && Number.isFinite(quote.pct) && stamp && Number.isFinite(stamp.getTime()) && new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(stamp) === today && clock >= '09:30'
-        const name = callFile.views[code]?.name || ledger?.rows.find((r) => r.code === code)?.name || '名称暂无'
+        const row = ledger?.rows.find((r) => r.code === code)
+        /**
+         * ⛔ 2026-11-10 用户「同一只票一处 +5.54%、一处暂无报价」：
+         *    账本已落盘时**以账本为主口径**（竞价价买→收盘卖），实时快照只作未结算时的兜底。
+         *    原来无条件走实时快照，收盘后 quotes 过期 → 明明有结算却显示「暂无报价」。
+         */
+        const settled = row != null && typeof row.au_ret === 'number' && Number.isFinite(row.au_ret)
+        const pct = settled ? (row!.au_ret as number) : valid ? quote.pct : null
+        const tone = pct == null ? 'text-sub' : pct >= 0 ? 'text-up' : 'text-down'
+        const note = settled
+          ? '收盘结算 · 竞价价买 → 收盘卖'
+          : valid
+            ? `${quote.source} · 快照 ${quote.ts}`
+            : callFile.trade_date !== today ? '历史执行日不套用今日行情' : '实时快照未到 · 结算见下表'
+        const name = callFile.views[code]?.name || row?.name || '名称暂无'
         return <div key={code} className="flex flex-wrap items-baseline gap-3 text-12">
           <StockLink code={code}>{name}</StockLink><span className="num text-sub">{code}</span>
-          <span className={valid ? quote.pct >= 0 ? 'text-up' : 'text-down' : 'text-sub'}>{valid ? signedPct(quote.pct) : '暂无报价'}</span>
-          <span className="text-11 text-sub">{valid ? `${quote.source} · 快照 ${quote.ts}` : callFile.trade_date !== today ? '历史执行日不套用今日行情' : '等待同日盘中行情'}</span>
+          <span className={tone}>{pct == null ? '暂无报价' : signedPct(pct)}</span>
+          <span className="text-11 text-sub">{note}</span>
         </div>
       })}
     </div>
@@ -225,6 +241,14 @@ export function PoolLedgerCard({
       </Card>
     )
   }
+
+  /**
+   * 🕳️ 空列治理（2026-11-10）：T+1 次日行情未落盘时整列为 `—`。
+   * 它既占宽度（把「为什么」挤出视口），又让读者以为「今天 T+1 是 0」。
+   * 全列都空 → 整列不渲染；有任意一行有值才显示。
+   */
+  const showT1 = ledger.rows.some((r) => r.t1_ret !== null && r.t1_ret !== undefined)
+  const columns = showT1 ? COLUMNS : COLUMNS.filter((c) => c.label !== 'T+1')
 
   const s = ledger.summary
   const agg = s.auction_buy_close_sell
@@ -331,7 +355,7 @@ export function PoolLedgerCard({
           rows={rows}
           rowKey={(r) => r.code}
           dense
-          columns={COLUMNS}
+          columns={columns}
           // 买不进（一字/竞价封死）整行压灰：它出现在表里只为回答「为什么没买」，
           // ⛔ 它的收益不参与统计，视觉上必须与可成交行区分开。
           rowClass={(r) => (r.tradable ? undefined : 'opacity-55')}

@@ -468,13 +468,18 @@ describe('PoolLedgerCard 赚没赚', () => {
     const row = [...container.querySelectorAll('tr')].find((tr) => tr.textContent?.includes('园城黄金'))
     expect(row?.textContent).toContain('封死')
     // 列序锁（2026-11-06 新增 DEV / T+1 两列）：0 标的 · 1 板 · 2 方向 · 3 今开 · 4 DEV
-    // · 5 裁决 · 6 竞价→收盘 · 7 T+1 · 8 当日 · 9 为什么
+    // · 5 裁决 · 6 竞价→收盘 · 7 当日 · 8 为什么（T+1 全空时按需隐藏）
     // ⛔ 这里同时断表头文字：以后再插列会直接红，而不是静默断言到错的列。
     const head = container.querySelector('thead')?.textContent ?? ''
     expect(head).toContain('DEV')
-    expect(head).toContain('T+1')
-    expect(row?.children[6]?.textContent).toBe('—')
-    expect(row?.children[8]?.textContent).toBe('+10.00%')
+    // 2026-11-10：T+1 整列全空（次日未落盘）→ 整列不渲染；空列既占宽度又误导「今天是 0」
+    expect(head).not.toContain('T+1')
+    // ⛔ 按表头定位列，不写死下标：2026-11-10 起 T+1 空列会按需隐藏，下标会漂。
+    const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '')
+    const col = (name: string) => heads.indexOf(name)
+    expect(col('竞价→收盘')).toBeGreaterThanOrEqual(0)
+    expect(row?.children[col('竞价→收盘')]?.textContent).toBe('—')
+    expect(row?.children[col('当日')]?.textContent).toBe('+10.00%')
   })
 
   it('逐票带裁决与拒因 —— 「赚没赚」和「为什么」在同一行', () => {
