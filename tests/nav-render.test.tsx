@@ -91,13 +91,14 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 32 个 Tab（含实时段 8 个与数据底座）', () => {
+  it('导航渲染出全部 29 个 Tab（含实时段 8 个与数据底座）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
     // 2026-11-05：决策段新增「竞价留痕」(/sector-gap) → 30 → 31
     // 2026-11-10：盘面段新增「龙头基因」(/dragon-gene) → 31 → 32
-    expect(links.length).toBe(32)
+    // 2026-11-10：财富密码收成单入口（竞价留痕/执行审计/尾盘潜伏 并入 /ai 四切面）→ 32 → 29
+    expect(links.length).toBe(29)
     expect(nav.querySelector('a[href="/data"]')?.textContent).toContain('数据底座')
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
@@ -121,7 +122,7 @@ describe('AppShell 导航渲染', () => {
       '主线题材',
       '情绪周期',
       '连板日观察',
-      'AI尾盘潜伏',
+      // 2026-11-10：AI尾盘潜伏 收进「财富密码」四切面，不再单列入口
       '数据底座',
     ])
     // 每个重点入口都必须带星标

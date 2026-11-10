@@ -15,7 +15,7 @@ export async function loader() {
   return null
 }
 
-export function Component() {
+export function ExecutionAuditView() {
   const audit = useQuery(analyticsQueries.decisionExecutionAudit())
   const data: ExecutionAudit | undefined = audit.data
   const batches = useMemo(() => [...(data?.batches ?? [])].reverse(), [data])
@@ -101,4 +101,9 @@ export function Component() {
       </Card>
     </div>
   )
+}
+
+/** 路由入口（保持 URL 兼容）：ExecutionAuditView 的薄包装 */
+export function Component() {
+  return <ExecutionAuditView />
 }

@@ -34,7 +34,7 @@ export async function loader() {
   return null
 }
 
-export function Component() {
+export function AmbushView() {
   const signals = useQuery(analyticsQueries.ambushPullbackSignals())
   const settlements = useQuery(analyticsQueries.ambushPullbackSettlements())
   const weightedPnl = useQuery(analyticsQueries.ambushWeightedPnl())
@@ -152,4 +152,9 @@ function ReturnText({ value }: { value: number }) {
 
 function Metric({ label, value, cls }: { label: string; value: string; cls?: string }) {
   return <div className="flex flex-col"><span className="text-sub text-12">{label}</span><span className={cn('num text-15 font-semibold', cls ?? 'text-txt')}>{value}</span></div>
+}
+
+/** 路由入口（保持 URL 兼容）：AmbushView 的薄包装 */
+export function Component() {
+  return <AmbushView />
 }

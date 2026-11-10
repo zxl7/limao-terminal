@@ -91,16 +91,13 @@ export const TABS: readonly TabDef[] = [
   { to: '/dragon-gene', label: '龙头基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
-  { to: '/ambush', label: 'AI尾盘潜伏', group: '决策', priority: true },
   { to: '/trade', label: '交易战绩', group: '决策' },
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
   // ⛔ 2026-11-04 合并：原「竞价决策」(`/auction`) 已并入「财富密码」(`/ai`) 的
   //    「今日执行」tab —— 两页曾是同一份决策档案的两个副本（环境/接力/观察三块
   //    完全重复）。导航不再单列；路由 `/auction` 保留可直达，避免旧链接失效。
-  { to: '/execution-audit', label: '执行审计', group: '决策' },
   // 竞价三环影子留痕（只观察、不裁决）——与「回测」并列，但不混算账户战绩
-  { to: '/sector-gap', label: '竞价留痕', group: '决策' },
 
   // ── 段4 · 题材与资金（日频）──
   { to: '/eruption', label: '题材爆发史', group: '题材' },

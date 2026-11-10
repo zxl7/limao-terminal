@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchRoute, queryClient } from '@/shared/api'
+import { SectorGapView } from '@/pages/sector-gap/SectorGapPage'
+import { ExecutionAuditView } from '@/pages/execution-audit/ExecutionAuditPage'
+import { AmbushView } from '@/pages/ambush/AmbushPage'
 import type {
   AiDecisionEntry,
   AiViewFile,
@@ -81,7 +84,7 @@ const NAV_BASELINE: { value: number; label: string; tone: 'sub'; dashed: boolean
   { value: 1, label: '盈亏分界 1.0', tone: 'sub', dashed: true },
 ]
 
-export function Component() {
+export function AiWealthView() {
   const [today] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()))
   const quotes = useQuery({ queryKey: ['participation-quotes'], queryFn: () => fetchRoute('/api/decision/participation-quotes'), staleTime: 0, refetchInterval: 30_000 })
   const view = useQuery(analyticsQueries.aiView())
@@ -656,6 +659,44 @@ export function Component() {
           hint="wealth_code/cache/candidates-<日期>.json 与 ai_decisions.jsonl 未生成"
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * 财富密码 · 单一入口（2026-11-10 终端精简）
+ *
+ * 原来侧栏有 4 个入口（财富密码 / 竞价留痕 / 执行审计 / 尾盘潜伏），但它们是同一条链路的
+ * 不同切面：**预案 → 竞价 → 成交 → 结算**。分成 4 个入口的结果是「看今天这票为什么买」
+ * 要在 4 页之间来回切（实测多数页面 8 天只被打开 1 次）。
+ *
+ * 现在收成一个入口 + 四个切面；⛔ 旧 URL 全部保留（各自仍是独立路由），只是不再占侧栏。
+ */
+const WEALTH_SECTIONS = [
+  { key: 'link', label: '今日链路' },
+  { key: 'gap', label: '竞价留痕' },
+  { key: 'audit', label: '执行审计' },
+  { key: 'ambush', label: '尾盘潜伏' },
+] as const
+
+type WealthSection = (typeof WEALTH_SECTIONS)[number]['key']
+
+export function Component() {
+  const [section, setSection] = useState<WealthSection>('link')
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2 border-b border-line pb-2">
+        <span className="text-12 font-semibold text-txt">财富密码</span>
+        <SegTabs
+          items={WEALTH_SECTIONS as unknown as ReadonlyArray<{ key: string; label: string }>}
+          value={section}
+          onChange={(k) => setSection(k as WealthSection)}
+        />
+      </div>
+      {section === 'link' && <AiWealthView />}
+      {section === 'gap' && <SectorGapView />}
+      {section === 'audit' && <ExecutionAuditView />}
+      {section === 'ambush' && <AmbushView />}
     </div>
   )
 }

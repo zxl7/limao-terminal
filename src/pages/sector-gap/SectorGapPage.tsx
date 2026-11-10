@@ -40,7 +40,7 @@ const STATUS_TEXT: Record<string, string> = {
 
 type Scope = 'flagged' | 'all'
 
-export function Component() {
+export function SectorGapView() {
   const q = useQuery(analyticsQueries.sectorGapTrace())
   const data = q.data
   const [scope, setScope] = useState<Scope>('flagged')
@@ -209,4 +209,9 @@ export function Component() {
       </Card>
     </div>
   )
+}
+
+/** 路由入口（保持 URL 兼容）：SectorGapView 的薄包装 */
+export function Component() {
+  return <SectorGapView />
 }
