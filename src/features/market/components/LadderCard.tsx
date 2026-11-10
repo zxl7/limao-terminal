@@ -27,6 +27,15 @@ import { feedbackTone, pctTone } from "../model/labels"
  *    的封单套到今天的梯队上）；不同日时仅显示昨日基线位置。
  * 3. 同梯位只按今日涨停池首封时间排序；未晋级票不借用昨日 fbt，排在有今日时间的股票之后。
  */
+/**
+ * 🎨 天梯高度梯度（2026-11-10 用户「高度前三按 4/3/2 递减」）。
+ *
+ * 只给**前三个梯位**上底色，且强度递减：最高板最重 → 次高 → 第三。
+ * 第四档及以下不上色：梯队尾部经常有十几个 1 板，全上色等于没重点。
+ * ⛔ 用字面量类名（Tailwind 不认拼接），改色只改这张表。
+ */
+const RANK_BG = ['bg-up-soft', 'bg-up/13', 'bg-up/7'] as const
+
 export function LadderCard() {
   const { data: yzt } = useQuery(marketQueries.yesterday())
   const { data: fb, isError: feedbackError } = useQuery(marketQueries.feedback())
@@ -121,11 +130,13 @@ export function LadderCard() {
       {groups.length > 0 ? (
         /* 上限 300px + 内部滚动：梯队档数与每档票数随盘面变化。 */
         <div className="flex flex-col gap-1 max-h-[300px] overflow-auto">
-          {groups.map((g) => {
+          {groups.map((g, rank) => {
             const isTop = g.boards === maxBoards
+            // 前三个梯位按 1/2/3 递减上色；第四档起不上色（尾部 1 板太多，全上色就没重点了）
+            const rankBg = RANK_BG[rank] ?? ""
             return (
-              <div key={g.boards} className={cn("flex items-baseline gap-2.5 px-1.5 py-1 rounded", isTop && "bg-up-soft")}>
-                <span className="num flex-none w-10 text-xs font-bold text-up">{g.boards}板</span>
+              <div key={g.boards} className={cn("flex items-baseline gap-2.5 px-1.5 py-1 rounded", rankBg)}>
+                <span className={cn("num flex-none w-10 text-xs font-bold", isTop ? "text-up" : "text-up/75")}>{g.boards}板</span>
                 <span className="flex flex-wrap gap-x-3 gap-y-1">
                   {g.stocks.map((s) => {
                     const q = quotes[s.code]
