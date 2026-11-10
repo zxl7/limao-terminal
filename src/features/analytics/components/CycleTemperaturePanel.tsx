@@ -196,6 +196,12 @@ export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResu
             <HeatItem label="情绪分" value={latestSentiment} unit="/10" signal={result.heat.sentiment} />
           </div>
           <HeatLegend />
+          {/* 🧾 2026-11-10 口径去重（截图审查）：顶栏与页面都在说「涨停/炸板/封板率」，
+              但顶栏写封板率、页面写炸板率，读者会以为两个数打架。这里一次性把关系钉死。 */}
+          <div className="mt-1.5 text-10 leading-relaxed text-sub">
+            涨停 / 炸板 / 封板率与顶栏同源同口径：<b className="text-txt">封板率 = 涨停 ÷（涨停 + 炸板）</b>，
+            此处「炸板率」= 100 − 封板率；后面的冷热标签是它在历史窗口中的相对位置，⛔ 不是另一个口径。
+          </div>
         </section>
       </div>
 

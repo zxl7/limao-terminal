@@ -107,7 +107,13 @@ export function TopBar() {
 
       {/* 极值 / 广度 / 量能 —— 盘中页原指挥条的数据维度，全部上移到 header */}
       <div className="flex items-center gap-4 min-w-0 overflow-hidden">
-        <HeadKpi label="涨停" value={data?.total_zt ?? DASH} unit="只" tone={headFromTone('up')} />
+        <HeadKpi
+          label="涨停"
+          value={data?.total_zt ?? DASH}
+          unit="只"
+          tone={headFromTone('up')}
+          hint="收盘封住涨停的只数（口径同「情绪周期」页的涨停家数）"
+        />
         <HeadKpi
           label="跌停"
           value={data?.limit_down?.count ?? DASH}
@@ -119,12 +125,14 @@ export function TopBar() {
           value={data?.broken?.count ?? DASH}
           unit="只"
           tone={headFromTone('down')}
+          hint="今日曾涨停、收盘未封住的只数；封板率的分母是「涨停 + 炸板」"
         />
         <HeadKpi
           label="封板率"
           value={sd?.seal_rate != null ? sd.seal_rate.toFixed(1) : DASH}
           unit="%"
           tone={sd?.seal_rate != null && sd.seal_rate < 55 ? headFromTone('down') : 'text-head-txt'}
+          hint="封板率 = 涨停 ÷（涨停 + 炸板）；页面里的「炸板率」= 100 − 封板率，两者同源"
         />
         <HeadKpi
           label="最高板"
@@ -209,15 +217,21 @@ function HeadKpi({
   unit,
   tone,
   className,
+  hint,
 }: {
   label: string
   value: string | number
   unit?: string
   tone: string
   className?: string
+  /** 口径提示（悬停可见）：把「这个数怎么算的」钉在指标上，避免与页面内同名数字打架 */
+  hint?: string
 }) {
   return (
-    <div className={cn('flex-col leading-tight whitespace-nowrap', className || 'flex')}>
+    <div
+      className={cn('flex-col leading-tight whitespace-nowrap', className || 'flex')}
+      title={hint}
+    >
       <span className="text-10 text-head-soft">{label}</span>
       <span className={cn('head-num text-13', tone)}>
         {value}
