@@ -94,14 +94,14 @@ export function SignalRail({ className }: { className?: string }) {
       {/*
         ⛔ 2026-10-18 用户硬要求：短线精灵**固定高度 + 内部滚动，不得超屏**。
         行高必须与 `rowH` 完全一致（否则虚拟列表会出现空白缝隙）：
-          · 当日沉淀行含「首/末」两行 → 46px
-          · 实时行只有两行 → 34px
+          · 当日沉淀行：三行（名称/首末/类型）→ **56px**（46px 装不下三行，类型行被裁掉）
+          · 实时行：两行 → 40px
         列表容器 `flex-1 min-h-0`：高度由上面的固定 section 决定，绝不反向撑高页面。
       */}
       {visible.length > 0 ? (
         <VirtualList
           items={visible}
-          itemHeight={isHistory ? 46 : 34}
+          itemHeight={isHistory ? 56 : 40}
           heightClass="flex-1 min-h-0"
           className="-mx-0.5 pr-0.5"
           empty={null}
@@ -110,7 +110,7 @@ export function SignalRail({ className }: { className?: string }) {
             return (
               <div
                 key={s.code ?? s.name}
-                style={{ height: isHistory ? 46 : 34 }}
+                style={{ height: isHistory ? 56 : 40 }}
                 className="py-[4px] border-b border-line last:border-b-0 min-w-0 overflow-hidden"
               >
                 <div className="flex items-baseline gap-1.5">
@@ -124,9 +124,12 @@ export function SignalRail({ className }: { className?: string }) {
                   )}
                 </div>
                 {isHistory && (
-                  <div className="num flex flex-wrap gap-x-2 text-10 text-sub mt-0.5">
-                    <span>首 {s.first_seen?.slice(0, 5) ?? '—'}</span>
-                    <span>末 {s.last_seen?.slice(0, 5) ?? '—'}</span>
+                  /* ⛔ 2026-11-10 截图反馈「首/末时间被截断」：这一行原来 flex-wrap，
+                     栏宽一窄就折成两行，把下面的信号类型挤出 46px 固定行高（被 overflow-hidden 裁掉）。
+                     改为单行不换行：栏宽再窄也只横向压缩，不再把内容挤没。 */
+                  <div className="num flex items-baseline gap-x-2 text-10 text-sub mt-0.5 whitespace-nowrap overflow-hidden">
+                    <span className="truncate">首 {s.first_seen?.slice(0, 5) ?? '—'}</span>
+                    <span className="truncate">末 {s.last_seen?.slice(0, 5) ?? '—'}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5 mt-[2px]">
