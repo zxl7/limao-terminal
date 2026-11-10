@@ -26,7 +26,7 @@ import type { PagePath } from './pages'
  * 导航分段。**「实时」段必须在最前** —— 见 TABS 的排序依据。
  * 用联合类型而非 string，防止后续新增 Tab 时把段名写错、静默多出一段。
  */
-export type TabGroup = '实时' | '盘面' | '题材' | '决策' | '数据'
+export type TabGroup = '实时' | '盘面' | '题材' | '决策' | '数据' | '更多'
 
 interface TabDef {
   /** 必须来自 `pages.ts` 的 `PAGE_LOADERS` —— 类型层保证「导航项都有对应页面模块」 */
@@ -103,17 +103,19 @@ export const TABS: readonly TabDef[] = [
   { to: '/eruption', label: '题材爆发史', group: '题材' },
   { to: '/lhb', label: '龙虎榜', group: '题材' },
   { to: '/carrier', label: '载体追踪', group: '题材' },
-  { to: '/risk', label: '风险监控', group: '题材' },
 
   // ── 段5 · 数据与运维（日频）──
   { to: '/data', label: '数据底座', group: '数据', priority: true },
-  { to: '/record', label: '数据记录', group: '数据' },
-  { to: '/ops', label: '运维审计', group: '数据' },
   { to: '/hithink', label: '同花顺数据', group: '数据' },
-  { to: '/stack', label: '数据堆叠', group: '数据' },
-  { to: '/archive', label: '决策存档', group: '数据' },
-  { to: '/cards', label: '卡片原文', group: '数据' },
   { to: '/system', label: '系统台账', group: '数据' },
+
+  // ── 段6 · 更多（低频档案；侧栏默认收起，⛔ 不占主视线）──
+  { to: '/risk', label: '风险监控', group: '更多' },
+  { to: '/record', label: '数据记录', group: '更多' },
+  { to: '/ops', label: '运维审计', group: '更多' },
+  { to: '/stack', label: '数据堆叠', group: '更多' },
+  { to: '/archive', label: '决策存档', group: '更多' },
+  { to: '/cards', label: '卡片原文', group: '更多' },
 ] as const
 
 export function AppShell() {

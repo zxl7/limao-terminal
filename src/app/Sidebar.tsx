@@ -26,7 +26,7 @@ import { cn } from '@/shared/lib'
  */
 
 /** 五段固定顺序（与 TABS 的分组一致，仅用于控制渲染次序与段头） */
-const GROUPS: TabGroup[] = ['实时', '盘面', '决策', '题材', '数据']
+const GROUPS: TabGroup[] = ['实时', '盘面', '决策', '题材', '数据', '更多']
 
 /** 段图标 —— 极简线性 SVG（currentColor 跟随侧栏文字色） */
 function GroupIcon({ group }: { group: TabGroup }) {
@@ -40,6 +40,13 @@ function GroupIcon({ group }: { group: TabGroup }) {
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
     'aria-hidden': true,
+  }
+  if (group === '更多') {
+    return (
+      <svg {...common}>
+        <circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" />
+      </svg>
+    )
   }
   switch (group) {
     case '实时': // 脉冲线
@@ -81,6 +88,8 @@ function GroupIcon({ group }: { group: TabGroup }) {
 
 export function Sidebar() {
   const nav = usePageNav()
+  /** 「更多」默认收起：这 6 个是「需要时才翻」的档案页（8 天访问日志：多数只开过 1 次） */
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const grouped = GROUPS.map(
     (g) => [g, TABS.filter((t) => t.group === g)] as const,
@@ -130,17 +139,28 @@ export function Sidebar() {
                 <GroupIcon group={group} />
                 {/* 实时段用深底强调红 text-head-up（不是浅底 text-up ——
                     深底上 --color-up 对比度不足），与历史段拉开层级 */}
-                <span
-                  className={cn(
-                    'text-11 font-semibold tracking-[0.12em] uppercase',
-                    live ? 'text-head-up' : 'text-head-soft',
-                  )}
-                >
-                  {group}
-                </span>
+                {group === '更多' ? (
+                  <button
+                    type="button"
+                    aria-expanded={moreOpen}
+                    onClick={() => setMoreOpen((open) => !open)}
+                    className="text-11 font-semibold tracking-[0.12em] uppercase text-head-soft cursor-pointer hover:text-head-txt bg-transparent border-0 p-0"
+                  >
+                    更多 {moreOpen ? '⌃' : '⌄'}
+                  </button>
+                ) : (
+                  <span
+                    className={cn(
+                      'text-11 font-semibold tracking-[0.12em] uppercase',
+                      live ? 'text-head-up' : 'text-head-soft',
+                    )}
+                  >
+                    {group}
+                  </span>
+                )}
               </div>
               <div className="space-y-0.5">
-                {items.map((t) => (
+                {group === '更多' && !moreOpen ? null : items.map((t) => (
                   <NavLink
                     key={t.to}
                     to={t.to}
@@ -207,6 +227,8 @@ export function Sidebar() {
 /** 窄屏（<lg）回退导航 —— 侧栏隐藏时退化为顶部横向 tab 条，避免移动端无导航。 */
 export function TopNavFallback() {
   const [dataOpen, setDataOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const seenGroups = new Set<string>()
   const nav = usePageNav()
 
   return (
@@ -215,7 +237,11 @@ export function TopNavFallback() {
       aria-label="顶部导航"
     >
       {TABS.map((t, i) => {
-        const isGroupStart = i === 0 || TABS[i - 1].group !== t.group
+        // ⛔ 组头按「首次出现」判，不按「与上一项不同」判：
+        //    2026-11-10 把 6 个入口移入「更多」后，TABS 不再按组连续排列，
+        //    旧判据会让同一组头渲染多次（实测「数据」出现两个按钮）。
+        const isGroupStart = !seenGroups.has(t.group)
+        if (isGroupStart) seenGroups.add(t.group)
         const live = t.group === '实时'
         return (
           <Fragment key={t.to}>
@@ -225,14 +251,17 @@ export function TopNavFallback() {
                 {live && (
                   <span className="w-1.5 h-1.5 rounded-full bg-up animate-pulse" aria-hidden />
                 )}
-                {t.group === '数据' ? (
+                {t.group === '数据' || t.group === '更多' ? (
                   <button
                     type="button"
-                    aria-expanded={dataOpen}
-                    onClick={() => setDataOpen((open) => !open)}
-                    className="text-11 text-sub whitespace-nowrap cursor-pointer hover:text-txt"
+                    aria-expanded={t.group === '数据' ? dataOpen : moreOpen}
+                    aria-label={`展开${t.group}`}
+                    onClick={() => (t.group === '数据'
+                      ? setDataOpen((open) => !open)
+                      : setMoreOpen((open) => !open))}
+                    className="text-11 text-sub whitespace-nowrap cursor-pointer hover:text-txt bg-transparent border-0 p-0"
                   >
-                    数据 {dataOpen ? '⌃' : '⌄'}
+                    {t.group} {(t.group === '数据' ? dataOpen : moreOpen) ? '⌃' : '⌄'}
                   </button>
                 ) : (
                   <span
@@ -247,7 +276,7 @@ export function TopNavFallback() {
                 )}
               </span>
             )}
-            {(t.group !== '数据' || dataOpen) && (
+            {(t.group !== '数据' || dataOpen) && (t.group !== '更多' || moreOpen) && (
               <NavLink
                 to={t.to}
                 end={t.end}

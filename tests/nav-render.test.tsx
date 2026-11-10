@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppShell } from '@/app/AppShell'
@@ -91,14 +91,15 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 29 个 Tab（含实时段 8 个与数据底座）', () => {
+  it('导航渲染出全部 23 个 Tab（「更多」默认收起 6 个：29 → 23）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
     // 2026-11-05：决策段新增「竞价留痕」(/sector-gap) → 30 → 31
     // 2026-11-10：盘面段新增「龙头基因」(/dragon-gene) → 31 → 32
     // 2026-11-10：财富密码收成单入口（竞价留痕/执行审计/尾盘潜伏 并入 /ai 四切面）→ 32 → 29
-    expect(links.length).toBe(29)
+    // 2026-11-10：6 个低频入口折进「更多」（默认收起）→ 29 → 23
+    expect(links.length).toBe(23)
     expect(nav.querySelector('a[href="/data"]')?.textContent).toContain('数据底座')
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
@@ -141,13 +142,27 @@ describe('AppShell 导航渲染', () => {
   it('顶部导航的数据子 Tab 默认收起，点击“数据”后展开', () => {
     renderShell()
     const topNav = screen.getByRole('navigation', { name: '顶部导航' })
-    expect(topNav.querySelector('a[href="/record"]')).toBeNull()
+    // 2026-11-10：/record 已移入「更多」组；数据组剩下 /data /hithink /system
+    expect(topNav.querySelector('a[href="/system"]')).toBeNull()
 
-    const trigger = screen.getByRole('button', { name: /数据/ })
+    // ⛔ 侧栏与窄屏回退都渲染，必须限定在「顶部导航」内查找
+    const trigger = within(topNav).getByRole('button', { name: /展开数据/ })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(trigger)
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    expect(topNav.querySelector('a[href="/record"]')).toBeTruthy()
+    expect(topNav.querySelector('a[href="/system"]')).toBeTruthy()
   })
 })
+
+  it('「更多」展开后能看到那 6 个低频入口（收起 ≠ 删除，URL 仍可达）', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    renderShell()
+    const nav = screen.getByRole('navigation', { name: '主导航' })
+    expect(nav.querySelectorAll('a').length).toBe(23)
+    await userEvent.click(within(nav).getByRole('button', { name: /更多/ }))
+    expect(nav.querySelectorAll('a').length).toBe(29)
+    for (const href of ['/risk', '/ops', '/record', '/stack', '/archive', '/cards']) {
+      expect(nav.querySelector(`a[href="${href}"]`), `${href} 展开后应可见`).toBeTruthy()
+    }
+  })

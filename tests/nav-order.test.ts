@@ -53,10 +53,10 @@ const REALTIME_TABS = [
 ] as const
 
 /** 段序 —— 实时段置首是本次改动的核心，顺序即契约 */
-const GROUP_ORDER = ['实时', '盘面', '决策', '题材', '数据'] as const
+const GROUP_ORDER = ['实时', '盘面', '决策', '题材', '数据', '更多'] as const
 
 describe('导航顺序 —— 实时优先', () => {
-  it('分段顺序固定为 实时 → 盘面 → 决策 → 题材 → 数据', () => {
+  it('分段顺序固定为 实时 → 盘面 → 决策 → 题材 → 数据 → 更多', () => {
     // 按出现次序去重，得到实际段序
     const seen: string[] = []
     for (const t of TABS) if (seen[seen.length - 1] !== t.group) seen.push(t.group)
