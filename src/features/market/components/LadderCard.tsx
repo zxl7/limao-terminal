@@ -34,7 +34,9 @@ import { feedbackTone, pctTone } from "../model/labels"
  * 第四档及以下不上色：梯队尾部经常有十几个 1 板，全上色等于没重点。
  * ⛔ 用字面量类名（Tailwind 不认拼接），改色只改这张表。
  */
-const RANK_BG = ['bg-up-soft', 'bg-up/13', 'bg-up/7'] as const
+// ⛔ 第一档不能用 `bg-up-soft`（#ffe9e5 是**固定浅粉**，比 13% 的 up 还浅，
+//    实测出现「第二名比第一名深」的倒挂）。三档统一用同一底色的不透明度阶梯。
+const RANK_BG = ['bg-up/26', 'bg-up/13', 'bg-up/6'] as const
 
 export function LadderCard() {
   const { data: yzt } = useQuery(marketQueries.yesterday())

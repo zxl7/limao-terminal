@@ -113,11 +113,13 @@ describe('LadderCard · 昨日梯队 × 今日晋级', () => {
       expect(screen.getByText('5板')).toBeInTheDocument()
     })
 
-    // 最高梯位（5板）整行获得红色底；原 4 板未上移者仍在 4 板行
+    // 2026-11-10：前三档按 26/13/6 递减（同一底色不透明度阶梯，⛔ 不再用固定浅粉 bg-up-soft，
+    //   否则会出现「第二名比第一名深」的倒挂）。
     const topRow = screen.getByText('5板').closest('div') as HTMLElement
-    expect(topRow.className).toContain('bg-up-soft')
+    expect(topRow.className).toContain('bg-up/26')
     const lowerRow = screen.getByText('4板').closest('div') as HTMLElement
-    expect(lowerRow.className).not.toContain('bg-up-soft')
+    expect(lowerRow.className).toContain('bg-up/13')
+    expect(lowerRow.className).not.toContain('bg-up/26')
 
     // 头部：基线日 + 按封单上移数
     const text = document.body.textContent ?? ''
