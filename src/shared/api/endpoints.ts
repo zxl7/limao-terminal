@@ -23,6 +23,7 @@ import type {
   AiNavEntry,
   AiViewFile,
   ArchiveIndexEntry,
+  DragonGeneFile,
   AuctionLive,
   AuditEntry,
   BacktestReport,
@@ -130,6 +131,7 @@ export interface RouteTypeMap {
   '/api/gene/detail': DatedFile<GeneProfile>[]
   '/api/gene/hist': DatedFile<GeneHistory>[]
   '/api/gene/pool': GenePoolFile
+  '/api/dragon/gene': DragonGeneFile
 
   // ── 六、情绪周期 ──
   '/api/emotion/summary5d': EmotionSummary5D
@@ -309,6 +311,8 @@ export const api = {
   geneHist: () => fetchRoute('/api/gene/hist'),
   /** 涨停基因池（最近一期） */
   genePool: () => fetchRoute('/api/gene/pool'),
+  /** 龙头基因沉淀池（≥4板入池 / 断板两日判 A 杀） */
+  dragonGene: () => fetchRoute('/api/dragon/gene'),
 
   // ── 六、情绪周期 ──
   /** 5 日情绪摘要（含 3 日 MA 与转折信号） */

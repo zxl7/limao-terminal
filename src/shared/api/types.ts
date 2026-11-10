@@ -2524,7 +2524,10 @@ export interface PoolCallFile {
       distribution_thin_late_blocked?: Array<{ code: string; name?: string; note?: string }>
       sector_drain_blocked?: Array<{ code: string; name?: string; note?: string }>
       position_blocked?: Array<{ code: string; name?: string; note?: string }>
-      /** 每条题材线的态度（一字顶板 / 强开可打 / 破预期）+ 一句话判词 */
+      /** 每条题材线的锚点态度 + 状态标签 + 一句话判词。
+          ⚠️ 2026-11-10 晚文案定稿：label 只给**状态**（超预期 / 符合预期 / 略低于预期 /
+          错杀 / 低于预期 / 未达预期 / 一字 / 大高开），**动作**由后端 `ATT_ACTION` 给
+          （观察接力 / 可低吸 / 不买，看跟风 / 放弃…），前端⛔ 不自己拼结论。 */
       anchor?: {
         enabled?: boolean
         lines?: Record<
@@ -2535,6 +2538,8 @@ export interface PoolCallFile {
             boards: number
             attitude: string
             label: string
+            /** 后端给的**动作**（观察接力 / 可低吸 / 不买，看跟风 / 放弃）；`符合预期` 时为空串。 */
+            action?: string
             gap: number
             note: string
           }
@@ -3769,4 +3774,66 @@ export interface BacktestLive {
     t1_avg: number | null
     participate: number
   }[]
+}
+
+// ────────────────────────────────────────────────────────────────
+// 龙头基因沉淀池（`scripts/dragon_gene.py` · 2026-11-10 用户定义）
+// ────────────────────────────────────────────────────────────────
+
+/** 池内一只票的退潮跟踪状态 */
+export interface DragonGeneRow {
+  code: string
+  name: string
+  sector?: string
+  /** tracking=还在涨停 / pending=已断板未满两日 / retained=温和撤退 / eliminated=A杀淘汰 */
+  status: 'tracking' | 'pending' | 'retained' | 'eliminated'
+  /** 首次达到 4 板那天 */
+  entry_day: string | null
+  entry_boards: number | null
+  max_boards: number
+  /** 最高板 ≥5：有望突破板块、成为市场情绪龙头 */
+  strong: boolean
+  break_day: string | null
+  /** 断板当日相对最后涨停日收盘 */
+  d1_pct: number | null
+  /** 断板后第 2 个交易日累计 */
+  d2_pct: number | null
+  post_2d_pct: number | null
+  a_kill: boolean | null
+  /** 该票单日涨跌停幅度（10 / 20 / 5 / 30） */
+  limit_pct?: number
+  /** A 杀阈值 = −一个跌停板（如 −20） */
+  a_kill_threshold?: number
+  /** 绝对 −10% 口径的对照结论（与 a_kill 可能不同） */
+  a_kill_abs10?: boolean | null
+  current_boards?: number
+  generation?: number
+}
+
+export interface DragonGeneFile {
+  schema: string
+  generated_at: string
+  /** 最后一个**完整**归档日（盘中归档会被跳过） */
+  data_as_of: string | null
+  window: string[]
+  rules: {
+    entry_boards: number
+    strong_boards: number
+    a_kill_pct: number
+    a_kill_mode?: string
+    a_kill_ratio?: number
+    a_kill_note?: string
+  }
+  summary: {
+    entered: number
+    strong: number
+    tracking: number
+    pending: number
+    retained: number
+    eliminated: number
+    decided: number
+    retain_rate: number | null
+    a_kill_rate: number | null
+  }
+  pool: DragonGeneRow[]
 }

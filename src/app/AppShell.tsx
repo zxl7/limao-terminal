@@ -88,6 +88,7 @@ export const TABS: readonly TabDef[] = [
   { to: '/leader-daily', label: '连板日观察', group: '盘面', priority: true },
   { to: '/promotion', label: '连板晋级', group: '盘面' },
   { to: '/gene', label: '股性基因', group: '盘面' },
+  { to: '/dragon-gene', label: '龙头基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
   { to: '/ambush', label: 'AI尾盘潜伏', group: '决策', priority: true },

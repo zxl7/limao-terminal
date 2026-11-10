@@ -53,6 +53,7 @@ export const PAGE_LOADERS = {
   '/leader-daily': () => import('@/pages/leader-daily/LeaderDailyPage'),
   '/promotion': () => import('@/pages/promotion/PromotionPage'),
   '/gene': () => import('@/pages/gene/GenePage'),
+  '/dragon-gene': () => import('@/pages/dragon-gene/DragonGenePage'),
 
   // ── 决策与战绩 ──
   '/ai': () => import('@/pages/ai/AiPage'),

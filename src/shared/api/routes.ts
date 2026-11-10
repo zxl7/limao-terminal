@@ -166,6 +166,10 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache/zt_genes', pattern: '^pool_\\d{8}\\.json$', mode: 'latest', cadence: 'daily',
     desc: '涨停基因池（最近一期·逐票 zt_boards/zt_days/zt_times/seal_min/broken/seal_fund_yi）',
   },
+  '/api/dragon/gene': {
+    file: 'cache/dragon_gene.json', cadence: 'daily',
+    desc: '龙头基因沉淀池（≥4板入池 · 5板强票 · 断板两日跌幅≤−10% 判 A 杀淘汰）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 六、情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）
