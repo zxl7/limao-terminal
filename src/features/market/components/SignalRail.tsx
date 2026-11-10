@@ -103,7 +103,13 @@ export function SignalRail({ className }: { className?: string }) {
           items={visible}
           itemHeight={isHistory ? 56 : 40}
           heightClass="flex-1 min-h-0"
-          className="-mx-0.5 pr-0.5"
+          /*
+            ⛔ 2026-11-10 截图反馈「标题左侧被切」：原来是 `-mx-0.5 pr-0.5`——
+            负边距把内容往左顶 2px，而父级 `.signal-rail` 是 `overflow-hidden`，
+            正好把名字的第一个字裁掉（丝路视觉看起来像「幺路视觉」）。
+            改为对称内边距：只在框内缩，不再往框外顶。
+          */
+          className="px-0.5"
           empty={null}
           render={(s) => {
             const st = signalTypeStyle(s.type)
