@@ -6,6 +6,24 @@ import { analyticsQueries, DataTable, n1, n2, pct } from '@/features/analytics'
 import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, rsiWilder } from '@/shared/lib'
 
+/**
+ * 🕳️ 列级空值治理（2026-11-10）：整列都无值 → 不渲染该列。
+ *
+ * 起因：`/data` 的「当前封单」整列 `—`、「逻辑」整列 `—`，既占宽度，又让读者
+ * 以为「这里有数据只是没显示」。空列应该消失，而不是排成一张表。
+ */
+function anyTruthy<T>(rows: readonly T[], pick: (r: T) => unknown): boolean {
+  return rows.some((r) => Boolean(pick(r)))
+}
+
+function hasValue<T>(rows: readonly T[], pick: (r: T) => unknown): boolean {
+  return rows.some((r) => {
+    const v = pick(r)
+    return v !== null && v !== undefined && v !== '' && v !== '—'
+  })
+}
+
+
 export async function loader() {
   await Promise.allSettled([
     queryClient.ensureQueryData(analyticsQueries.dataExitPeaks()),
@@ -137,19 +155,24 @@ export function Component() {
                       </span>
                     ),
                   },
-                  {
-                    label: '当前状态',
-                    cell: (row) => (
-                      <span className={row.current_sealed ? 'text-up font-semibold' : 'text-sub'}>
-                        {row.current_sealed ? '封板' : '未封'}
-                      </span>
-                    ),
-                  },
-                  {
-                    label: '当前封单(亿)',
-                    num: true,
-                    cell: (row) => <span className="num">{n1(row.current_seal_yi)}</span>,
-                  },
+                  // 全列「未封」/全列「—」时不渲染：这两列在收盘后经常整列为空
+                  ...(anyTruthy(stockRows, (r) => r.current_sealed)
+                    ? [{
+                        label: '当前状态',
+                        cell: (row: (typeof stockRows)[number]) => (
+                          <span className={row.current_sealed ? 'text-up font-semibold' : 'text-sub'}>
+                            {row.current_sealed ? '封板' : '未封'}
+                          </span>
+                        ),
+                      }]
+                    : []),
+                  ...(hasValue(stockRows, (r) => r.current_seal_yi)
+                    ? [{
+                        label: '当前封单(亿)',
+                        num: true,
+                        cell: (row: (typeof stockRows)[number]) => <span className="num">{n1(row.current_seal_yi)}</span>,
+                      }]
+                    : []),
                   {
                     label: '盘中峰值(亿)',
                     num: true,
@@ -238,7 +261,10 @@ export function Component() {
                     ),
                   },
                   { label: '主题', cell: (row) => <span className="text-rec">{row.theme ?? '—'}</span> },
-                  { label: '逻辑', cell: (row) => <span className="text-sub">{row.logic || '—'}</span> },
+                  // 全列无逻辑时不渲染（题材快照多数没有 logic 字段）
+                  ...(hasValue(frozenThemeRows, (r) => r.logic)
+                    ? [{ label: '逻辑', cell: (row: (typeof frozenThemeRows)[number]) => <span className="text-sub">{row.logic || '—'}</span> }]
+                    : []),
                 ]}
               />
             )}

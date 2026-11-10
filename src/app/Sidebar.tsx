@@ -107,7 +107,7 @@ export function Sidebar() {
      *    （表现就是「tab 列表不自己滚，整个侧栏跟着内容走」）。
      */
     <aside
-      className="max-lg:hidden lg:flex flex-col w-[220px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none bg-head-bg"
+      className="max-lg:hidden lg:flex flex-col w-[132px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none bg-head-bg"
       aria-label="主导航"
     >
       {/* 品牌：固定左上角（⛔ 不要放进可滚动区） */}
@@ -117,19 +117,19 @@ export function Sidebar() {
         >
           狸
         </span>
-        <span className="font-bold text-15 tracking-[0.02em]">狸猫终端</span>
+        <span className="font-bold text-13 tracking-[0.02em] truncate">狸猫终端</span>
       </div>
 
       {/* 分组导航 —— 本侧栏唯一的滚动区 */}
       <nav
         aria-label="主导航"
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 py-3 space-y-4"
+        className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-1.5 py-3 space-y-3"
       >
         {grouped.map(([group, items]) => {
           const live = group === '实时'
           return (
             <div key={group}>
-              <div className="flex items-center gap-1.5 px-2 mb-1.5">
+              <div className="flex items-center gap-1.5 px-1.5 mb-1.5">
                 {live && (
                   <span
                     className="w-1.5 h-1.5 rounded-full bg-head-up animate-pulse"
@@ -182,7 +182,7 @@ export function Sidebar() {
                     data-priority={t.priority ? 'true' : undefined}
                     className={({ isActive }) =>
                       cn(
-                        'flex items-center gap-2 px-2.5 py-[7px] rounded-md text-13 no-underline transition-colors',
+                        'flex items-center gap-1.5 px-2 py-[6px] rounded-md text-12 no-underline transition-colors',
                         isActive
                           ? 'bg-white/10 text-white shadow-[inset_2px_0_0_var(--color-up)]'
                           : 'text-head-soft hover:bg-white/5 hover:text-head-txt',
@@ -214,9 +214,10 @@ export function Sidebar() {
       </nav>
 
       {/* 页脚状态 */}
-      <div className="px-4 py-2.5 border-t border-white/10 flex items-center gap-2 text-11 text-head-soft flex-none">
-        <span className="w-1.5 h-1.5 rounded-full bg-head-down" aria-hidden />
-        <span>A股情绪核心 · 盘中实时终端</span>
+      <div className="px-2 py-2.5 border-t border-white/10 flex items-center gap-1.5 text-10 text-head-soft flex-none">
+        <span className="w-1.5 h-1.5 rounded-full bg-head-down flex-none" aria-hidden />
+        {/* ⛔ 2026-11-10 侧栏收窄到 132px：长文案换行会撑高页脚，缩成两行标签 */}
+        <span className="leading-tight">A股情绪核心<br />盘中实时终端</span>
       </div>
 
       <NavErrorBanner failure={nav.failure} onRetry={nav.retry} onDismiss={nav.dismiss} />

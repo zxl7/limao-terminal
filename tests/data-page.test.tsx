@@ -126,12 +126,19 @@ describe('数据底座页', () => {
     vi.stubGlobal('fetch', fetchSpy)
     renderPage()
     const row = (await screen.findByText('海洋王')).closest('tr')!
+    // ⛔ 2026-11-10：整列为空时该列不渲染（当前状态/当前封单在收盘后常全空），
+    //    所以按表头定位，不写死列下标。
+    const table = row.closest('table') as HTMLElement
+    const head = within(table).getAllByRole('columnheader')
+    const col = (name: string) => head.findIndex((th) => th.textContent?.includes(name))
     const cells = within(row).getAllByRole('cell')
-    expect(cells[1].textContent).toBe('未封')
-    expect(cells[2].textContent).toBe('—')
-    expect(cells[3].textContent).toBe('4.3')
-    expect(cells[4].textContent).toBe('09:32:08')
-    expect(cells[5].textContent).toBe('14:59:10')
+    // 夹具里全部「未封」且封单全空 ⇒ 两列都不渲染（空列既占宽又像「有数据只是没显示」）；
+    // 盘中峰值 / 峰值时刻 / 报价时刻 必须原样保留。
+    expect(col('当前状态')).toBe(-1)
+    expect(col('当前封单')).toBe(-1)
+    expect(cells[col('盘中峰值')].textContent).toBe('4.3')
+    expect(cells[col('峰值时刻')].textContent).toBe('09:32:08')
+    expect(cells[col('报价时刻')].textContent).toBe('14:59:10')
   })
 
   it('接口失败不冒充未命中或未入库', async () => {

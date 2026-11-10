@@ -283,9 +283,12 @@ describe('盘中实时页 · 实时字段覆盖（此前零渲染）', () => {
     const top5 = ((readSnapshot()?.top5 as unknown[] | undefined) ?? [])
     if (top5.length > 0) {
       expect(c.querySelector('button[aria-label^="题材 "]'), 'top5 非空却没渲染题材行').not.toBeNull()
-      // 默认展开第一名 —— 打开页面就能看到最强那条线里是谁
+      // ⛔ 2026-11-10 用户「首屏默认收起明细」：打开页面先看排序，
+      //    点某一行才展开它那条线的个股（旧口径是默认展开第一名，会把首屏铺满）。
       const opened = c.querySelector('button[aria-expanded="true"]')
-      expect(opened, '应默认展开最强题材').not.toBeNull()
+      expect(opened, '默认应收起明细').toBeNull()
+      const rows = c.querySelectorAll('button[aria-label^="题材 "]')
+      expect(rows.length, '题材行必须仍可见（收起 ≠ 隐藏）').toBeGreaterThan(0)
     } else {
       expect(c.textContent, 'top5 为空时应给明确空态').toContain('暂无题材强度数据')
     }

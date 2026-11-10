@@ -24,12 +24,22 @@ const stock = (code: string, name: string, extra: Partial<Leader> = {}): Leader 
 const early = (buy: Leader, sector = '题材乙'): EarlyItem => ({ buy, sector, desc: '催化原文', type: '爆发中', count: 1, zt_in_sector: 3, members: [] })
 const ev = (at: string, kind: string, fields = {}): IntradayTimelineEvent => ({ at, kind, ...fields }) as IntradayTimelineEvent
 
-function mount(snapshot: Partial<MarketSnapshot> = {}, events: IntradayTimelineEvent[] = []) {
+function mount(
+  snapshot: Partial<MarketSnapshot> = {},
+  events: IntradayTimelineEvent[] = [],
+  /** 2026-11-10 起题材明细**默认收起**：断言个股内容的用例先点开第一条；行为用例传 expand:false */
+  opts: { expand?: boolean } = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false, gcTime: 0 } } })
   // 夹具只给部分字段（页面按可选字段渲染）—— 断言在渲染结果上，故此处收窄为完整类型
   client.setQueryData(marketQueries.latest().queryKey, snapshot as MarketSnapshot)
   client.setQueryData(analyticsQueries.intradayTimeline().queryKey, events)
-  return render(<QueryClientProvider client={client}><TopThemeCard /><IntradayMoodCard /></QueryClientProvider>)
+  const r = render(<QueryClientProvider client={client}><TopThemeCard /><IntradayMoodCard /></QueryClientProvider>)
+  if (opts.expand !== false) {
+    const first = r.container.querySelector('button[aria-label^="题材 "]')
+    if (first) fireEvent.click(first)
+  }
+  return r
 }
 
 /** 题材夹具：默认 3 涨停 / 6 家数，可按需覆盖 */
@@ -59,19 +69,19 @@ describe('盘中精简内容', () => {
     expect(container.textContent).not.toMatch(/主线|共振/)
   })
 
-  it('最强 = 涨停家数最多，而不是上游给的顺序；默认只展开它', () => {
+  it('最强 = 涨停家数最多，而不是上游给的顺序；明细默认收起', () => {
     const { container } = mount({
       top5: [
         theme('上游第一但只有2只', { rank: 1, zt_count: 2, zt_prev: 1 }),
         theme('真最强', { rank: 2, zt_count: 20, zt_prev: 4 }),
       ],
-    })
+    }, [], { expand: false })
     const buttons = [...container.querySelectorAll('button[aria-label^="题材 "]')]
     expect(buttons.map((b) => b.getAttribute('aria-label'))).toEqual(['题材 真最强', '题材 上游第一但只有2只'])
     expect(buttons[0].textContent).toContain('最强')
     expect(buttons[1].textContent).not.toContain('最强')
-    // 默认态：只展开第一名
-    expect(buttons[0].getAttribute('aria-expanded')).toBe('true')
+    // 2026-11-10 用户「首屏默认收起明细」：默认全部收起（旧口径是默认展开第一名）
+    expect(buttons[0].getAttribute('aria-expanded')).toBe('false')
     expect(buttons[1].getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -81,10 +91,13 @@ describe('盘中精简内容', () => {
         theme('甲', { zt_count: 9, zt_stocks: [{ name: '甲票', code: '000001', pct: 10 }] }),
         theme('乙', { rank: 2, zt_count: 5, zt_stocks: [{ name: '乙票', code: '000002', pct: 10 }] }),
       ],
-    })
+    }, [], { expand: false })
     const pick = (name: string) => within(container).getByRole('button', { name: `题材 ${name}` })
 
-    // 默认展开甲 → 只有甲的个股在屏上
+    // 默认全部收起 → 屏上没有个股；点甲才展开
+    expect(container.textContent).not.toContain('甲票')
+    fireEvent.click(pick('甲'))
+    expect(pick('甲').getAttribute('aria-expanded')).toBe('true')
     expect(container.textContent).toContain('甲票')
     expect(container.textContent).not.toContain('乙票')
 

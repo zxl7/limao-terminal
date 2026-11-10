@@ -77,8 +77,9 @@ export function TopThemeCard() {
   const frozen = isFrozenSnapshot(data?.data_scope?.asof || data?.ts)
   const snapDay = String(data?.data_scope?.asof ?? data?.ts ?? '').slice(5, 10)
 
-  // undefined = 还没点过，跟随「最强」（第一名）；null = 用户主动全部收起
-  const [picked, setPicked] = useState<string | null | undefined>(undefined)
+  // null = 默认全部收起（2026-11-10 截图审查：第一名默认展开会把 20+ 只票铺满首屏，
+  //        其余题材被挤到折叠线以下）；点某一行才展开它，再点一次收起。
+  const [picked, setPicked] = useState<string | null | undefined>(null)
   const activeName = picked === undefined ? (rows[0]?.name ?? null) : picked
 
   return (

@@ -223,7 +223,7 @@ function LabelChip({
         data-label-dir={dir}
       />
       <span
-        className="absolute left-1/2 -translate-x-1/2 num text-10 text-txt whitespace-nowrap pointer-events-none"
+        className="absolute left-1/2 -translate-x-1/2 num text-11 text-txt whitespace-nowrap pointer-events-none"
         style={isUp ? { bottom: HIT_H + slot.tier * LABEL_STEP } : { top: HIT_H + slot.tier * LABEL_STEP }}
         data-label-tier={slot.tier}
         data-label-dir={dir}
@@ -262,7 +262,7 @@ export function ShapeLegend({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-sm border border-line-faint bg-line-faint/40 px-2.5 py-1.5',
+        'flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-sm border border-line-faint bg-line-faint/40 px-2 py-1',
         className,
       )}
       aria-label="时间轴图形说明"
@@ -273,7 +273,7 @@ export function ShapeLegend({ className }: { className?: string }) {
         return (
           <span
             key={kind}
-            className="flex items-center gap-1 text-11 text-txt/85"
+            className="flex items-center gap-1 text-10 text-txt/85"
             title={spec.desc}
             data-legend-kind={kind}
           >
@@ -288,7 +288,7 @@ export function ShapeLegend({ className }: { className?: string }) {
           </span>
         )
       })}
-      <span className="text-11 text-sub">图标等大 · 竖线高度 = 活跃度</span>
+      <span className="text-10 text-sub">图标等大 · 竖线高度 = 活跃度</span>
     </div>
   )
 }
@@ -1397,7 +1397,7 @@ export function TimelineSnake({
         {layout.lanes.map((lane) => (
           <span
             key={`lane-${lane.row}`}
-            className="absolute text-10 text-txt whitespace-nowrap pointer-events-none"
+            className="absolute text-11 text-txt whitespace-nowrap pointer-events-none"
             style={{
               left: lane.reversed ? layout.x1 : layout.x0,
               // 段末标签贴在**本段**底边（行高自适应后不能再用统一 rowHeight）
