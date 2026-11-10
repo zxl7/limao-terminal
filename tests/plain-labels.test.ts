@@ -4,12 +4,13 @@ import path from 'node:path'
 import { DEFAULT_DATA_ROOT, DATA_ROOT_ENV, ROUTES } from '@/shared/api'
 import {
   CAPITAL_PLAIN,
+  PLAIN_PLACEHOLDERS,
+  PLAIN_UNKNOWN,
   biasText,
   capitalText,
   cardPhaseText,
   klineText,
   phaseText,
-  PLAIN_UNKNOWN,
   sectorSentimentText,
   sectorTierText,
   stanceText,
@@ -122,6 +123,22 @@ describe('白话层 · 已知取值全覆盖（取值清单来自后端源码与
     expect(phaseText('分歧')).toBe('分歧')
   })
 
+  it('⑤′ 空值占位符 → 「—」，⛔ 不得说成「未识别」（2026-11-09 对齐）', () => {
+    /**
+     * 实测 `candidates-2026-11-09.json` 里 `phase` 有 25 个「修复」+ **2 个「—」**。
+     * 「—」是后端「这只票没有题材阶段」的写法，属正常空态；
+     * 而 `未识别` 的含义是「值是枚举，但我们没登记翻译」—— 那是数据脏的告警。
+     * 两者混在一起，真告警就废了：读者看到「未识别」不知道是该修后端还是本来没数据。
+     */
+    for (const v of ['—', '–', '-', '--', '— '.trim()]) {
+      expect(phaseText(v), `占位符 ${JSON.stringify(v)} 应显示「—」`).toBe('—')
+    }
+    expect(phaseText('—')).not.toBe(PLAIN_UNKNOWN)
+
+    // ⛔ 反向守卫：占位符豁免**不能**变成「未知枚举也不报」—— 真枚举仍旧要报未识别
+    expect(phaseText('phase_v3_new')).toBe(PLAIN_UNKNOWN)
+  })
+
   it('⑥ 接力卡相位走另一套词，且 `cardPhaseText` 对两套值都安全', () => {
     // `candidate.phase` 是英文枚举；接力卡 `expectation.phase` 实测是中文（亢奋/分歧/冰点）
     expect(cardPhaseText('亢奋')).toBe('亢奋')
@@ -157,7 +174,12 @@ function collect(obj: unknown, keys: readonly string[], out: Array<[string, stri
     for (const x of obj) collect(x, keys, out)
   } else if (obj && typeof obj === 'object') {
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      if (keys.includes(k) && typeof v === 'string' && v.trim()) out.push([k, v])
+      // ⛔ 占位符不是枚举值：`—` / `-` 表示「后端这里没有值」，
+      //    它会被 resolve 翻成 `—`（正确空态），若把它当枚举值收进来，
+      //    「翻译结果不得为空」这条断言就必然自相矛盾。
+      //    判断必须与 `shared/lib/plain.ts` 的 resolve 同一份（PLAIN_PLACEHOLDERS）。
+      if (keys.includes(k) && typeof v === 'string' && v.trim()
+          && !PLAIN_PLACEHOLDERS.has(v.trim())) out.push([k, v])
       collect(v, keys, out)
     }
   }
@@ -233,9 +255,11 @@ describe('白话层 · 源扫描（⛔ 防「?? raw」回落复发）', () => {
    */
   const SAFE = [
     'r.call?.view ?? r.view',
-    // AiPage#finalViewOf：`call.view`（09:25 裁决）优先，缺失回落 `judge.view`；
-    // 终极缺省 `'pending'` 只进 finalCounts 计数与比较，⛔ 从不上屏。
-    'row.call?.view ?? row.view',
+    // ⛔ 2026-11-09 删掉原来登记的 `row.call?.view ?? row.view`：
+    //    源码里已无此写法（`grep -F` 0 命中），留一条过期例外会让下面
+    //    「过期豁免」断言恒红 —— 而它报的是「测试自己过时」，不是产品问题，
+    //    这种红最误导人（看起来像功能坏了）。同一场景现由上面那条
+    //    `r.call?.view ?? r.view` 覆盖（逻辑相同，只是变量名是 r 不是 row）。
     // RotationPage#themeLifecycle：candidate.phase 与 confidence_factors.phase 同枚举，
     // 只参与 if 分支比较，再映射成中文 label 上屏，⛔ 不直出原 token。
     'c.phase || f.phase',

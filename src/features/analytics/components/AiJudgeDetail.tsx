@@ -230,11 +230,20 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
               finalView === 'participate' ? 'border-up/30 bg-up-soft/40' : 'border-line bg-card',
             )}
           >
-            {/* ── 标题行：名称 + 冻结排序评分 + 判断 + 池别 + 标签 ── */}
-            <div className="flex items-baseline gap-2 flex-wrap mb-1.5 min-w-0">
+            {/* ── 标题行：名称 + 代码 + 冻结排序评分 + 判断 + 池别 + 标签 ── */}
+            {/*
+              ⛔ 名称与代码**都要上屏**（2026-09-22 用户原话：「股票名称加股票代码，
+                 不能只显示股票代码」）。2026-11-09 对齐：此前只渲染 `s?.name || r.code`，
+                 code 仅存在于链接的 `title` 里 —— `title` 不算「上屏」，
+                 textContent 里根本没有它，等于有名称时代码完全消失。
+            */}
+            <div className="flex items-baseline gap-1.5 flex-wrap mb-1.5 min-w-0">
               <StockLink code={r.code} className="text-14 font-semibold text-txt">
                 {s?.name || r.code}
               </StockLink>
+              {s?.name && (
+                <span className="num text-11 text-sub flex-none">{r.code}</span>
+              )}
               <span
                 className={cn('num text-15 font-semibold flex-none', (s?.score ?? 0) >= 80 ? 'text-up' : 'text-sub')}
               >

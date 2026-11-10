@@ -79,7 +79,7 @@ export function TodayVerdict({
                 !hasCall ? 'text-sub' : empty ? 'text-warn' : 'text-up',
               )}
             >
-              {!hasCall ? '今晨裁决未落盘' : empty ? '今天空仓' : `今天买了 ${picks.length} 只`}
+              {!hasCall ? '今晨裁决未落盘' : empty ? '今天空仓' : `系统买入 ${picks.length} 只（非券商成交）`}
             </span>
             {hasCall && (
               <span className="text-12 text-sub">
@@ -102,11 +102,11 @@ export function TodayVerdict({
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               {picks.map((code) => {
                 const row = boughtRows.find((r) => r.code === code)
-                const name = row?.name ?? code
+                const name = callFile?.views[code]?.name || row?.name || '名称暂无'
                 return (
                   <span key={code} className="flex items-baseline gap-1">
                     <StockLink code={code} className="text-13 font-medium text-txt">
-                      {name}
+                      {name} <span className="num text-sub">{code}</span>
                     </StockLink>
                     {row && (
                       <span
@@ -196,7 +196,7 @@ export function TodayVerdict({
           ) : (
             <>
               <div className="text-12 leading-relaxed text-sub">
-                按名额序取前 {picks.length} 只成交，逐票理由见「今日池」。
+                系统按名额序买入前 {picks.length} 只（非券商成交），逐票理由见「今日池」。
               </div>
               {hits.length > 0 && (
                 <ul className="flex flex-col gap-0.5">

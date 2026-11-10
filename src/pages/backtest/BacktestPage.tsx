@@ -214,17 +214,42 @@ export function Component() {
 
             <div>
               <div className="text-12 font-semibold mb-1.5">情绪对齐偏差（预测情绪分 − 实际情绪分）</div>
-              <BarChart
-                bars={trend.labels.map((label, i) => ({
-                  label,
-                  value: trend.sent[i],
-                  /* 绝对值 ≤1 视为对齐（体系内的容忍带），取中性色；超出才用红绿区分偏乐观/偏悲观 */
-                  tone: trend.sent[i] == null ? undefined : Math.abs(trend.sent[i]!) <= 1 ? ('mid' as const) : undefined,
-                }))}
-                height={150}
-                format={(v) => (v > 0 ? `+${n1(v)}` : n1(v))}
-                maxBarWidth={26}
-              />
+              {/*
+                ⛔ 全期次都没有偏差数据时不许画空图（2026-11-09 对齐）。
+                   实测 2026-10-27~11-06 共 8 期 `summary.sentiment_diff` **全部 null**，
+                   后端 `metrics.sentiment_align.status = contract_missing`，原因是：
+                   「『情绪X/10』为昨日实际分（回顾语境），非明日预判，不采用」——
+                   即盘前卡没有「明日预判情绪分」的结构化字段，这个指标根本算不出来。
+                   画一张空白柱图等于让读者以为「偏差都是 0」，那是伪造读数；
+                   必须把「算不出来 + 为什么」直接写在图的位置上。
+              */}
+              {trend.sent.every((v) => v == null) ? (
+                <div className="border border-warn rounded-sm px-2.5 py-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Tag tone="warn">不可评</Tag>
+                  </div>
+                  <p className="text-13 leading-relaxed">
+                    这段时间的情绪偏差 <b className="text-txt">算不出来</b>：盘前卡里没有「明日预判情绪分」
+                    这个结构化字段（卡片上写的「情绪 X/10」是<b className="text-txt">昨日实际分</b>，
+                    属回顾语境，解析器已拒绝采用）。
+                  </p>
+                  <p className="text-sub text-12 mt-1">
+                    ⛔ 不是「偏差 = 0」。要恢复这张柱图，需要盘前卡先落 `sentiment_predict` 结构化预测分。
+                  </p>
+                </div>
+              ) : (
+                <BarChart
+                  bars={trend.labels.map((label, i) => ({
+                    label,
+                    value: trend.sent[i],
+                    /* 绝对值 ≤1 视为对齐（体系内的容忍带），取中性色；超出才用红绿区分偏乐观/偏悲观 */
+                    tone: trend.sent[i] == null ? undefined : Math.abs(trend.sent[i]!) <= 1 ? ('mid' as const) : undefined,
+                  }))}
+                  height={150}
+                  format={(v) => (v > 0 ? `+${n1(v)}` : n1(v))}
+                  maxBarWidth={26}
+                />
+              )}
               <p className="text-sub text-11 mt-1.5 leading-relaxed">
                 零轴居中：<b className="text-up">正值 = 预测偏乐观</b>（实际没有预期那么热）/
                 <b className="text-down"> 负值 = 预测偏悲观</b>。

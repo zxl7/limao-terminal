@@ -12,6 +12,14 @@
 // 通用
 // ════════════════════════════════════════════════════════════════
 
+export interface ParticipationQuotes {
+  date: string
+  ts: string
+  call_available: boolean
+  quotes: Record<string, { pct: number; ts: string; source: string }>
+  missing: string[]
+}
+
 /** 数据不可用（文件缺失/解析失败）—— 原系统大量空态降级依赖此语义 */
 export interface ApiError {
   error: 'data_unavailable'

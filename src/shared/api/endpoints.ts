@@ -99,6 +99,7 @@ import type {
  *    即「文件名 + 内容」的数组，内容损坏时为 null。
  */
 export interface RouteTypeMap {
+  '/api/decision/participation-quotes': import('./types').ParticipationQuotes
   // ── 一、行情主链路 · 盘中实时 ──
   '/api/market/latest': MarketSnapshot
   '/api/market/prev': MarketSnapshot

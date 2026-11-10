@@ -193,12 +193,20 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
   const EV = (time: string, event: string, topic: string, severity = 'high') =>
     ({ time, event, topic, severity }) as never
 
-  /** 造一份含「跨分钟情绪回摆」的事件流（⛔ 单卡内去重是无效的，必须跨槽累积） */
+  /**
+   * 造一份含「跨分钟情绪回摆」的事件流（⛔ 单卡内去重是无效的，必须跨槽累积）。
+   *
+   * ⚠️ 2026-11-09 对齐：首两条原为 **09:19**，而时间轴时段起点是
+   *    `SESSION_OPEN = 09:25`（`snake.ts`，竞价结束才算开盘），`inTimelineSession` 会把
+   *    早于它的事件整条丢掉 —— 于是 `events` 只剩 4 条、`foldedIdx` 全 undefined，
+   *    三条断言一起红。这是**测试数据越界**，不是折叠功能坏了（`foldNoise:false` 那条一直绿）。
+   *    这里把整条情绪链平移到时段内，**保持原有先后顺序**（分歧→修复→分歧 的回摆语义不变）。
+   */
   const RAW = [
-    EV('09:19', '市场情绪由「亢奋」转为「分歧」', '情绪'), // 分歧 首次 → signal
-    EV('09:19', '涨停广度骤变 89 → 0', '广度'), // 归零 → noise
-    EV('09:25', '市场情绪由「分歧」转为「修复」', '情绪'), // 修复 首次 → signal
-    EV('09:32', '市场情绪由「修复」转为「分歧」', '情绪'), // 回摆 → noise
+    EV('09:25', '市场情绪由「亢奋」转为「分歧」', '情绪'), // 分歧 首次 → signal
+    EV('09:25', '涨停广度骤变 89 → 0', '广度'), // 归零 → noise（与上一条同分钟）
+    EV('09:31', '市场情绪由「分歧」转为「修复」', '情绪'), // 修复 首次 → signal
+    EV('09:38', '市场情绪由「修复」转为「分歧」', '情绪'), // 回摆 → noise
     EV('09:47', '新主线崛起：玻璃基板封装 涨停3只，龙头 三峡新材', '玻璃基板封装'), // 题材 → noise
     EV('10:02', '市场情绪由「1/10·退潮」转为「修复」', '情绪'), // 回摆 → noise
   ]
@@ -211,11 +219,11 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
   it('★ 跨槽按时间累积：同一状态第二次出现即折叠（⛔ 卡内去重做不到这件事）', () => {
     const slots = build()
     const at = (m: number) => slots.find((s) => s.at === m)
-    // 09:19：「分歧」是首次出现 → **保留**；广度归零 → 折叠（只有第 2 条）
-    expect(at(9 * 60 + 19)?.foldedIdx).toEqual([1])
-    expect(at(9 * 60 + 19)?.events).toHaveLength(2) // ⛔ 保留的那条不被删除
-    expect(at(9 * 60 + 25)?.foldedIdx, '修复首次 → 不折叠').toBeUndefined()
-    expect(at(9 * 60 + 32)?.foldedIdx, '分歧回摆 → 折叠').toEqual([0])
+    // 09:25：「分歧」是首次出现 → **保留**；广度归零 → 折叠（只有第 2 条）
+    expect(at(9 * 60 + 25)?.foldedIdx).toEqual([1])
+    expect(at(9 * 60 + 25)?.events).toHaveLength(2) // ⛔ 保留的那条不被删除
+    expect(at(9 * 60 + 31)?.foldedIdx, '修复首次 → 不折叠').toBeUndefined()
+    expect(at(9 * 60 + 38)?.foldedIdx, '分歧回摆 → 折叠').toEqual([0])
     expect(at(9 * 60 + 47)?.foldedIdx, '题材类 → 折叠').toEqual([0])
     expect(at(10 * 60 + 2)?.foldedIdx, '修复回摆 → 折叠').toEqual([0])
   })
@@ -224,8 +232,8 @@ describe('展示闸门 · buildTimelineSlots 的折叠标注', () => {
     const slots = build()
     expect(slots.flatMap((s) => s.events ?? [])).toHaveLength(RAW.length)
     // 被折叠的那些仍在数组里
-    const s0919 = slots.find((s) => s.at === 9 * 60 + 19)!
-    expect(s0919.events).toHaveLength(2)
+    const s0925 = slots.find((s) => s.at === 9 * 60 + 25)!
+    expect(s0925.events).toHaveLength(2)
   })
 
   it('★ 全局守恒：signal 数 + 折叠数 === 总条数（不丢不重）', () => {

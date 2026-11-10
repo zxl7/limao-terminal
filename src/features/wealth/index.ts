@@ -20,3 +20,4 @@ export {
   styleText,
   VERDICT_META,
 } from './lib/format'
+export { navRowsDesc } from './lib/nav'

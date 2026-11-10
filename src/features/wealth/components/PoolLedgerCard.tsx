@@ -1,4 +1,5 @@
-import type { PoolLedger, PoolLedgerAgg, PoolLedgerRow } from '@/shared/api'
+import { useState } from 'react'
+import type { ParticipationQuotes, PoolCallFile, PoolLedger, PoolLedgerAgg, PoolLedgerRow } from '@/shared/api'
 import { Card, CardBadge, EmptyState, StockLink } from '@/shared/ui'
 import { DataTable, type Column } from '@/features/analytics'
 import { cn } from '@/shared/lib'
@@ -181,17 +182,42 @@ const COLUMNS: Column<PoolLedgerRow>[] = [
 
 export function PoolLedgerCard({
   ledger,
+  callFile,
+  quotes,
   /** 与台账同日的 09:25 裁决：只为取「实际成交几只」，⛔ 不参与收益计算 */
   participateCount,
   effectiveQuota,
 }: {
   ledger?: PoolLedger
+  callFile?: PoolCallFile
+  quotes?: ParticipationQuotes
   participateCount?: number
   effectiveQuota?: number
 }) {
+  if (ledger && callFile && ledger.date !== callFile.trade_date) ledger = undefined
+  const picks = callFile?.meta?.participate ?? []
+  const [today] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()))
+  const buyList = (
+    <div className="flex flex-col gap-2">
+      <div className="text-11 text-sub">系统买入名单 · 09:25 冻结裁决，非券商成交 · 当前涨跌幅为昨收对比，非持仓收益</div>
+      {!callFile ? <div className="text-12 text-sub">该执行日裁决未落盘，不使用昨日名单</div> : !picks.length ? <div className="text-12 text-sub">该执行日系统无参与票</div> : picks.map((code) => {
+        const quote = callFile.trade_date === today && quotes?.date === today ? quotes.quotes[code] : undefined
+        const stamp = quote && new Date(quote.ts)
+        const clock = stamp && Number.isFinite(stamp.getTime()) ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(stamp) : ''
+        const valid = quote && Number.isFinite(quote.pct) && stamp && Number.isFinite(stamp.getTime()) && new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(stamp) === today && clock >= '09:30'
+        const name = callFile.views[code]?.name || ledger?.rows.find((r) => r.code === code)?.name || '名称暂无'
+        return <div key={code} className="flex flex-wrap items-baseline gap-3 text-12">
+          <StockLink code={code}>{name}</StockLink><span className="num text-sub">{code}</span>
+          <span className={valid ? quote.pct >= 0 ? 'text-up' : 'text-down' : 'text-sub'}>{valid ? signedPct(quote.pct) : '暂无报价'}</span>
+          <span className="text-11 text-sub">{valid ? `${quote.source} · 快照 ${quote.ts}` : callFile.trade_date !== today ? '历史执行日不套用今日行情' : '等待同日盘中行情'}</span>
+        </div>
+      })}
+    </div>
+  )
   if (!ledger) {
     return (
       <Card title="今日账本" extra={<CardBadge tone="warn">未落盘</CardBadge>}>
+        {buyList}
         <EmptyState
           text="今日收盘结算未落盘"
           hint="16:00 收盘 K 线确认后由 scripts/pool_ledger.py 生成；不是「今天没票」，也不是 0 收益"
@@ -214,11 +240,12 @@ export function PoolLedgerCard({
       extra={<CardBadge>{ledger.date}</CardBadge>}
     >
       <div className="flex flex-col gap-2">
+        {buyList}
         {/* ① 一行结论：今天到底赚没赚 */}
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-sm bg-hover px-2.5 py-1.5">
           <AggLine label="池内全买" agg={agg} strong />
           <span className="flex items-baseline gap-1.5">
-            <span className="text-11 text-sub">实际成交</span>
+            <span className="text-11 text-sub">系统参与（非券商成交）</span>
             <span
               className={cn(
                 'num text-13 font-semibold',

@@ -1,4 +1,4 @@
-import type { DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
+import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { BuyPlan } from './BuyPlan'
 import { EnvPanel } from './EnvPanel'
@@ -79,21 +79,24 @@ export function DecisionBoard({
   dossier,
   callFile,
   ledger,
+  quotes,
   screen: _screen,
 }: {
   dossier?: DecisionDossier
   callFile?: PoolCallFile
   /** 与 `callFile.trade_date` 同日的收盘结算；取不到就是「未落盘」，⛔ 不回落昨日 */
   ledger?: PoolLedger
+  quotes?: ParticipationQuotes
   // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
   screen?: ScreenFile
 }) {
   if (!dossier) {
     return (
-      <EmptyState
-        text="本期决策档案未落盘"
-        hint="wealth_code/cache/candidates-<日期>.json 未生成"
-      />
+      <div className="flex flex-col gap-3">
+        <TodayVerdict callFile={callFile} ledger={ledger} />
+        <PoolLedgerCard callFile={callFile} ledger={ledger} quotes={quotes} participateCount={callFile?.meta?.participate?.length} />
+        <EmptyState text="本期决策档案未落盘" hint="wealth_code/cache/candidates-<日期>.json 未生成" />
+      </div>
     )
   }
 
@@ -108,6 +111,8 @@ export function DecisionBoard({
 
       {/* ② 今日账本：09:25 竞价价买 → 当日收盘卖（赚没赚） */}
       <PoolLedgerCard
+        callFile={callFile}
+        quotes={quotes}
         ledger={ledger}
         participateCount={callFile?.meta?.participate?.length ?? 0}
         effectiveQuota={callFile?.meta?.effective_quota ?? callFile?.quota}

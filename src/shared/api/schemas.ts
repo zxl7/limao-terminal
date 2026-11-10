@@ -1126,6 +1126,10 @@ const StockRegistryResponseSchema = z.object({
 //    TS 会因「K 可能是未登记的键」而报 TS2536。字面量类型由 GuardedRoute 保留。
 
 const SCHEMA_MAP = {
+  '/api/decision/participation-quotes': z.object({
+    date: z.string(), ts: z.string(), call_available: z.boolean(), missing: z.array(z.string()),
+    quotes: z.record(z.string(), z.object({ pct: z.number().finite(), ts: z.string(), source: z.string() })),
+  }),
   '/api/market/latest': MarketSnapshotSchema,
   '/api/market/prev': MarketSnapshotSchema,
   '/api/market/auction': AuctionLiveSchema,

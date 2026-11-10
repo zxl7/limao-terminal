@@ -3,6 +3,7 @@ import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import { execFile } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { ROUTES, HEALTH_ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV } from './src/shared/api/routes.ts'
 import { readRoute, healthPayload, freshnessHeaders, resolveDataRoot } from './scripts/lib/read-route.mjs'
@@ -48,6 +49,17 @@ function dataApiPlugin(): Plugin {
       server.middlewares.use((req, res, next) => {
         const requestUrl = new URL(req.url ?? '/', 'http://localhost')
         const url = requestUrl.pathname
+        if (url === '/api/decision/participation-quotes') {
+          execFile('python3', ['-c', 'import json,sys; sys.path.insert(0,sys.argv[1]); from common.participation_quotes import participation_quotes; print(json.dumps(participation_quotes(sys.argv[1])))', DATA_ROOT], { timeout: 15000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+            try {
+              if (error) throw error
+              sendJson(res, 200, JSON.parse(stdout))
+            } catch {
+              sendJson(res, 503, { error: 'data_unavailable', route: url })
+            }
+          })
+          return
+        }
         const dataQuery = parseDataQuery(url, requestUrl.searchParams)
 
         if (dataQuery) {

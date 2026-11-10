@@ -107,14 +107,37 @@ const callRow: JudgeRow = {
 }
 
 describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
-  it('同一 AI 裁决档内，板块龙和空间高度优先于低位高分票', () => {
-    const leader = { ...stock, code: '000001', name: '高度龙', boards: 3, is_sector_dragon: true, score: 45 } as DossierStock
-    const follower = { ...stock, code: '000002', name: '低位高分', boards: 2, is_sector_dragon: true, score: 90 } as DossierStock
+  it('同一裁决档内按冻结评分降序；评分相同才看板块龙与空间高度', () => {
+    /**
+     * 2026-11-09 对齐（原用例名：「板块龙和空间高度优先于低位高分票」）。
+     *
+     * 排序规则在 09-29 的 `7144fc3`（新增 StockLink 那次）被有意改过：
+     * 原先看「板块龙 → 板数」，改成**冻结评分 score 优先**，板块龙/板数/带动降为次级。
+     * 提交里那句注释写得很明白：「AI 裁决不变；每个裁决类别内**严格按冻结排序评分**从高到低展示」。
+     * 但测试没跟着改，于是从 09-29 起这条一直是红的 —— 报的是「测试过时」，不是功能坏了。
+     *
+     * 这里按现行规则重写，并把**两层规则都测**（只测一半等于没测）：
+     *   ① 评分不同 → 高分在前，哪怕它板数更低
+     *   ② 评分相同 → 板块龙 / 板数高的在前
+     */
+    const lowBoardHighScore = { ...stock, code: '000002', name: '低位高分', boards: 2, is_sector_dragon: true, score: 90 } as DossierStock
+    const highBoardLowScore = { ...stock, code: '000001', name: '高度龙', boards: 3, is_sector_dragon: true, score: 45 } as DossierStock
+
     const rows: JudgeRow[] = [
-      { code: follower.code, view: 'watch', stock: follower },
-      { code: leader.code, view: 'watch', stock: leader },
+      { code: lowBoardHighScore.code, view: 'watch', stock: lowBoardHighScore },
+      { code: highBoardLowScore.code, view: 'watch', stock: highBoardLowScore },
     ]
-    expect([...rows].sort(compareJudgeRows).map((item) => item.code)).toEqual(['000001', '000002'])
+    // ① 评分优先
+    expect([...rows].sort(compareJudgeRows).map((item) => item.code)).toEqual(['000002', '000001'])
+
+    // ② 评分相同 → 板块龙 / 板数高在前（次级规则仍在，不是删掉了）
+    const tieA = { ...stock, code: '000003', name: '同分低位', boards: 1, is_sector_dragon: false, score: 70 } as DossierStock
+    const tieB = { ...stock, code: '000004', name: '同分高位', boards: 4, is_sector_dragon: true, score: 70 } as DossierStock
+    const tieRows: JudgeRow[] = [
+      { code: tieA.code, view: 'watch', stock: tieA },
+      { code: tieB.code, view: 'watch', stock: tieB },
+    ]
+    expect([...tieRows].sort(compareJudgeRows).map((item) => item.code)).toEqual(['000004', '000003'])
   })
 
   it('历史normal强龙复核提示不展示，硬否决降级提示保留', () => {

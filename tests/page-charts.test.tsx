@@ -378,7 +378,29 @@ describe('BacktestPage —— 指标走势 / 情绪偏差', () => {
     ).toBeGreaterThan(0)
 
     expect(linePath(container), '命中率折线未生成 path').toBeTruthy()
-    expect(dataRects(container).length, '情绪偏差柱未生成 rect').toBeGreaterThan(0)
+
+    /*
+     * ⚠️ 2026-11-09 对齐：情绪偏差柱**不再无条件要求存在**。
+     *
+     * 实测 2026-10-27~11-06 共 8 期 `summary.sentiment_diff` 全部为 null：
+     * 后端 `metrics.sentiment_align.status = contract_missing`，原因是
+     * 「『情绪X/10』为昨日实际分（回顾语境），非明日预判，不采用」——
+     * 盘前卡没有「明日预判情绪分」的结构化字段，这个指标根本算不出来。
+     *
+     * 于是页面有两条合法路径，这里必须**分别锁死**，⛔ 不允许「既没柱也没说明」蒙过去：
+     *   · 有数据 → 必须有柱
+     *   · 没数据 → 必须明确写「算不出来 + 为什么」，⛔ 不许画空图（空图 = 伪造「偏差为 0」）
+     */
+    const rects = dataRects(container).length
+    const txt = container.textContent ?? ''
+    if (rects === 0) {
+      expect(
+        txt,
+        '情绪偏差既没有柱、也没有写明不可评 —— 空图会把「算不出来」伪装成「偏差为 0」',
+      ).toMatch(/情绪偏差[\s\S]{0,80}(不可评|算不出来)/)
+    } else {
+      expect(rects, '有情绪偏差数据时必须画出柱子').toBeGreaterThan(0)
+    }
   })
 })
 

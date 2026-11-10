@@ -380,11 +380,68 @@ describe('TodayVerdict 今天买没买', () => {
     expect(txt).toContain('+3.20%')
   })
 
+  it('未落账本仍优先显示冻结名称与代码', () => {
+    const call = poolCall({ meta: { ...poolCall().meta, participate: ['002388'] }, views: { '002388': { ...poolCall().views['002388'], code: '002388', name: '冻结名称' } } as PoolCallFile['views'] })
+    const { container } = render(<TodayVerdict callFile={call} />)
+    expect(container.textContent).toContain('冻结名称')
+    expect(container.textContent).toContain('002388')
+    expect(container.textContent).toContain('非券商成交')
+  })
+
+  it('盘中名单展示同日行情，缺价不是零', () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+    const call = poolCall({ trade_date: today, meta: { ...poolCall().meta, participate: ['002388', '000995'] } })
+    const { container } = render(<PoolLedgerCard callFile={call} quotes={{ date: today, ts: `${today}T10:00:00+08:00`, call_available: true, missing: ['000995'], quotes: { '002388': { pct: -2.3, ts: `${today}T10:00:00+08:00`, source: '主快照' } } }} />)
+    expect(container.textContent).toContain('-2.30%')
+    expect(container.textContent).toContain('暂无报价')
+    expect(container.textContent).toContain('快照')
+    expect(container.textContent).toContain('未落盘')
+  })
+
+  it('DecisionBoard 无档案也透传冻结名单和行情', () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+    const call = poolCall({ trade_date: today, meta: { ...poolCall().meta, participate: ['002388'] } })
+    const { container } = render(<DecisionBoard callFile={call} quotes={{ date: today, ts: `${today}T10:00:00+08:00`, call_available: true, missing: [], quotes: { '002388': { pct: 1.25, ts: `${today}T10:00:00+08:00`, source: 'market/latest' } } }} />)
+    expect(container.textContent).toContain('+1.25%')
+    expect(container.textContent).toContain('002388')
+    expect(container.textContent).toContain('本期决策档案未落盘')
+  })
+
+  it('竞价涨幅与异日行时间不得充当当前行情', () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+    const call = poolCall({ trade_date: today, meta: { ...poolCall().meta, participate: ['002388', '000995'] } })
+    const { container } = render(<PoolLedgerCard callFile={call} quotes={{ date: today, ts: `${today}T10:00:00+08:00`, call_available: true, missing: [], quotes: {
+      '002388': { pct: 8.88, ts: `${today}T09:25:00+08:00`, source: 'market/latest' },
+      '000995': { pct: 9.99, ts: '2020-01-01T15:00:00+08:00', source: 'market/latest' },
+    } }} />)
+    expect(container.textContent?.match(/暂无报价/g)).toHaveLength(2)
+    expect(container.textContent).not.toContain('+8.88%')
+    expect(container.textContent).not.toContain('+9.99%')
+  })
+
+  it('冻结名称优先于同日账本且不同日账本不渲染收益', () => {
+    const call = poolCall({ meta: { ...poolCall().meta, participate: ['002388'] }, views: { '002388': { ...poolCall().views['002388'], name: '冻结名称' } } })
+    const verdict = render(<TodayVerdict callFile={call} ledger={ledger()} />)
+    expect(verdict.container.textContent).toContain('冻结名称')
+    expect(verdict.container.textContent).not.toContain('新亚制程')
+    const card = render(<PoolLedgerCard callFile={call} ledger={{ ...ledger(), date: '2020-01-01' }} />)
+    expect(card.container.textContent).toContain('冻结名称')
+    expect(card.container.textContent).toContain('今日收盘结算未落盘')
+    expect(card.container.textContent).not.toContain('+16.00%')
+  })
+
+  it('历史执行日不使用今日行情', () => {
+    const call = poolCall({ trade_date: '2020-01-01', meta: { ...poolCall().meta, participate: ['002388'] } })
+    const { container } = render(<PoolLedgerCard callFile={call} />)
+    expect(container.textContent).toContain('历史执行日不套用今日行情')
+    expect(container.textContent).toContain('暂无报价')
+  })
+
   it('买到票时列出名称与当日结算', () => {
     const call = poolCall({ meta: { ...poolCall().meta, participate: ['002388'], effective_quota: 1 } })
     const { container } = render(<TodayVerdict dossier={dossier()} callFile={call} ledger={ledger()} />)
     const txt = container.textContent ?? ''
-    expect(txt).toContain('今天买了 1 只')
+    expect(txt).toContain('系统买入 1 只（非券商成交）')
     expect(txt).toContain('新亚制程')
     expect(txt).toContain('+16.00%')
   })

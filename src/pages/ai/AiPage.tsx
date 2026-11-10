@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { queryClient } from '@/shared/api'
+import { fetchRoute, queryClient } from '@/shared/api'
 import type {
   AiDecisionEntry,
   AiViewFile,
@@ -24,7 +24,7 @@ import {
   n2,
   pct,
 } from '@/features/analytics'
-import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel } from '@/features/wealth'
+import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel, navRowsDesc } from '@/features/wealth'
 import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, stanceText } from '@/shared/lib'
 
@@ -82,13 +82,15 @@ const NAV_BASELINE: { value: number; label: string; tone: 'sub'; dashed: boolean
 ]
 
 export function Component() {
+  const [today] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()))
+  const quotes = useQuery({ queryKey: ['participation-quotes'], queryFn: () => fetchRoute('/api/decision/participation-quotes'), staleTime: 0, refetchInterval: 30_000 })
   const view = useQuery(analyticsQueries.aiView())
   const decisions = useQuery(analyticsQueries.aiDecisions())
   const nav = useQuery(analyticsQueries.aiNav())
   /** 尾盘财富密码接力卡存档（近 3 期）—— 判断明细的「真实字段」来源 */
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
-  const poolCalls = useQuery(analyticsQueries.decisionPoolCall())
+  const poolCalls = useQuery({ ...analyticsQueries.decisionPoolCall(), refetchInterval: 30_000, staleTime: 0 })
   /** 池内台账（近 20 期）—— 「今天到底赚没赚」的唯一来源（09:25 竞价价买 → 收盘卖） */
   const poolLedgers = useQuery(analyticsQueries.decisionPoolLedger())
   /** 全量涨停逐票过筛（近 5 期）—— 回答「48 只涨停为什么只剩这几只」 */
@@ -128,16 +130,16 @@ export function Component() {
    *   · 「今日账本」→ 显示「未落盘」
    * 用户收盘后打开页面，**今天的结算一个字都看不到**，看到的是一个还没到竞价时刻的未来日。
    *
-   * ✅ 现口径：默认锚定**最近一期已经有 09:25 裁决的执行日**（= 真正在跑的那天）；
-   *    用户主动在日期下拉里选了某天时，才按所选展示（那是回看/预览，语义正确）。
+   * ✅ 默认执行日固定北京时间今天；缺今日裁决就明说，不用昨日名单。
+   *    用户主动选择历史日期才回看；预案展示仍独立选择已有预案。
    *    「明日标的」不受影响 —— 它单独取最新一期候选（`dossier`），即刚写的次日预案。
    */
   const activeView = useMemo(
     () =>
       viewDate
         ? (viewFiles.find((f) => f.date === viewDate) ?? viewFiles[0])
-        : (viewFiles.find((f) => callDates.has(f.date)) ?? viewFiles[0]),
-    [viewFiles, viewDate, callDates],
+        : (viewFiles.find((f) => f.date === today) ?? viewFiles.find((f) => callDates.has(f.date)) ?? viewFiles[0]),
+    [viewFiles, viewDate, callDates, today],
   )
 
   /** 判断条目展开为行（code 是 Record 的 key，需要提上来） */
@@ -201,13 +203,13 @@ export function Component() {
    * ⛔ **无 fallback**：配不上就该显示「今晨裁决未落盘」——用最近一期顶上会把
    *    别天的成交结论安到本日头上（用户 2026-09-22 明确要求显示「今天 9:25 的这个」）。
    */
+  const executionDate = viewDate || today
   const callFile = useMemo<PoolCallFile | undefined>(() => {
-    if (!activeView?.date) return undefined
     const list = (poolCalls.data ?? [])
       .map((f) => f.data)
       .filter((x): x is PoolCallFile => !!x)
-    return list.find((p) => p.trade_date === activeView.date)
-  }, [poolCalls.data, activeView])
+    return list.find((p) => p.trade_date === executionDate)
+  }, [poolCalls.data, executionDate])
 
   /**
    * 与所选执行日**同一天**的收盘结算（`pool_ledger.date`）。
@@ -217,12 +219,11 @@ export function Component() {
    *    「基线把 +2.56% 虚报成 +13.22%」的同型错误（缺的那笔往往就是当天唯一那笔）。
    */
   const ledger = useMemo<PoolLedger | undefined>(() => {
-    if (!activeView?.date) return undefined
     const list = (poolLedgers.data ?? [])
       .map((f) => f.data)
       .filter((x): x is PoolLedger => !!x)
-    return list.find((l) => l.date === activeView.date)
-  }, [poolLedgers.data, activeView])
+    return list.find((l) => l.date === executionDate)
+  }, [poolLedgers.data, executionDate])
 
   /**
    * 与所选决策日同一天的全量过筛结论。
@@ -309,6 +310,14 @@ export function Component() {
     () => [...(nav.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
     [nav.data],
   )
+  /**
+   * 净值**表格**用逆序（最新一行在最上面，2026-11-09 用户要求）。
+   *
+   * ⛔ 只给表格用：`navRows` 本身必须保持**正序** ——
+   *    折线图时间轴只能从左到右；`lastNav` / 最大回撤都是按正序逐点递推算的。
+   * 规则与理由集中在 `features/wealth/lib/nav.ts`（那里有完整的四消费者对照表）。
+   */
+  const navTableRows = useMemo(() => navRowsDesc(navRows), [navRows])
   const lastNav = navRows.at(-1)
 
   /** 累计收益 = 末值 - 1；最大回撤按净值序列逐点计算 */
@@ -345,10 +354,11 @@ export function Component() {
         <span className="text-13 font-semibold text-txt">财富密码</span>
         {viewFiles.length > 1 && (
           <select
-            value={activeView?.date ?? ''}
+            value={viewDate}
             onChange={(e) => setViewDate(e.target.value)}
             className="text-12 px-2 py-1 rounded-sm border border-line bg-transparent text-txt cursor-pointer"
           >
+            <option value="">今天</option>
             {viewFiles.map((f) => (
               <option key={f.date} value={f.date}>
                 {f.date}
@@ -375,7 +385,7 @@ export function Component() {
         />
         {activeView && (
           <span className="ml-auto num text-11 text-sub">
-            预案 {activeView.decision_date} · 执行 {activeView.date}
+            预案 {activeView.decision_date} · 执行 {executionDate}
             {/* 盘后会提前写出次一交易日预案，那天还没到竞价时刻 → 明说，别让人以为系统坏了 */}
             {!callFile && <span className="ml-2 text-warn">该执行日尚无 09:25 裁决</span>}
           </span>
@@ -384,7 +394,7 @@ export function Component() {
 
       {/* ① 今日决策 = 一天的完整决策链（该不该做 → 什么环境 → 筛掉谁 → 选了什么 → 怎么买） */}
       {tab === 'board' && (
-        <DecisionBoard dossier={dossier} callFile={callFile} ledger={ledger} screen={screenFile} />
+        <DecisionBoard dossier={dossier} callFile={callFile} ledger={ledger} quotes={quotes.data} screen={screenFile} />
       )}
 
       {/* ② 今日执行 = 09:25 竞价怎么走的（原 /auction 的独有视角，2026-11-04 合并）
@@ -582,11 +592,19 @@ export function Component() {
             />
           </div>
           <DataTable
-            rows={navRows}
+            rows={navTableRows}
             rowKey={(r) => r.trade_date}
             empty="尚无结算记录（15:30 后落盘）"
             columns={[
-              { label: '结算日', cell: (r) => <span className="num">{r.trade_date}</span> },
+              {
+                label: '结算日',
+                cell: (r, i) => (
+                  <span className="num">
+                    {r.trade_date}
+                    {i === 0 && <span className="ml-1.5 text-10 text-sub">最新</span>}
+                  </span>
+                ),
+              },
               { label: '决策日', cell: (r) => <span className="num text-sub">{r.recommendation_date}</span> },
               { label: '口径', cell: (r) => <Tag>{r.strategy || '—'}</Tag> },
               {

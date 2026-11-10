@@ -38,12 +38,31 @@ export const PLAIN_UNKNOWN = '未识别'
 const DECORATED = /^([A-Za-z0-9_]+)\s*[（(]([^)）]*)[)）]$/
 
 /**
+ * **空值占位符** —— 后端「这个字段没有值」时写的字符，不是枚举值。
+ *
+ * 2026-11-09 对齐：实测 `candidates-2026-11-09.json` 里 `phase` 有 25 个「修复」+ 2 个「—」，
+ * 而 `resolve('—')` 原先掉到最后一档返回 `未识别` —— 页面于是告诉读者「数据识别不了」，
+ * 实际含义只是「这只票没有题材阶段」。**「没有值」和「值不认识」是两件完全不同的事**，
+ * 前者是正常空态，后者才是数据脏、需要修后端的告警。混在一起会让真告警失去意义。
+ */
+const PLACEHOLDERS = new Set(['—', '–', '-', '--'])
+
+/**
+ * 占位符集合的只读出口 —— 给「枚举值可译性」扫描用。
+ *
+ * 扫描器必须与 `resolve` **同一份判断**：否则会出现「resolve 认为它是占位符 → 翻成 `—`、
+ * 扫描器认为它是枚举值 → 断言『翻译结果不得为空』」这种自相矛盾的红。
+ */
+export const PLAIN_PLACEHOLDERS: ReadonlySet<string> = PLACEHOLDERS
+
+/**
  * 通用解析。⛔ 这是本文件唯一的解析入口 —— 任何映射都走它，保证回落行为一致
  * （各自写一套回落 = 迟早有一处又变成「直出原 token」）。
  */
 function resolve(v: unknown, table: Readonly<Record<string, string>>): string {
   const raw = String(v ?? '').trim()
-  if (!raw) return '—' // 空 → 项目统一口径：显示「—」（⛔ 不退化成 0 或空白）
+  // 空 / 占位符 → 项目统一口径：显示「—」（⛔ 不退化成 0、空白或「未识别」）
+  if (!raw || PLACEHOLDERS.has(raw)) return '—'
   const exact = table[raw]
   if (exact) return exact
   const m = DECORATED.exec(raw)

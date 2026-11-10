@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { ROUTES, DEFAULT_DATA_ROOT, DATA_ROOT_ENV, type PoolCallFile } from '@/shared/api'
+import { ROUTES, SCHEMAS, DEFAULT_DATA_ROOT, DATA_ROOT_ENV, type PoolCallFile } from '@/shared/api'
 // eslint-disable-next-line
 import { readRoute, resolveDataRoot } from '../scripts/lib/read-route.mjs'
 
@@ -46,6 +46,17 @@ const readFiles = () =>
   }>
 
 describe('/api/decision/pool-call 路由', () => {
+  it('盘中行情契约拒绝空报价冒充数值', () => {
+    const schema = SCHEMAS['/api/decision/participation-quotes']!
+    const data = { date: '2026-11-09', ts: '2026-11-09T10:00:00+08:00', call_available: true, missing: [], quotes: { '600261': { pct: 0, ts: '2026-11-09T10:00:00+08:00', source: '主快照' } } }
+    expect(schema.safeParse(data).success).toBe(true)
+    expect(schema.safeParse({ ...data, quotes: { '600261': { pct: null } } }).success).toBe(false)
+  })
+  it('收盘账本生产白名单与前端路由同构', () => {
+    const source = readFileSync(path.join(DATA_ROOT, 'serve.py'), 'utf8')
+    expect(source).toContain('"/api/decision/pool-ledger"')
+    expect(ROUTES['/api/decision/pool-ledger']).toMatchObject({ dir: 'cache/pool_ledger', mode: 'all', limit: 20 })
+  })
   it('① 多期形态 + 落在 wealth_code/cache（回归锁：曾完全无出口）', () => {
     const def = ROUTES['/api/decision/pool-call']
     expect(def, 'pool_call 路由必须存在 —— 否则页面只能读到昨日预案').toBeTruthy()
