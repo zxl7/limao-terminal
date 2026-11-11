@@ -1162,6 +1162,11 @@ export interface DossierForecastBand {
 
 export interface DossierForecast {
   schema?: string
+  /**
+   * 档位统计（同档所有票共用一句，2026-11-11）。
+   * ⛔ 只在列表上方显示一次；不要逐行复读——那正是用户说的「重复率没有意义」。
+   */
+  stat_note?: string
   /** 该票当前板数 */
   boards?: number
   /** 距全市场最高板 */

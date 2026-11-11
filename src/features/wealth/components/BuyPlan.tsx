@@ -34,8 +34,21 @@ export function BuyPlan({
     ...watch.map((s) => ({ s, bucket: '观察' as const, rank: s.watch_rank })),
   ].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999) || (b.s.boards ?? 0) - (a.s.boards ?? 0))
 
+  // 🧾 档位统计只显示一次（2026-11-11 用户「重复率没有意义」）
+  const statNotes = Array.from(new Set(
+    rows.map((r) => r.s.forecast?.stat_note).filter((x): x is string => Boolean(x)),
+  ))
+
   return (
-    <DataTable
+    <div className="flex flex-col gap-1.5">
+      {statNotes.length > 0 && (
+        <div className="text-11 leading-relaxed text-sub">
+          {statNotes.map((n) => (
+            <div key={n}>本档统计：{n}</div>
+          ))}
+        </div>
+      )}
+      <DataTable
       rows={rows}
       rowKey={(r) => `${r.bucket}-${r.s.code}`}
       empty="本期无候选 —— 接力池留空是允许的结论，不是数据缺失"
@@ -61,6 +74,24 @@ export function BuyPlan({
           label: '板数',
           num: true,
           cell: ({ s }) => <span className="num font-semibold text-up">{boardsText(s.boards)}</span>,
+        },
+        {
+          label: '身位',
+          cell: ({ s }) => {
+            // 🐉 2026-11-11 用户「龙1/龙2 全没了」：身位单独成列，
+            // ⛔ 不再塞进理由里（理由列只放这只票特有的事实）。
+            const role = s.leader_role ?? ''
+            const dr = s.dragon_rank
+            const rank = typeof dr === 'number' && dr > 0 ? `第${dr}` : ''
+            if (!role && !rank) return <span className="text-sub">—</span>
+            return (
+              <span className={cn('text-12', role === '龙头' ? 'text-up' : 'text-txt')}>
+                {role}
+                {role && rank ? '·' : ''}
+                {rank}
+              </span>
+            )
+          },
         },
         {
           label: '方向',
@@ -110,6 +141,7 @@ export function BuyPlan({
           },
         },
       ]}
-    />
+      />
+    </div>
   )
 }
