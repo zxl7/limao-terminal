@@ -3861,3 +3861,18 @@ export interface RulesRegistryFile {
   count: number
   groups: Array<{ name: string; rules: RuleEntry[] }>
 }
+
+/** 判据命中日报（/api/rules/fired · 2026-11-11）——只看「今天哪条判据真的在干活」。 */
+export interface RulesFiredFile {
+  schema: string
+  date: string
+  total_views: number
+  bought: number
+  fired: Array<{ id: string; name: string; hits: number; codes: string[] }>
+  /** 今天一次都没命中的判据（⚠️ 待删候选，不是错误） */
+  zero_hit: string[]
+  unattributed: string[]
+  by_state: Record<string, number>
+  substitutes: string[]
+  note: string
+}

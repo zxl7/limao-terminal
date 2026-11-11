@@ -15,6 +15,7 @@ import { DataUnavailableError, getJson, withQuery } from './client'
 import { SCHEMAS } from './schemas'
 import type {
   RulesRegistryFile,
+  RulesFiredFile,
   AccountNavEntry,
   BacktestSummary,
   AmbushPullbackSettlementEntry,
@@ -134,6 +135,7 @@ export interface RouteTypeMap {
   '/api/gene/pool': GenePoolFile
   '/api/dragon/gene': DragonGeneFile
   '/api/rules': RulesRegistryFile
+  '/api/rules/fired': RulesFiredFile
 
   // ── 六、情绪周期 ──
   '/api/emotion/summary5d': EmotionSummary5D
@@ -317,6 +319,8 @@ export const api = {
   dragonGene: () => fetchRoute('/api/dragon/gene'),
   /** 判据登记表（准入闸/排序/仓位/数据/展示，带开关与回退） */
   rules: () => fetchRoute('/api/rules'),
+  /** 判据命中日报（最新一期） */
+  rulesFired: () => fetchRoute('/api/rules/fired'),
 
   // ── 六、情绪周期 ──
   /** 5 日情绪摘要（含 3 日 MA 与转折信号） */

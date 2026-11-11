@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/shared/api'
-import type { RuleEntry, RulesRegistryFile } from '@/shared/api'
+import type { RuleEntry, RulesFiredFile, RulesRegistryFile } from '@/shared/api'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { cn } from '@/shared/lib'
 
@@ -42,6 +42,11 @@ export function Component() {
   const { data, isPending, isError } = useQuery<RulesRegistryFile>({
     queryKey: ['rules'],
     queryFn: () => api.rules(),
+    retry: 1,
+  })
+  const fired = useQuery<RulesFiredFile>({
+    queryKey: ['rules-fired'],
+    queryFn: () => api.rulesFired(),
     retry: 1,
   })
   const [kind, setKind] = useState<RuleEntry['kind'] | 'all'>('all')
@@ -100,6 +105,36 @@ export function Component() {
           ))}
         </div>
       </Card>
+
+      {fired.data && (
+        <Card
+          title="今日命中"
+          extra={<CardBadge tone="warn">{fired.data.date} · 买 {fired.data.bought}/{fired.data.total_views}</CardBadge>}
+        >
+          <div className="flex flex-col gap-1.5">
+            {fired.data.fired.length === 0 && (
+              <div className="text-12 text-sub">今天没有任何判据拦票（全过或全买）。</div>
+            )}
+            {fired.data.fired.map((f) => (
+              <div key={f.id} className="flex flex-wrap items-baseline gap-2 text-12">
+                <span className="text-txt">{f.name}</span>
+                <span className="num text-11 text-sub">{f.id}</span>
+                <span className="num text-12 font-semibold text-up">×{f.hits}</span>
+                <span className="num text-10 text-sub">{f.codes.join(' ')}</span>
+              </div>
+            ))}
+            {fired.data.zero_hit.length > 0 && (
+              <div className="mt-1 text-11 text-sub">
+                ⚠️ 今日零命中（待删候选，不是错误）：{fired.data.zero_hit.join('、')}
+              </div>
+            )}
+            <div className="text-11 text-sub">
+              三态分布：{Object.entries(fired.data.by_state).map(([k, v]) => `${k || '未标'} ${v}`).join(' · ')}
+              {fired.data.substitutes.length > 0 && `｜替补 ${fired.data.substitutes.length} 只`}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {groups.map((g) => (
         <Card key={g.name} title={g.name} extra={<CardBadge>{g.rules.length} 条</CardBadge>}>

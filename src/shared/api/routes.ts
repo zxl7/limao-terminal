@@ -174,6 +174,10 @@ export const ROUTES: Record<string, RouteDef> = {
     file: 'config/rules_registry.json', cadence: 'daily',
     desc: '判据登记表（准入闸/排序/仓位/数据语义/展示口径，逐条带开关与回退）',
   },
+  '/api/rules/fired': {
+    dir: 'cache', pattern: '^rules_fired_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
+    desc: '判据命中日报（每条判据今日命中数 / 零命中候选 / 三态分布）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 六、情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）
