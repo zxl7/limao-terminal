@@ -22,6 +22,33 @@ import { boardsText, num, yiText } from '../lib/format'
  * 需要多少钱、明天到底做不做（含一句理由）。
  * ⛔ 区间用二元数组 `expected_range`（`[下沿, 上沿]`），⛔ 不可直接插值。
  */
+/**
+ * 明日结论的**一句话**（2026-11-11 用户第二次反馈「还是全是重复文案」）。
+ *
+ * 旧冻结件（11-10 及以前）的 `forecast.reasons[0]` 是**整段档位统计**——同档所有票一字不差。
+ * 冻结件不改写，所以在展示层做规范化：能拿到 `stat_note`（新件）就直接用后端短句；
+ * 拿不到就从**这只票自己的字段**拼一句，统计交给上方的「本档统计」行（只显示一次）。
+ */
+function shortReason(s: DossierStock): string {
+  const fc = s.forecast
+  const raw = String(fc?.reasons?.[0] ?? '').trim()
+  if (fc?.stat_note) return raw                       // 新冻结件：后端已给短句
+  if (!raw) return ''
+  const b = s.boards
+  const dr = s.dragon_rank
+  const role = s.leader_role ?? ''
+  const rank = typeof dr === 'number' && dr > 0 ? `本方向第${dr}` : ''
+  const tag = [b ? `${b}板` : '', rank, role].filter(Boolean).join('·')
+  if (raw.includes('本题材最高板')) {
+    return `它就是本题材最高板${tag ? `（${tag}）` : ''}`
+  }
+  if (raw.includes('只差 1 板')) {
+    return `只差 1 板＝最快的一档${tag ? `（${tag}）` : ''}`
+  }
+  if (raw.includes('历史崖位')) return `${b} 板是历史崖位`
+  return raw
+}
+
 export function BuyPlan({
   relay,
   watch,
@@ -35,17 +62,26 @@ export function BuyPlan({
   ].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999) || (b.s.boards ?? 0) - (a.s.boards ?? 0))
 
   // 🧾 档位统计只显示一次（2026-11-11 用户「重复率没有意义」）
-  const statNotes = Array.from(new Set(
-    rows.map((r) => r.s.forecast?.stat_note).filter((x): x is string => Boolean(x)),
-  ))
+  //    新冻结件：直接用 `forecast.stat_note`；
+  //    旧冻结件：从整段理由里**截出统计从句**（「这档 35 日实测…」）去重后显示，
+  //    ⛔ 不改冻结数据，也不在这里重算任何统计数字。
+  const statNotes = Array.from(new Set([
+    ...rows.map((r) => r.s.forecast?.stat_note).filter((x): x is string => Boolean(x)),
+    ...rows
+      .filter((r) => !r.s.forecast?.stat_note)
+      .map((r) => String(r.s.forecast?.reasons?.[0] ?? ''))
+      .map((t) => {
+        const i = t.indexOf('这档')
+        return i >= 0 ? t.slice(i).trim() : ''
+      })
+      .filter(Boolean),
+  ]))
 
   return (
     <div className="flex flex-col gap-1.5">
       {statNotes.length > 0 && (
         <div className="text-11 leading-relaxed text-sub">
-          {statNotes.map((n) => (
-            <div key={n}>本档统计：{n}</div>
-          ))}
+          本档统计：{statNotes.join('｜')}
         </div>
       )}
       <DataTable
@@ -119,7 +155,7 @@ export function BuyPlan({
           className: 'whitespace-normal min-w-[260px]',
           cell: ({ s }) => {
             const v = s.forecast?.verdict
-            const why = s.forecast?.reasons?.[0]
+            const why = shortReason(s)
             if (!v) return <span className="text-sub">—</span>
             return (
               <span className="flex flex-col gap-0.5">
