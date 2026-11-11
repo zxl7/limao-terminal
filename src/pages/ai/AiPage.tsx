@@ -29,7 +29,7 @@ import {
   pct,
 } from '@/features/analytics'
 import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel, navRowsDesc } from '@/features/wealth'
-import { Card, CardBadge, EmptyState, LineChart, StockLink, Zone, ZoneRow } from '@/shared/ui'
+import { Card, CardBadge, EmptyState, LineChart, StockLink } from '@/shared/ui'
 import { cn, stanceText } from '@/shared/lib'
 
 /**
@@ -101,7 +101,9 @@ export function AiWealthView() {
   const screens = useQuery(analyticsQueries.decisionScreen())
   /** 回测战绩快照（研究产物，手工刷新；三口径并列，⛔ 不轮询） */
   const backtest = useQuery(analyticsQueries.researchBacktest())
-  const [tab, setTab] = useState<'board' | 'exec' | 'judge' | 'hit' | 'decisions' | 'nav' | 'bt' | 'diag'>('board')
+  const [tab, setTab] = useState<'board' | 'judge' | 'record' | 'analysis'>('board')
+  /** 战绩：曲线 / 明细（2026-11-11 合并 台账+净值） */
+  const [recordView, setRecordView] = useState<'chart' | 'detail'>('chart')
   const [viewDate, setViewDate] = useState<string>('')
 
   /** 判断记录：按日期倒序，默认取最新 */
@@ -372,17 +374,18 @@ export function AiWealthView() {
         )}
         <SegTabs
           items={[
-            // 2026-11-06 用户四问：「买什么 / 赚没赚 / 为什么买 / 为什么没买」
-            // → 默认 tab 就叫「今天」，里面 ①结论 ②账本 ③今晨竞价 ④明日标的 ⑤⑥两池
-            { key: 'board', label: '今天' },
-            { key: 'exec', label: '竞价现场' },
-            { key: 'judge', label: `判断 (${callFile ? Object.keys(callFile.views ?? {}).length : 0}/${viewRows.length})` },
-            { key: 'hit', label: `为什么选它 (${hitCount})` },
-            { key: 'decisions', label: `台账 (${decRows.length})` },
-            { key: 'nav', label: `净值 (${navRows.length})` },
-            // 回测战绩：三套收益口径（策略=当日收盘 / T+1=次日收盘 / T+1 最保守）
-            { key: 'bt', label: '回测' },
-            { key: 'diag', label: '诊断' },
+            // 2026-11-11 精简：8 个 tab → 4 个（今天 / 判断 / 战绩 / 分析）
+            // · 竞价现场 并入「今天」（DecisionBoard 里本就有今晨竞价块）
+            // · 为什么选它 并入「判断」（它只是 4/41 的子集）
+            // · 台账 + 净值 合成「战绩」
+            // · 回测 + 诊断 合成「分析」
+            { key: 'board', label: '今日决策' },
+            {
+              key: 'judge',
+              label: `判断 · ${callFile ? Object.keys(callFile.views ?? {}).length : 0} 已判 / ${viewRows.length} 预案`,
+            },
+            { key: 'record', label: '战绩' },
+            { key: 'analysis', label: '分析' },
           ]}
           value={tab}
           onChange={(k) => setTab(k as typeof tab)}
@@ -401,140 +404,95 @@ export function AiWealthView() {
         <>
           <AiTiltCard />
           <DecisionBoard dossier={dossier} callFile={callFile} ledger={ledger} quotes={quotes.data} screen={screenFile} />
+          {/* 竞价现场（原独立 tab）——与 DecisionBoard 的「今晨竞价」同源，合到一处看 */}
+          <Card
+            title="竞价现场"
+            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
+          >
+            <ExecutionPanel dossier={dossier} callFile={callFile} />
+          </Card>
         </>
       )}
 
       {/* ② 今日执行 = 09:25 竞价怎么走的（原 /auction 的独有视角，2026-11-04 合并）
           ⛔ 与「今日决策」分工：决策页回答「明天买什么」，本页回答「今天到底做了没有」。
             两页曾是同一份档案的两个副本（环境/接力/观察三块重复），现已合并到一处。 */}
-      {tab === 'exec' && (
-        <Card
-          title="竞价现场"
-          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
-        >
-          <ExecutionPanel dossier={dossier} callFile={callFile} />
-        </Card>
-      )}
-
-      {/* ③ 诊断 = 全量过筛（调参用，不是下单依据）
-          ⛔ 2026-11-04 用户「全量过筛感觉没有存在必要」：它从决策页移到这里。
-            保留的理由只有一个——复盘调参要看「哪一关卡得最死」。
-            实证 11-04：过筛放行 70 只，后面「最高板薄封」全拦掉，70 只一只没用上。 */}
-      {tab === 'diag' && (
-        <Card
-          title="全量过筛"
-          extra={
-            <CardBadge tone={screenFile ? 'rec' : 'neutral'}>
-              {screenFile ? `通过 ${screenFile.counts.pass} / 涨停 ${screenFile.zt_count}` : '未启用'}
-            </CardBadge>
-          }
-        >
-          <ScreenFunnel screen={screenFile} />
-        </Card>
+      {tab === 'analysis' && (
+        <div className="flex flex-col gap-3">
+          {/* 回测：三套收益口径并列（⛔ 不混账） */}
+          <BacktestCard data={backtest.data} />
+          {/* 全量过筛：调参用，不是下单依据 */}
+          <Card
+            title="全量过筛"
+            extra={
+              <CardBadge tone={screenFile ? 'rec' : 'neutral'}>
+                {screenFile ? `通过 ${screenFile.counts.pass} / 涨停 ${screenFile.zt_count}` : '未启用'}
+              </CardBadge>
+            }
+          >
+            <ScreenFunnel screen={screenFile} />
+          </Card>
+        </div>
       )}
 
       {tab === 'judge' && (
-        <ZoneRow className="ai-ledger-layout">
-          <Zone label="台账总览" dot="bg-rec" className="xl:w-[24%] xl:order-1 xl:sticky xl:top-3">
-            <Card
-              title="🤖 AI 独立台账"
-              extra={
-                <CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>
-                  AI 轨净值 {lastNav ? n2(lastNav.nav) : '—'}
-                </CardBadge>
-              }
-            >
-              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
-                <StatPair
-                  label="累计收益"
-                  value={lastNav ? pct((lastNav.nav - 1) * 100) : '—'}
-                  tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}
-                />
-                <StatPair
-                  label="最大回撤"
-                  value={navRows.length ? pct(maxDrawdown * 100) : '—'}
-                  tone="down"
-                />
-                <StatPair label="结算日数" value={navRows.length} />
-                <StatPair label="最新结算日" value={lastNav?.trade_date ?? '—'} />
-                <StatPair label="判断日数" value={viewFiles.length} />
-              </div>
-              <div className="border border-line rounded-sm p-2.5 mb-2.5">
-                <div className="text-13 font-semibold mb-2">🤖 AI 轨净值走势</div>
-                {navRows.length ? (
-                  <LineChart
-                    series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
-                    labels={navRows.map((r) => r.trade_date)}
-                    height={200}
-                    format={(v) => n2(v)}
-                    refLines={NAV_BASELINE}
-                  />
-                ) : (
-                  <div className="text-sub text-12 py-6 text-center">暂无结算记录（每日 15:30 后落盘）</div>
-                )}
-              </div>
-            </Card>
-          </Zone>
+        <div className="flex flex-col gap-3">
+          {/* 命中逻辑：只讲「买到的 4 只为什么被选中」 */}
+          <Card
+            title="命中逻辑"
+            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{hitCount} 只 · {callFile?.trade_date ?? '未落盘'}</CardBadge>}
+          >
+            <AiHitLogic file={callFile} tradeDate={callFile?.trade_date ?? activeView?.date} />
+          </Card>
 
-          <Zone label="判断明细" dot="bg-lead" className="xl:w-[76%] xl:order-2">
-            <Card title="判断明细">
-              {activeView && (
-                <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span>预案参与</span>
-                    <span className="num text-txt">{planCount}</span>
-                    <span>/ 共</span>
-                    <span className="num text-txt">{viewRows.length}</span>
-                    <span className="text-sub">|</span>
-                    <span>今晨 09:25 裁决</span>
-                    {callFile ? (
-                      <>
-                        <span className="text-sub">|</span>
-                        <span>
-                          取向 <span className="text-txt">{stanceText(callFile.stance)}</span>
-                        </span>
-                        <span className="text-sub">|</span>
-                        <span>
-                          名额 <span className="num text-txt">{callFile.quota}</span>
-                        </span>
-                        <span className="text-sub">|</span>
-                        <span>
-                          实际买入 <span className="num text-up font-semibold">{callCount}</span> 只
-                        </span>
-                        {callFile.meta?.call_at && (
-                          <span className="num text-sub">· {callFile.meta.call_at}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span>未落盘（当日 09:25 后生成）</span>
-                    )}
-                  </div>
+          {/* 判断明细 = 今晨 09:25 裁决终态 × 接力卡真实字段 */}
+          <Card title="判断明细">
+            {activeView && (
+              <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span>预案参与</span>
+                  <span className="num text-txt">{planCount}</span>
+                  <span>/ 共</span>
+                  <span className="num text-txt">{viewRows.length}</span>
+                  <span className="text-sub">|</span>
+                  <span>今晨 09:25 裁决</span>
+                  {callFile ? (
+                    <>
+                      <span className="text-sub">|</span>
+                      <span>取向 <span className="text-txt">{stanceText(callFile.stance)}</span></span>
+                      <span className="text-sub">|</span>
+                      <span>名额 <span className="num text-txt">{callFile.quota}</span></span>
+                      <span className="text-sub">|</span>
+                      <span>实际买入 <span className="num text-up font-semibold">{callCount}</span> 只</span>
+                      {callFile.meta?.call_at && <span className="num text-sub">· {callFile.meta.call_at}</span>}
+                    </>
+                  ) : (
+                    <span>未落盘（当日 09:25 后生成）</span>
+                  )}
                 </div>
-              )}
-              {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘接力卡真实字段。
-                  ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
-              <AiJudgeDetail
-                rows={judgeRows}
-                decisionDate={activeView?.decision_date}
-                hasCallFile={Boolean(callFile?.trade_date)}
-              />
-            </Card>
-          </Zone>
-        </ZoneRow>
+              </div>
+            )}
+            <AiJudgeDetail
+              rows={judgeRows}
+              decisionDate={activeView?.decision_date}
+              hasCallFile={Boolean(callFile?.trade_date)}
+            />
+          </Card>
+        </div>
       )}
 
-      {/* 竞价命中逻辑 = **命中的票为什么被选中**：方向强度 → 方向内身位 → 量能封板 → 竞价落点。
-          ⛔ 只讲命中，不逐只解释观察/放弃的票。 */}
-      {tab === 'hit' && (
-        <Card
-          title="命中逻辑"
-          extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
-        >
-          <AiHitLogic file={callFile} tradeDate={callFile?.trade_date ?? activeView?.date} />
-        </Card>
-      )}
-
-      {tab === 'decisions' && (
+      {tab === 'record' && (
+        <div className="flex flex-col gap-3">
+          <SegTabs
+            items={[
+              // 2026-11-11：台账 + 净值 合并为「战绩」；两套口径⛔ 不混成一条线
+              { key: 'chart', label: '净值曲线' },
+              { key: 'detail', label: `台账明细 (${decRows.length})` },
+            ]}
+            value={recordView}
+            onChange={(k) => setRecordView(k as 'chart' | 'detail')}
+          />
+          {recordView === 'detail' && (
         <Card title="AI 台账" extra={<CardBadge>{decRows.length} 条</CardBadge>}>
           <DataTable<AiDecisionEntry>
             rows={decRows}
@@ -586,13 +544,19 @@ export function AiWealthView() {
             ]}
           />
         </Card>
-      )}
-
-      {/* 回测战绩：三套口径并列（⛔ 不混账），回答「这套打法历史上赚不赚、赚得稳不稳」 */}
-      {tab === 'bt' && <BacktestCard data={backtest.data} />}
-
-      {tab === 'nav' && (
-        <Card title="AI 轨净值" extra={<CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>{lastNav ? n2(lastNav.nav) : '—'}</CardBadge>}>
+          )}
+          {recordView === 'chart' && (
+        <div className="flex flex-col gap-3">
+          <Card title="AI 轨净值" extra={<CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>{lastNav ? n2(lastNav.nav) : '—'}</CardBadge>}>
+          {/* 概览指标：原「台账总览」侧栏合并进来的，别在精简时丢掉 */}
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
+            <StatPair label="累计收益" value={lastNav ? pct((lastNav.nav - 1) * 100) : '—'}
+                      tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'} />
+            <StatPair label="最大回撤" value={navRows.length ? pct(maxDrawdown * 100) : '—'} tone="down" />
+            <StatPair label="结算日数" value={navRows.length} />
+            <StatPair label="最新结算日" value={lastNav?.trade_date ?? '—'} />
+            <StatPair label="判断日数" value={viewFiles.length} />
+          </div>
           <div className="border border-line rounded-sm p-2.5 mb-3">
             <LineChart
               series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
@@ -658,7 +622,10 @@ export function AiWealthView() {
               },
             ]}
           />
-        </Card>
+          </Card>
+        </div>
+          )}
+        </div>
       )}
 
       {!view.isLoading && !dossier && !viewRows.length && !decRows.length && !navRows.length && (
