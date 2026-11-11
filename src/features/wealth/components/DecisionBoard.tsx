@@ -149,9 +149,13 @@ export function DecisionBoard({
         emptyText="今日无可接力标的 —— 接力池留空是允许的结论"
       />
 
-      {/* ⑥ 观察池 */}
+      {/*
+        ⑥ 观察（2026-11-11 文案）：11-10 起已合并为**单接力池**，watch 里通常只剩
+        「全市场唯一且 ≥7 板」那只高度观察票。⛔ 不能再叫「观察池·不可买」——
+        原观察票明早照样走 09:25 裁决（POOL_CALL_ALL_TRADEABLE=1）。
+      */}
       <PoolSection
-        title="观察池"
+        title="观察（明早竞价判）"
         badge={`${watch.length} 只`}
         stocks={watch}
         bucket="watch"

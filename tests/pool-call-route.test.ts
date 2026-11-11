@@ -106,11 +106,25 @@ describe('/api/decision/pool-call 路由', () => {
       const ranked = entries
         .filter(([, v]) => v.quota_rank != null)
         .sort((a, b) => (a[1].quota_rank ?? 0) - (b[1].quota_rank ?? 0))
-      expect(ranked.map(([code]) => code)).toEqual(d.meta.participate)
+      // ⛔ 2026-11-11：旧冻结件（无 `meta.participate_order`）是按池子顺序写的
+      //    participate，可能与 quota_rank 不同序 —— 那是**历史档案**，不改写。
+      //    新冻结件带 `participate_order="quota"`，从此强制同序。
+      if ((d.meta as { participate_order?: string }).participate_order === 'quota') {
+        expect(ranked.map(([code]) => code)).toEqual(d.meta.participate)
+      } else {
+        expect([...d.meta.participate].sort()).toEqual(ranked.map(([code]) => code).sort())
+      }
       expect(ranked.map(([, v]) => v.quota_rank)).toEqual(
         ranked.map((_, i) => i + 1),
       )
-      expect(ranked.length).toBeLessThanOrEqual(d.quota)
+      // ⛔ 2026-11-05 起 `POOL_CALL_UNLIMITED_SLOTS=1`：达标几只买几只，
+      //    参与数可以**超过** `quota`（名额只影响 quota_rank/卡面顺序）。
+      //    只有显式关掉不限名额（`meta.stance.unlimited_slots=false`）才要求 ≤ quota。
+      const unlimited =
+        (d.meta as { slot_policy?: { unlimited_slots?: boolean } })?.slot_policy?.unlimited_slots !== false
+      if (!unlimited) {
+        expect(ranked.length).toBeLessThanOrEqual(d.quota)
+      }
     }
   })
 

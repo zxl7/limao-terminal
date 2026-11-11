@@ -433,7 +433,7 @@ export function DossierView({ d }: { d: DecisionDossier }) {
           <SegTabs
             items={[
               { key: 'relay', label: `接力池 ${d.relay?.length ?? 0}` },
-              { key: 'watch', label: `观察池 ${d.watch?.length ?? 0}` },
+              { key: 'watch', label: `观察 ${d.watch?.length ?? 0}` },
               { key: 'early', label: `早鸟埋伏 ${d.early_ambush?.length ?? 0}` },
               { key: 'narrative', label: '全局旁白' },
             ]}
