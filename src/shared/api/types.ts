@@ -3881,3 +3881,31 @@ export interface RulesFiredFile {
   substitutes: string[]
   note: string
 }
+
+/** 智能层状态（/api/ai/tilt · 2026-11-11）——数据维度与迭代记录的唯一展示源。 */
+export interface AiTiltIteration {
+  version: string
+  at: string
+  n_features: number
+  samples: number
+  days: number
+  auc_train: number
+  auc_valid: number
+  acc_valid: number
+  note?: string
+}
+
+export interface AiTiltState {
+  schema: string
+  updated: string
+  /** off / shadow / live —— 目前恒为 shadow：只建议不执行 */
+  mode: string
+  model: string
+  features: string[]
+  samples: number
+  window: string[]
+  auc_train: number
+  auc_valid: number
+  iterations: AiTiltIteration[]
+  note: string
+}

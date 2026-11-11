@@ -15,6 +15,7 @@ import { DataUnavailableError, getJson, withQuery } from './client'
 import { SCHEMAS } from './schemas'
 import type {
   RulesRegistryFile,
+  AiTiltState,
   RulesFiredFile,
   AccountNavEntry,
   BacktestSummary,
@@ -136,6 +137,7 @@ export interface RouteTypeMap {
   '/api/dragon/gene': DragonGeneFile
   '/api/rules': RulesRegistryFile
   '/api/rules/fired': RulesFiredFile
+  '/api/ai/tilt': AiTiltState
 
   // ── 六、情绪周期 ──
   '/api/emotion/summary5d': EmotionSummary5D
@@ -321,6 +323,8 @@ export const api = {
   rules: () => fetchRoute('/api/rules'),
   /** 判据命中日报（最新一期） */
   rulesFired: () => fetchRoute('/api/rules/fired'),
+  /** 智能层状态（模型版本 / 特征 / AUC / 迭代记录） */
+  aiTilt: () => fetchRoute('/api/ai/tilt'),
 
   // ── 六、情绪周期 ──
   /** 5 日情绪摘要（含 3 日 MA 与转折信号） */

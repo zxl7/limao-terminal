@@ -178,6 +178,10 @@ export const ROUTES: Record<string, RouteDef> = {
     dir: 'cache', pattern: '^rules_fired_\\d{4}-\\d{2}-\\d{2}\\.json$', mode: 'latest', cadence: 'daily',
     desc: '判据命中日报（每条判据今日命中数 / 零命中候选 / 三态分布）',
   },
+  '/api/ai/tilt': {
+    file: 'config/ai_tilt_state.json', cadence: 'daily',
+    desc: '智能层状态（模型版本 / 12 维特征 / 验证 AUC / 迭代记录，只读）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 六、情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）
