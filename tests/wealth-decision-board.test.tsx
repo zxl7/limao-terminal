@@ -644,12 +644,13 @@ describe('ScreenFunnel 全量过筛（诊断层）', () => {
 })
 
 describe('DecisionBoard 版面顺序对回四个问题', () => {
-  it('六块齐全且顺序为：今天 → 账本 → 今晨竞价 → 明日标的 → 接力池 → 观察池', () => {
+  it('六块齐全且顺序为：今天 → 账本 → 今晨竞价 → 明日标的 → 接力池 → 观察（明早竞价判）', () => {
     const { container } = render(
       <DecisionBoard dossier={dossier()} callFile={poolCall()} ledger={ledger()} screen={screenFile()} />,
     )
     const txt = container.textContent ?? ''
-    const order = ['今天', '今日账本', '今晨竞价', '明日标的', '接力池', '观察池']
+    // 2026-11-11：观察池 → 「观察（明早竞价判）」（单池口径，watch 只剩高度观察）
+    const order = ['今天', '今日账本', '今晨竞价', '明日标的', '接力池', '观察（明早竞价判）']
     const idx = order.map((k) => txt.indexOf(k))
     for (const [i, v] of idx.entries()) {
       expect(v, `缺块：${order[i]}`).toBeGreaterThanOrEqual(0)
