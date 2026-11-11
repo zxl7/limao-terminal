@@ -91,6 +91,8 @@ export function AiWealthView() {
   const view = useQuery(analyticsQueries.aiView())
   const decisions = useQuery(analyticsQueries.aiDecisions())
   const nav = useQuery(analyticsQueries.aiNav())
+  /** T+1 口径（竞价买→次日收盘卖）：独立序列，只用于并列对照 */
+  const navT1 = useQuery(analyticsQueries.aiNavT1())
   /** 尾盘财富密码接力卡存档（近 3 期）—— 判断明细的「真实字段」来源 */
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
@@ -324,6 +326,38 @@ export function AiWealthView() {
    * 规则与理由集中在 `features/wealth/lib/nav.ts`（那里有完整的四消费者对照表）。
    */
   const navTableRows = useMemo(() => navRowsDesc(navRows), [navRows])
+  /**
+   * 两套口径并列（2026-11-11 用户「不混账」）：策略口径＝竞价买→当日收盘；
+   * T+1 口径＝竞价买→**次日**收盘。日期集合不同 → 取并集，各自**前向填充**
+   * （净值是阶梯序列，缺日沿用上一值），⛔ 不做插值）。
+   */
+  const navT1Rows = useMemo(
+    () => [...(navT1.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
+    [navT1.data],
+  )
+  const navAxis = useMemo(() => {
+    const ds = new Set<string>()
+    for (const r of navRows) ds.add(r.trade_date)
+    for (const r of navT1Rows) ds.add(r.trade_date)
+    return [...ds].sort()
+  }, [navRows, navT1Rows])
+  const fillNav = (rows: { trade_date: string; nav: number }[], d: string) => {
+    let v = 1
+    for (const r of rows) {
+      if (r.trade_date <= d) v = r.nav
+      else break
+    }
+    return v
+  }
+  const navSeries = useMemo(() => {
+    const out: Array<{ name: string; values: number[]; tone: 'up' | 'rec'; area?: boolean }> = [
+      { name: '策略口径（当日收盘）', values: navAxis.map((d) => fillNav(navRows, d)), tone: 'up', area: true },
+    ]
+    if (navT1Rows.length) {
+      out.push({ name: 'T+1 口径（次日收盘）', values: navAxis.map((d) => fillNav(navT1Rows, d)), tone: 'rec' })
+    }
+    return out
+  }, [navAxis, navRows, navT1Rows])
   const lastNav = navRows.at(-1)
 
   /** 累计收益 = 末值 - 1；最大回撤按净值序列逐点计算 */
@@ -559,8 +593,8 @@ export function AiWealthView() {
           </div>
           <div className="border border-line rounded-sm p-2.5 mb-3">
             <LineChart
-              series={[{ name: '净值', values: navRows.map((r) => r.nav), tone: 'up', area: true }]}
-              labels={navRows.map((r) => r.trade_date)}
+              series={navSeries}
+              labels={navAxis}
               height={220}
               format={(v) => n2(v)}
               refLines={NAV_BASELINE}
@@ -581,7 +615,7 @@ export function AiWealthView() {
                 ),
               },
               { label: '决策日', cell: (r) => <span className="num text-sub">{r.recommendation_date}</span> },
-              { label: '口径', cell: (r) => <Tag>{r.strategy || '—'}</Tag> },
+              { label: '口径', cell: (r) => <Tag>{CALIBER_LABEL[r.strategy] ?? (r.strategy || '—')}</Tag> },
               {
                 label: '成交数',
                 num: true,
@@ -647,6 +681,11 @@ export function AiWealthView() {
  *
  * 现在收成一个入口 + 四个切面；⛔ 旧 URL 全部保留（各自仍是独立路由），只是不再占侧栏。
  */
+const CALIBER_LABEL: Record<string, string> = {
+  ai_judgement_next_day_close: '策略口径（竞价→当日收盘）',
+  ai_judgement_t1_close: 'T+1 口径（竞价→次日收盘）',
+}
+
 const WEALTH_SECTIONS = [
   { key: 'link', label: '今日链路' },
   { key: 'gap', label: '竞价留痕' },

@@ -334,6 +334,13 @@ export const analyticsQueries = {
       queryFn: api.aiNav,
       staleTime: DAILY_STALE,
     }),
+  /** T+1 口径（次日收盘卖）——与策略口径并列，⛔ 不混成一条线 */
+  aiNavT1: () =>
+    queryOptions({
+      queryKey: ['ai', 'nav', 't1'] as const,
+      queryFn: api.aiNavT1,
+      staleTime: DAILY_STALE,
+    }),
 
   // ══════════════ 尾盘潜伏研究账本 ══════════════
   ambushPullbackSignals: () =>

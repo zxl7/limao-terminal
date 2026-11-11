@@ -323,6 +323,10 @@ export const ROUTES: Record<string, RouteDef> = {
     file: 'wealth_code/cache/ai_nav_history.jsonl', format: 'jsonl', cadence: 'daily',
     desc: 'AI 轨净值台账（首行由当日 15:30 接力卡 settle 落 · 早于该时点为空属正常）',
   },
+  '/api/ai/nav-t1': {
+    file: 'wealth_code/cache/ai_nav_history_t1.jsonl', format: 'jsonl', cadence: 'daily',
+    desc: 'AI 轨 T+1 口径净值（竞价买 → 次日收盘卖，独立序列；⛔ 不与策略口径混账）',
+  },
 
   /**
    * 回测战绩快照（`scripts/build_backtest_summary.py` 合成，唯一出口）。

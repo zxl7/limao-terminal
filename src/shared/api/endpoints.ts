@@ -177,6 +177,7 @@ export interface RouteTypeMap {
   '/api/research/backtest': BacktestSummary
   '/api/ai/decisions': AiDecisionEntry[]
   '/api/ai/nav': AiNavEntry[]
+  '/api/ai/nav-t1': AiNavEntry[]
 
   // ── 九、尾盘潜伏研究账本 ──
   '/api/ambush/pullback/signals': AmbushPullbackSignalEntry[]
@@ -428,6 +429,8 @@ export const api = {
   aiDecisions: () => fetchRoute('/api/ai/decisions'),
   /** AI 轨净值（首行由当日 15:30 settle 落，早于该时点为空属正常） */
   aiNav: () => fetchRoute('/api/ai/nav'),
+  /** T+1 口径净值（竞价买→次日收盘卖，独立序列） */
+  aiNavT1: () => fetchRoute('/api/ai/nav-t1'),
 
   // ── 九、尾盘潜伏研究账本（独立于接力账户）──
   // 账本首次在 14:30 研究扫描落盘前不存在是正常空态，不应让整个交易页 loader 失败。
