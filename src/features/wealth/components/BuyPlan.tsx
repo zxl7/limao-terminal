@@ -39,8 +39,14 @@ function shortReason(s: DossierStock): string {
   const role = s.leader_role ?? ''
   const rank = typeof dr === 'number' && dr > 0 ? `本方向第${dr}` : ''
   const tag = [b ? `${b}板` : '', rank, role].filter(Boolean).join('·')
-  if (raw.includes('本题材最高板')) {
+  // ⛔ 必须用 startsWith：「比本题材最高板低 ≥2 板…」也含这个子串，
+  //    用 includes 会把**后排**的票误写成「它就是最高板」（11-11 日出东方踩到）。
+  // 旧数据写作「它自己就是本题材最高板」，新数据写作「它就是本题材最高板」
+  if (/^它(自己)?就是本题材最高板/.test(raw)) {
     return `它就是本题材最高板${tag ? `（${tag}）` : ''}`
+  }
+  if (raw.includes('比本题材最高板低')) {
+    return `比本题材最高板低 ≥2 板＝后排${tag ? `（${tag}）` : ''}`
   }
   if (raw.includes('只差 1 板')) {
     return `只差 1 板＝最快的一档${tag ? `（${tag}）` : ''}`
@@ -72,7 +78,8 @@ export function BuyPlan({
       .map((r) => String(r.s.forecast?.reasons?.[0] ?? ''))
       .map((t) => {
         const i = t.indexOf('这档')
-        return i >= 0 ? t.slice(i).trim() : ''
+        // 旧冻结件曾把空样本渲染成「None%」→ 展示层清洗成「样本不足」，⛔ 不改数据文件
+        return i >= 0 ? t.slice(i).trim().replace(/None%/g, '样本不足') : ''
       })
       .filter(Boolean),
   ]))

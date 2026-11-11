@@ -182,7 +182,12 @@ function actionableWarning(warning?: string): string | undefined {
     : warning
 }
 
-export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisionDate?: string }) {
+export function AiJudgeDetail({ rows, decisionDate, hasCallFile = false }: {
+  rows: JudgeRow[]
+  decisionDate?: string
+  /** 当日 09:25 裁决文件是否存在 —— 用来区分「未进池」与「裁决未落盘」（⛔ 两件事） */
+  hasCallFile?: boolean
+}) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const needle = search.trim().toLowerCase()
@@ -257,9 +262,14 @@ export function AiJudgeDetail({ rows, decisionDate }: { rows: JudgeRow[]; decisi
               >
                 {m.label}
               </span>
-              {/* 来源标注：有终态 = 今晨 09:25 定音；无 = 仍在看昨日预案（今晨裁决未落盘） */}
+              {/* 来源标注（2026-11-11 三态）：⛔ 「未进池」与「裁决未落盘」是两件事，
+                  以前都写成「未落盘」，导致「判断」页里 9 只预案票看起来像系统没跑 */}
               <span className="text-11 text-sub flex-none">
-                {c ? '今晨 09:25 裁决' : '昨日预案·今晨裁决未落盘'}
+                {c
+                  ? '今晨 09:25 裁决'
+                  : hasCallFile
+                    ? '预案有 · 未进 09:25 池'
+                    : '昨日预案·今晨裁决未落盘'}
               </span>
               {c?.quotaRank != null && <Chip tone="rec">买入名额 #{c.quotaRank}</Chip>}
               {/* 身份统一在下方展示，机械证据融入原有理由，不另增指标。 */}

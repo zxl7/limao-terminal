@@ -154,6 +154,11 @@ export const VIEW_PLAIN: Readonly<Record<string, string>> = {
   participate: '参与',
   watch: '观察',
   skip: '放弃',
+  /**
+   * 2026-11-11：`pending` 是「预案里有、09:25 没进池」的行——原来直接落回英文 token
+   * 「pending」显示在卡面上。它不是第四种裁决，只是**未裁决**，必须白话标出来。
+   */
+  pending: '待裁决',
 }
 
 /** 昨日盘后预案档 `views[code].bias`（3 种） */

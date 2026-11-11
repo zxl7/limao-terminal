@@ -375,7 +375,7 @@ export function AiWealthView() {
             // → 默认 tab 就叫「今天」，里面 ①结论 ②账本 ③今晨竞价 ④明日标的 ⑤⑥两池
             { key: 'board', label: '今天' },
             { key: 'exec', label: '竞价现场' },
-            { key: 'judge', label: `判断 (${viewRows.length})` },
+            { key: 'judge', label: `判断 (${callFile ? Object.keys(callFile.views ?? {}).length : 0}/${viewRows.length})` },
             { key: 'hit', label: `为什么选它 (${hitCount})` },
             { key: 'decisions', label: `台账 (${decRows.length})` },
             { key: 'nav', label: `净值 (${navRows.length})` },
@@ -509,7 +509,11 @@ export function AiWealthView() {
               )}
               {/* 判断明细 = **今晨 09:25 裁决终态** × 尾盘接力卡真实字段。
                   ⛔ 不显示「统一 5%」；⛔ 不可把「判断」退回成昨日预案（那是输入，非结论）。 */}
-              <AiJudgeDetail rows={judgeRows} decisionDate={activeView?.decision_date} />
+              <AiJudgeDetail
+                rows={judgeRows}
+                decisionDate={activeView?.decision_date}
+                hasCallFile={Boolean(callFile?.trade_date)}
+              />
             </Card>
           </Zone>
         </ZoneRow>
