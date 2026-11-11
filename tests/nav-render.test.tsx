@@ -91,7 +91,7 @@ describe('AppShell 导航渲染', () => {
     }
   })
 
-  it('导航渲染出全部 23 个 Tab（「更多」默认收起 6 个：29 → 23）', () => {
+  it('导航渲染出全部 24 个 Tab（「更多」默认收起 6 个：30 → 24）', () => {
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
     const links = nav.querySelectorAll('a')
@@ -99,7 +99,8 @@ describe('AppShell 导航渲染', () => {
     // 2026-11-10：盘面段新增「龙头基因」(/dragon-gene) → 31 → 32
     // 2026-11-10：财富密码收成单入口（竞价留痕/执行审计/尾盘潜伏 并入 /ai 四切面）→ 32 → 29
     // 2026-11-10：6 个低频入口折进「更多」（默认收起）→ 29 → 23
-    expect(links.length).toBe(23)
+    // 2026-11-11：数据段新增「判据登记」(/rules) → 23 → 24
+    expect(links.length).toBe(24)
     expect(nav.querySelector('a[href="/data"]')?.textContent).toContain('数据底座')
     // 实时段前缀连续 —— /timeline 必须落在最前 7 个之内，不得漂到历史段
     // （/record·/ops 已迁「数据」段 2026-09-22；/effect 新增实时段 2026-09-23）
@@ -159,9 +160,9 @@ describe('AppShell 导航渲染', () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     renderShell()
     const nav = screen.getByRole('navigation', { name: '主导航' })
-    expect(nav.querySelectorAll('a').length).toBe(23)
+    expect(nav.querySelectorAll('a').length).toBe(24)
     await userEvent.click(within(nav).getByRole('button', { name: /更多/ }))
-    expect(nav.querySelectorAll('a').length).toBe(29)
+    expect(nav.querySelectorAll('a').length).toBe(30)
     for (const href of ['/risk', '/ops', '/record', '/stack', '/archive', '/cards']) {
       expect(nav.querySelector(`a[href="${href}"]`), `${href} 展开后应可见`).toBeTruthy()
     }

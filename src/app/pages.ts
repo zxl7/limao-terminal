@@ -54,6 +54,7 @@ export const PAGE_LOADERS = {
   '/promotion': () => import('@/pages/promotion/PromotionPage'),
   '/gene': () => import('@/pages/gene/GenePage'),
   '/dragon-gene': () => import('@/pages/dragon-gene/DragonGenePage'),
+  '/rules': () => import('@/pages/rules/RulesPage'),
 
   // ── 决策与战绩 ──
   '/ai': () => import('@/pages/ai/AiPage'),

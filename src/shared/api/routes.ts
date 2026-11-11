@@ -170,6 +170,10 @@ export const ROUTES: Record<string, RouteDef> = {
     file: 'cache/dragon_gene.json', cadence: 'daily',
     desc: '龙头基因沉淀池（≥4板入池 · 5板强票 · 断板两日跌幅≤−10% 判 A 杀淘汰）',
   },
+  '/api/rules': {
+    file: 'config/rules_registry.json', cadence: 'daily',
+    desc: '判据登记表（准入闸/排序/仓位/数据语义/展示口径，逐条带开关与回退）',
+  },
 
   // ══════════════════════════════════════════════════════════════
   // 六、情绪周期（窗口分层：当日=执行层 / 3日=方向层 / 5日=纪律层 / 10日=归纳层）

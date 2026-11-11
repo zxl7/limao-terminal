@@ -14,6 +14,7 @@
 import { DataUnavailableError, getJson, withQuery } from './client'
 import { SCHEMAS } from './schemas'
 import type {
+  RulesRegistryFile,
   AccountNavEntry,
   BacktestSummary,
   AmbushPullbackSettlementEntry,
@@ -132,6 +133,7 @@ export interface RouteTypeMap {
   '/api/gene/hist': DatedFile<GeneHistory>[]
   '/api/gene/pool': GenePoolFile
   '/api/dragon/gene': DragonGeneFile
+  '/api/rules': RulesRegistryFile
 
   // ── 六、情绪周期 ──
   '/api/emotion/summary5d': EmotionSummary5D
@@ -313,6 +315,8 @@ export const api = {
   genePool: () => fetchRoute('/api/gene/pool'),
   /** 龙头基因沉淀池（≥4板入池 / 断板两日判 A 杀） */
   dragonGene: () => fetchRoute('/api/dragon/gene'),
+  /** 判据登记表（准入闸/排序/仓位/数据/展示，带开关与回退） */
+  rules: () => fetchRoute('/api/rules'),
 
   // ── 六、情绪周期 ──
   /** 5 日情绪摘要（含 3 日 MA 与转折信号） */

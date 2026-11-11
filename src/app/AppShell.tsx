@@ -107,6 +107,7 @@ export const TABS: readonly TabDef[] = [
   // ── 段5 · 数据与运维（日频）──
   { to: '/data', label: '数据底座', group: '数据', priority: true },
   { to: '/hithink', label: '同花顺数据', group: '数据' },
+  { to: '/rules', label: '判据登记', group: '数据' },
   { to: '/system', label: '系统台账', group: '数据' },
 
   // ── 段6 · 更多（低频档案；侧栏默认收起，⛔ 不占主视线）──

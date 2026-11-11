@@ -3837,3 +3837,27 @@ export interface DragonGeneFile {
   }
   pool: DragonGeneRow[]
 }
+
+/** 判据登记表（/api/rules · 2026-11-11）——新增判据必须先登记，不在表里的判据视为不存在。 */
+export interface RuleEntry {
+  id: string
+  name: string
+  /** gate=决定买不买 · rank=排序名额 · position=仓位 · data=数据语义 · display=展示口径 */
+  kind: 'gate' | 'rank' | 'position' | 'data' | 'display'
+  /** 环境变量开关名；'—' 表示没有开关（常开或结构性约束） */
+  switch: string
+  default: string
+  status: 'active' | 'shadow' | 'off'
+  since: string
+  what: string
+  source: string
+  rollback: string
+}
+
+export interface RulesRegistryFile {
+  schema: string
+  updated: string
+  note: string
+  count: number
+  groups: Array<{ name: string; rules: RuleEntry[] }>
+}
