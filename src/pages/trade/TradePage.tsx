@@ -22,6 +22,9 @@ export function Component() {
 }
 
 function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry[]; loading: boolean }) {
+  // 💰 账户收益：优先按仓位加权（account_return_pct），旧记录缺失才退回等权
+  const rowReturn = (row: AccountNavEntry) =>
+    Number.isFinite(row.account_return_pct) ? Number(row.account_return_pct) : row.avg_return_pct
   const rows = useMemo(
     () => [...sourceRows].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
     [sourceRows],
@@ -30,14 +33,20 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
   const winRate = useMemo(() => {
     const traded = rows.filter((row) => row.stock_count > 0)
     if (!traded.length) return null
-    return (traded.filter((row) => row.avg_return_pct > 0).length / traded.length) * 100
+    return (traded.filter((row) => rowReturn(row) > 0).length / traded.length) * 100
   }, [rows])
   const firstAiIdx = rows.findIndex((row) => row.caliber === 'ai')
   const tradeChart = useMemo(() => {
     const result = rows.reduce(
       (total, day) => {
         const stocks = day.stocks?.length
-          ? day.stocks.map((stock) => ({ label: `${day.trade_date.slice(5)} ${stock.name || stock.code}`, returnPct: stock.return_pct }))
+          ? day.stocks.map((stock) => ({
+              label: `${day.trade_date.slice(5)} ${stock.name || stock.code}`,
+              // 有仓位上限 → 按仓位折算；否则退回个股收益（旧记录）
+              returnPct: Number.isFinite(stock.position_cap)
+                ? Number(stock.return_pct) * Number(stock.position_cap)
+                : stock.return_pct,
+            }))
           : Array.from({ length: day.stock_count }, (_, index) => ({
               label: `${day.trade_date.slice(5)} ${day.names[index] || day.codes[index] || `交易${index + 1}`}`,
               returnPct: undefined,
@@ -45,7 +54,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
         return stocks.reduce(
           (dayTotal, stock) => {
             const hasStockReturn = Number.isFinite(stock.returnPct)
-            const returnPct = hasStockReturn ? Number(stock.returnPct) : day.avg_return_pct
+            const returnPct = hasStockReturn ? Number(stock.returnPct) : rowReturn(day)
             return {
               nav: dayTotal.nav * (1 + returnPct / 100),
               fallbackCount: dayTotal.fallbackCount + (hasStockReturn ? 0 : 1),
@@ -86,7 +95,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
       </Card>
 
       <Card title="📊 逐日收益分布" extra={<CardBadge tone={winRate != null && winRate >= 50 ? 'up' : 'neutral'}>胜率 {winRate == null ? '—' : `${winRate.toFixed(0)}%`}</CardBadge>}>
-        {rows.length ? <BarChart bars={rows.map((row) => ({ label: row.trade_date.slice(5), value: row.avg_return_pct, tone: row.stock_count === 0 ? ('sub' as const) : undefined }))} height={170} format={(value) => `${n1(value)}%`} maxBarWidth={26} /> : <EmptyState text="无逐日收益记录" />}
+        {rows.length ? <BarChart bars={rows.map((row) => ({ label: row.trade_date.slice(5), value: rowReturn(row), tone: row.stock_count === 0 ? ('sub' as const) : undefined }))} height={170} format={(value) => `${n1(value)}%`} maxBarWidth={26} /> : <EmptyState text="无逐日收益记录" />}
       </Card>
 
       <Card title="结算流水" extra={<CardBadge>{rows.length}日</CardBadge>}>
@@ -95,7 +104,8 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
           { label: '决策日', cell: (row) => <span className="num text-sub">{row.recommendation_date}</span> },
           { label: '口径', cell: (row) => { const caliber = row.caliber ? CALIBER_LABEL[row.caliber] : null; return caliber ? <Tag tone={caliber.tone} title={row.note}>{caliber.text}</Tag> : <span className="text-sub text-12">机械</span> } },
           { label: '成交', num: true, cell: (row) => <span className={row.stock_count === 0 ? 'text-sub' : 'text-txt'}>{row.stock_count}</span> },
-          { label: '均收益', num: true, cell: (row) => <ReturnText value={row.avg_return_pct} /> },
+          { label: '账户收益', num: true, cell: (row) => <ReturnText value={rowReturn(row)} /> },
+          { label: '等权参照', num: true, cell: (row) => <span className={cn('num', Number.isFinite(row.account_return_pct) && Math.abs((row.account_return_pct as number) - row.avg_return_pct) > 0.005 ? 'text-sub line-through' : 'text-sub')}>{pct(row.avg_return_pct)}</span> },
           { label: '净值', num: true, cell: (row) => <span className={cn('num font-semibold', row.nav >= 1 ? 'text-up' : 'text-down')}>{n2(row.nav)}</span> },
           { label: '成交标的', className: 'whitespace-normal min-w-[240px]', cell: (row) => row.names?.length ? <span className="flex flex-wrap gap-1">{row.names.map((name) => <Tag key={`${name}-${row.trade_date}`}>{name}</Tag>)}</span> : <span className="text-sub">空仓</span> },
         ]} />

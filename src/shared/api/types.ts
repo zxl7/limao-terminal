@@ -2749,6 +2749,8 @@ export interface AiNavStock {
   auction_price: number
   close: number
   return_pct: number
+  /** 该票仓位上限（0~1，2026-11-13 起账本按仓位加权） */
+  position_cap?: number
   reason: string
 }
 
@@ -2757,7 +2759,12 @@ export interface AiNavEntry {
   recommendation_date: string
   strategy: string
   stock_count: number
+  /** 个股等权平均（旧口径，仅作对照） */
   avg_return_pct: number
+  /** 账户口径：Σ(仓位 × 个股收益)；未使用仓位视为现金（2026-11-13） */
+  account_return_pct?: number
+  /** 'position' = 按仓位加权；'equal_fallback' = 无仓位数据时退回等权 */
+  weight?: 'position' | 'equal_fallback' | string
   /** 净值，起点 1.0 */
   nav: number
   stocks: AiNavStock[]
@@ -2849,6 +2856,8 @@ export interface AccountNavEntry {
   note?: string
   stock_count: number
   avg_return_pct: number
+  account_return_pct?: number
+  weight?: string
   nav: number
   codes: string[]
   names: string[]
