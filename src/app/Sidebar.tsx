@@ -107,7 +107,7 @@ export function Sidebar() {
      *    （表现就是「tab 列表不自己滚，整个侧栏跟着内容走」）。
      */
     <aside
-      className="max-lg:hidden lg:flex flex-col w-[132px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none bg-head-bg"
+      className="max-lg:hidden lg:flex flex-col w-[168px] flex-none min-h-0 h-full text-head-txt border-r border-white/10 select-none bg-head-bg"
       aria-label="主导航"
     >
       {/* 品牌：固定左上角（⛔ 不要放进可滚动区） */}
@@ -216,7 +216,7 @@ export function Sidebar() {
       {/* 页脚状态 */}
       <div className="px-2 py-2.5 border-t border-white/10 flex items-center gap-1.5 text-10 text-head-soft flex-none">
         <span className="w-1.5 h-1.5 rounded-full bg-head-down flex-none" aria-hidden />
-        {/* ⛔ 2026-11-10 侧栏收窄到 132px：长文案换行会撑高页脚，缩成两行标签 */}
+        {/* ⛔ 2026-11-10 侧栏收窄到 168px：长文案换行会撑高页脚，缩成两行标签 */}
         <span className="leading-tight">A股情绪核心<br />盘中实时终端</span>
       </div>
 

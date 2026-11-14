@@ -3918,3 +3918,51 @@ export interface AiTiltState {
   iterations: AiTiltIteration[]
   note: string
 }
+
+
+// ── 复盘面板（2026-11-14）─────────────────────────────────────────
+export interface ReviewSignal { name: string; hit: boolean; value: string }
+export interface ReviewRisk {
+  level: '高' | '中' | '低' | string
+  hits: number
+  signals: ReviewSignal[]
+  verdict?: string
+  prev_zt_to_limit_down?: string[]
+  prev_zt_to_limit_down_count?: number
+  high_board_avg_pct?: number | null
+  high_board_n?: number
+}
+export interface ReviewMoney {
+  zt_pool_avg: number | null
+  red_ratio: number | null
+  relay_max_boards: number
+  relay_avg: number | null
+  relay_best: { name: string; pct: number } | null
+  relay_worst: { name: string; pct: number } | null
+  overnight_avg: number | null
+  overnight_best: { name: string; pct: number } | null
+  overnight_worst: { name: string; pct: number } | null
+}
+export interface ReviewTheme {
+  name: string; zt: number; max_boards: number; day: number; first_seal: string; strength: number
+}
+export interface ReviewHighBoardRow {
+  name: string; code: string; boards: number; pct: number | null; zbc: number; fbt: string
+  second_wave: boolean; prior_zt: number | null; next_odds: number | null; key: string
+}
+export interface ReviewPanel {
+  date: string
+  prev: string | null
+  risk: ReviewRisk
+  dump_risk?: ReviewRisk
+  high_board?: { max_boards: number; count: number; rows: ReviewHighBoardRow[]; note: string }
+  money: ReviewMoney
+  themes: ReviewTheme[]
+  commentary?: Array<{ heading: string; lines: string[] }>
+  pool?: {
+    relay: number; watch: number; stance: string | null; quota: number | null
+    buyable: Array<{ name: string; code: string; cap: number | null; gap: number | null }>
+    observe: Array<{ name: string; code: string }>
+  }
+  sources?: Record<string, boolean>
+}
