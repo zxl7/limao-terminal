@@ -125,14 +125,21 @@ export function Component() {
         {/* 复盘点评：主体内容，双列文本流压高度 */}
         <Card title="🧠 复盘点评" extra={<CardBadge>{d.commentary?.length ?? 0} 段</CardBadge>}>
           {d.commentary?.length ? (
-            <div className="xl:columns-2 xl:gap-6 text-12 leading-[1.55]">
-              {d.commentary.map((sec) => (
-                <section key={sec.heading} className="mb-2 break-inside-avoid">
-                  <h4 className="text-12 font-semibold text-lead m-0 mb-0.5">{sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}</h4>
-                  {sec.lines.map((ln, i) => (
-                    // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
-                    <CommentLine key={i} text={ln} compact />
-                  ))}
+            <div className="flex flex-col">
+              {d.commentary.map((sec, idx) => (
+                <section
+                  key={sec.heading}
+                  className={cn('pl-2.5 border-l-2 border-lead/60', idx > 0 && 'mt-3.5')}
+                >
+                  <h4 className="text-13 font-semibold text-lead m-0 mb-1.5">
+                    {sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}
+                  </h4>
+                  <div className="text-13 leading-[1.75] text-txt">
+                    {sec.lines.map((ln, i) => (
+                      // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
+                      <CommentLine key={i} text={ln} />
+                    ))}
+                  </div>
                 </section>
               ))}
             </div>
@@ -184,13 +191,13 @@ function CommentLine({ text, compact = false }: { text: string; compact?: boolea
   }
   if (m) {
     return (
-      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 mb-0.5">
+      <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 mb-1">
         <span className="text-12 text-sub">{m[1]}</span>
         <span className={cn('leading-[1.55]', compact ? 'text-12' : 'text-13')} dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />
       </div>
     )
   }
-  return <p className={cn('m-0 leading-[1.55]', compact ? 'text-12 mb-0.5' : 'text-13 mb-1')} dangerouslySetInnerHTML={{ __html: fmt(t) }} />
+  return <p className={cn('m-0 leading-[1.75]', compact ? 'text-12 mb-0.5' : 'text-13 mb-1')} dangerouslySetInnerHTML={{ __html: fmt(t) }} />
 }
 
 /** lark_md 轻量转 HTML：`<text_tag color>` → span，`**加粗**` → b，换行 → br。 */

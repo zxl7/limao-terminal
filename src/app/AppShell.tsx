@@ -123,6 +123,7 @@ export const TABS: readonly TabDef[] = [
 
 export function AppShell() {
   usePrefetchPriorityPages()
+  const { pathname } = useLocation()
 
   return (
     /**
@@ -160,7 +161,8 @@ export function AppShell() {
             <TideAlgorithmLayer />
             <Outlet />
           </main>
-          <RightRail />
+          {/* 2026-11-14 用户：「今日复盘」页不显示右侧实时速览 */}
+          {pathname !== '/review' && <RightRail />}
         </div>
       </div>
     </div>
