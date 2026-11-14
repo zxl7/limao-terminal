@@ -46,6 +46,8 @@ const REALTIME_TABS = [
   // 放进实时段是**页面级导航决策**（开盘前后第一个要看），与 /timeline 的例外同理。
   '/ai',
   '/mainline',
+  // 2026-11-14 用户：新增「今日复盘」tab（盘后数据，但开盘前后就要看，与 /ai 同为页面级决策）
+  '/review',
   '/effect',
   '/flow',
   '/reflow',
@@ -95,6 +97,7 @@ describe('导航顺序 —— 实时优先', () => {
       '/timeline',
       '/ai',        // 财富密码 —— 2026-11-03 用户要求提到时间轴之下（开盘前后第一入口）
       '/mainline',
+      '/review',    // 今日复盘 —— 2026-11-14 用户加星入口
       '/effect',
       '/flow',
       '/reflow',

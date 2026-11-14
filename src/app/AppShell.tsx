@@ -77,6 +77,8 @@ export const TABS: readonly TabDef[] = [
   //    **按使用时机**做的导航决策（每天开盘前后第一个要看的就是它），与 /timeline 同理。
   { to: '/ai', label: '财富密码', group: '实时', priority: true },
   { to: '/mainline', label: '主线题材', group: '实时', priority: true },
+  // 2026-11-14 用户：新增「今日复盘」tab 并加星
+  { to: '/review', label: '今日复盘', group: '实时', priority: true },
   { to: '/effect', label: '赚钱效应', group: '实时' },
   { to: '/flow', label: '资金流向', group: '实时' },
   { to: '/reflow', label: '题材回流', group: '实时' },

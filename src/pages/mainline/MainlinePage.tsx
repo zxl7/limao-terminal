@@ -16,7 +16,6 @@ import {
   type ThemeCoreFacts,
 } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
-import { ReviewPanelSection } from '@/features/review/ReviewPanel'
 import { BarChart, Card, CardBadge, EmptyState, Icon, StockLink, Zone, ZoneRow } from '@/shared/ui'
 import { cn, tradableStocks } from '@/shared/lib'
 
@@ -414,9 +413,6 @@ export function Component() {
       )}
         </Zone>
       </ZoneRow>
-
-      {/* 🧭 复盘模块（2026-11-14 用户：放在主线题材下面；数据来自 /api/review/panel） */}
-      <ReviewPanelSection />
     </div>
   )
 }

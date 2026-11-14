@@ -42,6 +42,7 @@ export const PAGE_LOADERS = {
   '/': () => import('@/pages/intraday/IntradayPage'),
   '/timeline': () => import('@/pages/timeline/TimelinePage'),
   '/mainline': () => import('@/pages/mainline/MainlinePage'),
+  '/review': () => import('@/pages/review/ReviewPage'),
   '/effect': () => import('@/pages/effect/EffectPage'),
   '/flow': () => import('@/pages/flow/FlowPage'),
   '/reflow': () => import('@/pages/reflow/ReflowPage'),
