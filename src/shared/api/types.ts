@@ -3966,3 +3966,19 @@ export interface ReviewPanel {
   }
   sources?: Record<string, boolean>
 }
+
+
+export interface ReviewSeriesRow {
+  date: string
+  zt: number | null
+  dt: number | null
+  max_boards: number | null
+  sentiment: number | null
+  promote_rate: number | null
+  nuke: number | null
+}
+export interface ReviewSeries {
+  days: number
+  rows: ReviewSeriesRow[]
+  sources?: Record<string, boolean>
+}

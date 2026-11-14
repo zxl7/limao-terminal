@@ -114,6 +114,7 @@ export interface RouteTypeMap {
   '/api/market/relay-effect': RelayEffect
   '/api/market/feedback': FeedbackMatrix
   '/api/review/panel': import('./types').ReviewPanel
+  '/api/review/series': import('./types').ReviewSeries
   '/api/market/selection-effect': SelectionEffect
   '/api/market/candidates': CandidatesFile
   '/api/theme/rotation': RotationData
@@ -285,6 +286,8 @@ export const api = {
   feedback: () => fetchRoute('/api/market/feedback'),
   /** 复盘面板（风险/赚钱效应/高标/主线/LLM点评） */
   reviewPanel: () => fetchRoute('/api/review/panel'),
+  /** 复盘多日序列 */
+  reviewSeries: () => fetchRoute('/api/review/series'),
   /** 盘后候选的次日反馈（猎手原样发布） */
   selectionEffect: () => fetchRoute('/api/market/selection-effect'),
   relayEffect: () => fetchRoute('/api/market/relay-effect'),
