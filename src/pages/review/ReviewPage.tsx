@@ -62,13 +62,13 @@ export function Component() {
           </p>
         </Card>
 
-        <Card title="📈 情绪分 / 涨停" extra={<CardBadge>{rows.length} 日</CardBadge>}>
+        <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>{rows.length} 日</CardBadge>}>
           {rows.length ? (
             <LineChart
               labels={labels}
               series={[
                 { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
-                { name: '涨停数', values: rows.map((r) => r.zt), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}` },
+                { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
               ]}
               height={130}
               format={(v) => n1(v)}
@@ -159,7 +159,7 @@ export function Component() {
             <div className="text-13 leading-relaxed">
               {sec.lines.map((ln, i) => (
                 // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
-                <p key={i} className="m-0 mb-1" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                <CommentLine key={i} text={ln} />
               ))}
             </div>
           </Card>
@@ -171,6 +171,46 @@ export function Component() {
       </div>
     </div>
   )
+}
+
+/**
+ * 点评行渲染（2026-11-14 用户「右边全是文案，优化阅读」）。
+ * `**标签** 值` → 两列；`· xxx` → 列表；含进度条字符时画进度条。
+ */
+function CommentLine({ text }: { text: string }) {
+  const t = text.trim()
+  const m = /^\*\*(.+?)\*\*[　\s]*(.*)$/.exec(t)
+  const bar = /[▰▱]{6,}/.exec(t)
+  if (bar) {
+    const s = bar[0]
+    const filled = (s.match(/▰/g) || []).length
+    const pct = Math.round((filled / s.length) * 100)
+    return (
+      <div className="mb-1.5">
+        <div className="h-[6px] w-full rounded-sm overflow-hidden" style={{ background: 'var(--color-line-faint)' }}>
+          <div className="h-full" style={{ width: `${pct}%`, background: 'var(--color-up)' }} />
+        </div>
+        <div className="text-12 mt-0.5" dangerouslySetInnerHTML={{ __html: fmt(t.replace(s, '')) }} />
+      </div>
+    )
+  }
+  if (t.startsWith('·')) {
+    return (
+      <div className="flex gap-1.5 mb-0.5">
+        <span className="text-sub flex-none">·</span>
+        <span className="text-13 leading-relaxed" dangerouslySetInnerHTML={{ __html: fmt(t.replace(/^·\s*/, '')) }} />
+      </div>
+    )
+  }
+  if (m) {
+    return (
+      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 mb-0.5">
+        <span className="text-12 text-sub">{m[1]}</span>
+        <span className="text-13 leading-relaxed" dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />
+      </div>
+    )
+  }
+  return <p className="text-13 leading-relaxed m-0 mb-1" dangerouslySetInnerHTML={{ __html: fmt(t) }} />
 }
 
 /** lark_md 轻量转 HTML：`<text_tag color>` → span，`**加粗**` → b，换行 → br。 */
