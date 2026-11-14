@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, queryClient } from '@/shared/api'
 import type { ReviewPanel, ReviewSeries } from '@/shared/api/types'
-import { Card, CardBadge, EmptyState, LineChart, BarChart } from '@/shared/ui'
-import { StatPair, Tag, n1, n2 } from '@/features/analytics'
+import { Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
+import { Tag, n1, n2 } from '@/features/analytics'
 import { cn } from '@/shared/lib'
 
 /**
@@ -46,129 +46,109 @@ export function Component() {
   const last = rows.at(-1)
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,430px)_minmax(0,1fr)] gap-3 items-start">
-      {/* ⬅️ 左栏：图表速览（占位小，深度周期分析请看「情绪周期」tab） */}
-      <div className="flex flex-col gap-3">
-        <Card title="🧭 今日复盘" extra={<CardBadge>{d.date}</CardBadge>}>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <StatPair label="跌停风险" value={risk.level} tone={risk.level === '高' ? 'down' : risk.level === '中' ? 'warn' : 'up'} />
-            <StatPair label="涨停/跌停" value={`${last?.zt ?? '—'} / ${last?.dt ?? '—'}`} />
-            <StatPair label="最高板" value={last?.max_boards == null ? '—' : `${last.max_boards} 板`} tone="warn" />
-            <StatPair label="情绪分" value={last?.sentiment == null ? '—' : `${n1(last.sentiment)}/10`} tone={tone((last?.sentiment ?? 5) - 5)} />
+    <div className="flex flex-col gap-3">
+      {/* ① 一行速览：风险 + 关键数字 + 信号 chips（删除单独的「风险卡/赚钱效应卡」，避免重复） */}
+      <Card
+        title="🧭 今日复盘"
+        extra={<CardBadge>{d.date}{d.prev ? ` · ${d.prev}` : ''}</CardBadge>}
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-12 text-sub">跌停风险</span>
+            <span className={cn('text-20 font-semibold num', risk.level === '高' ? 'text-down' : risk.level === '中' ? 'text-warn' : 'text-up')}>{risk.level}</span>
           </div>
-          <p className="text-11 text-sub m-0 mt-1.5">{risk.verdict ?? ''}</p>
-          <p className="text-11 text-sub m-0 mt-1">
-            深度周期定位见 <span className="text-lead">情绪周期</span> 页 · 本页只做当日复盘
-          </p>
-        </Card>
+          <Kpi label="涨停/跌停" value={`${last?.zt ?? '—'} / ${last?.dt ?? '—'}`} />
+          <Kpi label="情绪分" value={last?.sentiment == null ? '—' : `${n1(last.sentiment)}`} tone={tone((last?.sentiment ?? 5) - 5)} />
+          <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />
+          <Kpi label="最高板" value={last?.max_boards == null ? '—' : `${last.max_boards}`} tone="warn" />
+          <Kpi label="池均幅" value={m.zt_pool_avg == null ? '—' : `${n2(m.zt_pool_avg)}%`} tone={tone(m.zt_pool_avg)} />
+          <Kpi label="红盘率" value={m.red_ratio == null ? '—' : `${n1(m.red_ratio)}%`} />
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {risk.signals.map((sig) => (
+            <span
+              key={sig.name}
+              className={cn('text-11 px-1.5 py-[1px] rounded-sm border',
+                sig.hit ? 'text-down border-down/40 bg-down/10' : 'text-sub border-line-faint')}
+            >
+              {sig.hit ? '●' : '○'} {sig.name} {sig.value}
+            </span>
+          ))}
+        </div>
+      </Card>
 
-        <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>{rows.length} 日</CardBadge>}>
-          {rows.length ? (
-            <LineChart
-              labels={labels}
-              series={[
-                { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
-                { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
-              ]}
-              height={130}
-              format={(v) => n1(v)}
-              showLegend={false}
-              refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
-            />
-          ) : <EmptyState text="无序列数据" />}
-        </Card>
+      {/* ② 一张图：情绪分 + 晋级率（双轴，20 日）；不再单列涨停柱/最高板图（同一信息重复） */}
+      <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>近 {rows.length} 日</CardBadge>}>
+        {rows.length ? (
+          <LineChart
+            labels={labels}
+            series={[
+              { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
+              { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
+            ]}
+            height={170}
+            format={(v) => n1(v)}
+            refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
+          />
+        ) : <EmptyState text="无序列数据" />}
+      </Card>
 
-        <Card title="📊 涨停 vs 跌停" extra={<CardBadge>近 10 日</CardBadge>}>
-          {rows.length ? (
-            <BarChart
-              bars={rows.slice(-10).map((r) => ({ label: r.date.slice(5), value: r.zt, compare: r.dt, compareLabel: '跌停' }))}
-              height={120}
-              maxBarWidth={18}
-              format={(v) => `${Math.round(v)}`}
-            />
-          ) : <EmptyState text="无序列数据" />}
-        </Card>
-
-        <Card title="⚠️ 明日跌停预判" extra={<CardBadge>{risk.level}（{risk.hits}）</CardBadge>}>
-          <div className="grid grid-cols-1 gap-y-0.5 text-12">
-            {risk.signals.map((sig) => (
-              <div key={sig.name} className="flex items-center gap-1.5">
-                <span className={sig.hit ? 'text-down' : 'text-sub'}>{sig.hit ? '●' : '○'}</span>
-                <span className={sig.hit ? 'text-txt' : 'text-sub'}>{sig.name}</span>
-                <span className="text-sub ml-auto num">{sig.value}</span>
+      {/* ③ 两栏：左=高标+主线（短），右=复盘点评（主体，双列文本流） */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-3 items-start">
+        <div className="flex flex-col gap-3">
+          <Card title="👑 高标" extra={hb ? <CardBadge>{hb.max_boards} 板</CardBadge> : undefined}>
+            {hb?.rows?.length ? hb.rows.map((r) => (
+              <div key={r.code} className="text-12 leading-relaxed">
+                <b>{r.name}</b> {r.boards} 板 · 封 {r.fbt || '—'} · 炸 {r.zbc}
+                {r.second_wave && <Tag tone="warn">二波</Tag>}
+                <div className="text-11 text-sub">明日封住 → {r.boards + 1} 板（{r.next_odds ?? '—'}%）；断板 → 退潮</div>
               </div>
-            ))}
-          </div>
-          {!!risk.prev_zt_to_limit_down?.length && (
-            <p className="text-11 text-warn mt-1 mb-0">
-              昨涨停今跌停 {risk.prev_zt_to_limit_down_count} 只：{risk.prev_zt_to_limit_down.join('、')}
-            </p>
-          )}
-        </Card>
-
-        <Card title="💰 赚钱效应" extra={<CardBadge>昨日涨停池</CardBadge>}>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <StatPair label="池均幅" value={m.zt_pool_avg == null ? '—' : `${n2(m.zt_pool_avg)}%`} tone={tone(m.zt_pool_avg)} />
-            <StatPair label="红盘率" value={m.red_ratio == null ? '—' : `${n1(m.red_ratio)}%`} />
-            <StatPair label="接力均幅" value={m.relay_avg == null ? '—' : `${n2(m.relay_avg)}%`} tone={tone(m.relay_avg)} />
-            <StatPair label="隔夜均幅" value={m.overnight_avg == null ? '—' : `${n2(m.overnight_avg)}%`} tone={tone(m.overnight_avg)} />
-          </div>
-          <ul className="text-11 leading-relaxed m-0 mt-1">
-            {m.relay_best && m.relay_worst && (
-              <li>接力最强 <b className="text-up">{m.relay_best.name} {n2(m.relay_best.pct)}%</b> · 最弱 <b className="text-down">{m.relay_worst.name} {n2(m.relay_worst.pct)}%</b></li>
-            )}
-            {m.overnight_best && m.overnight_worst && (
-              <li>隔夜最强 <b className="text-up">{m.overnight_best.name} {n2(m.overnight_best.pct)}%</b> · 最弱 <b className="text-down">{m.overnight_worst.name} {n2(m.overnight_worst.pct)}%</b></li>
-            )}
-          </ul>
-        </Card>
-
-        {!!hb?.rows?.length && (
-          <Card title="👑 高标处境" extra={<CardBadge>{hb.max_boards} 板</CardBadge>}>
-            {hb.rows.map((r) => (
-              <div key={r.code} className="text-12 leading-relaxed mb-1">
-                <b>{r.name}</b>({r.code}) {r.boards} 板 · 封 {r.fbt || '—'} · 炸 {r.zbc}
-                {r.second_wave && <Tag tone="warn">第二波</Tag>}
-                <span className="block text-11 text-sub">{r.key}</span>
-              </div>
-            ))}
+            )) : <p className="text-12 text-sub m-0">无高标</p>}
           </Card>
-        )}
 
-        <Card title="🎯 主线与板块" extra={<CardBadge>按家数</CardBadge>}>
-          <ul className="text-12 leading-relaxed m-0">
-            {d.themes.slice(0, 8).map((t) => (
-              <li key={t.name} className="flex items-center gap-2">
-                <span className="w-[88px] flex-none truncate">{t.name}</span>
-                <span className="h-[4px] flex-1 max-w-[110px] rounded-sm overflow-hidden" style={{ background: 'var(--color-line-faint)' }}>
-                  <span className="block h-full" style={{ width: `${Math.round(t.strength * 100)}%`, background: 'var(--color-lead)' }} />
-                </span>
-                <span className="num flex-none">{t.zt}</span>
-                <span className="text-sub flex-none">最高 {t.max_boards}</span>
-                <span className={cn('flex-none', t.day >= 3 ? 'text-warn' : 'text-sub')}>第 {t.day} 天</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
+          <Card title="🎯 主线" extra={<CardBadge>Top 6</CardBadge>}>
+            <ul className="text-12 leading-relaxed m-0">
+              {d.themes.slice(0, 6).map((t) => (
+                <li key={t.name} className="flex items-center gap-2 mb-0.5">
+                  <span className="w-[80px] flex-none truncate">{t.name}</span>
+                  <span className="h-[4px] flex-1 rounded-sm overflow-hidden" style={{ background: 'var(--color-line-faint)' }}>
+                    <span className="block h-full" style={{ width: `${Math.round(t.strength * 100)}%`, background: 'var(--color-lead)' }} />
+                  </span>
+                  <span className="num flex-none w-[34px] text-right">{t.zt}家</span>
+                  <span className={cn('flex-none w-[42px] text-right', t.day >= 3 ? 'text-warn' : 'text-sub')}>{t.max_boards}板·{t.day}天</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
 
-      {/* ➡️ 右栏：复盘点评（核心内容，全文不折叠） */}
-      <div className="flex flex-col gap-3">
-        {d.commentary?.length ? d.commentary.map((sec) => (
-          <Card key={sec.heading} title={sec.heading} extra={<CardBadge>{sec.lines.length} 行</CardBadge>}>
-            <div className="text-13 leading-relaxed">
-              {sec.lines.map((ln, i) => (
-                // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
-                <CommentLine key={i} text={ln} />
+        {/* 复盘点评：主体内容，双列文本流压高度 */}
+        <Card title="🧠 复盘点评" extra={<CardBadge>{d.commentary?.length ?? 0} 段</CardBadge>}>
+          {d.commentary?.length ? (
+            <div className="xl:columns-2 xl:gap-6 text-12 leading-[1.55]">
+              {d.commentary.map((sec) => (
+                <section key={sec.heading} className="mb-2 break-inside-avoid">
+                  <h4 className="text-12 font-semibold text-lead m-0 mb-0.5">{sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}</h4>
+                  {sec.lines.map((ln, i) => (
+                    // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
+                    <CommentLine key={i} text={ln} compact />
+                  ))}
+                </section>
               ))}
             </div>
-          </Card>
-        )) : (
-          <Card title="🧠 复盘点评" extra={<CardBadge>—</CardBadge>}>
-            <EmptyState text="今日暂无复盘点评" hint="15:35 复盘链生成后会出现在这里" />
-          </Card>
-        )}
+          ) : <EmptyState text="今日暂无复盘点评" hint="15:35 复盘链生成后出现" />}
+        </Card>
       </div>
+    </div>
+  )
+}
+
+/** 顶部速览用的小指标（label 上、值下，紧凑） */
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' | 'warn' | 'sub' }) {
+  return (
+    <div className="flex flex-col leading-tight">
+      <span className="text-11 text-sub">{label}</span>
+      <span className={cn('text-15 font-semibold num', tone === 'up' ? 'text-up' : tone === 'down' ? 'text-down' : tone === 'warn' ? 'text-warn' : 'text-txt')}>{value}</span>
     </div>
   )
 }
@@ -177,7 +157,7 @@ export function Component() {
  * 点评行渲染（2026-11-14 用户「右边全是文案，优化阅读」）。
  * `**标签** 值` → 两列；`· xxx` → 列表；含进度条字符时画进度条。
  */
-function CommentLine({ text }: { text: string }) {
+function CommentLine({ text, compact = false }: { text: string; compact?: boolean }) {
   const t = text.trim()
   const m = /^\*\*(.+?)\*\*[　\s]*(.*)$/.exec(t)
   const bar = /[▰▱]{6,}/.exec(t)
@@ -198,7 +178,7 @@ function CommentLine({ text }: { text: string }) {
     return (
       <div className="flex gap-1.5 mb-0.5">
         <span className="text-sub flex-none">·</span>
-        <span className="text-13 leading-relaxed" dangerouslySetInnerHTML={{ __html: fmt(t.replace(/^·\s*/, '')) }} />
+        <span className={cn('leading-[1.55]', compact ? 'text-12' : 'text-13')} dangerouslySetInnerHTML={{ __html: fmt(t.replace(/^·\s*/, '')) }} />
       </div>
     )
   }
@@ -206,11 +186,11 @@ function CommentLine({ text }: { text: string }) {
     return (
       <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2 mb-0.5">
         <span className="text-12 text-sub">{m[1]}</span>
-        <span className="text-13 leading-relaxed" dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />
+        <span className={cn('leading-[1.55]', compact ? 'text-12' : 'text-13')} dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />
       </div>
     )
   }
-  return <p className="text-13 leading-relaxed m-0 mb-1" dangerouslySetInnerHTML={{ __html: fmt(t) }} />
+  return <p className={cn('m-0 leading-[1.55]', compact ? 'text-12 mb-0.5' : 'text-13 mb-1')} dangerouslySetInnerHTML={{ __html: fmt(t) }} />
 }
 
 /** lark_md 轻量转 HTML：`<text_tag color>` → span，`**加粗**` → b，换行 → br。 */
