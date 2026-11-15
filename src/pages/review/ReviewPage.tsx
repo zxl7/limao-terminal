@@ -6,6 +6,7 @@ import { Tag, n1, n2 } from '@/features/analytics'
 import { cn } from '@/shared/lib'
 import { parseMainline } from '@/features/review/mainline'
 import { parseAi } from '@/features/review/ai'
+import { parseEvolution, parseOutlook, splitLabeled } from '@/features/review/sections'
 
 /**
  * 今日复盘（2026-11-14 用户「改造成网页类型，连续几天做折线图」）。
@@ -55,7 +56,13 @@ export function Component() {
   const evolution = commentary.find((sec) => sec.heading.includes('情绪演变'))
   const ai = commentary.find((sec) => sec.heading.includes('综合判断'))
   const mainline = commentary.find((sec) => sec.heading.includes('主线复盘'))
-  const rest = commentary.filter((sec) => sec !== evolution && sec !== ai && sec !== mainline)
+  const evo = commentary.find((sec) => sec.heading.includes('核心演化'))
+  const outlook = commentary.find((sec) => sec.heading.includes('明日展望'))
+  const rest = commentary.filter(
+    (sec) => sec !== evolution && sec !== ai && sec !== mainline && sec !== evo && sec !== outlook,
+  )
+  const evoData = evo ? parseEvolution(evo.lines) : null
+  const outlookData = outlook ? parseOutlook(outlook.lines) : null
   // 2026-11-15 用户：「支线」不展示
   const mainlineBlocks = (mainline ? parseMainline(mainline.lines) : []).filter((b) => b.rank !== '支线')
   const aiData = ai ? parseAi(ai.lines) : null
@@ -174,26 +181,32 @@ export function Component() {
                   )}
                 </div>
 
-                {/* 事实：两列小卡 */}
+                {/* 事实：先给标题（一眼看完），正文折叠在卡片内 */}
                 {aiData.facts.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                     {aiData.facts.map((f) => (
-                      <div key={f.tag} className="rounded-sm border border-line-faint px-2.5 py-2 min-w-0">
-                        <div className="text-11 text-lead mb-0.5">{f.tag}{f.title ? ` · ${f.title}` : ''}</div>
-                        <div className="text-12 leading-[1.65] text-txt break-words" dangerouslySetInnerHTML={{ __html: fmt(f.body) }} />
-                      </div>
+                      <details key={f.tag} className="rounded-sm border border-line-faint px-2.5 py-1.5 min-w-0">
+                        <summary className="cursor-pointer text-12 leading-[1.6] text-txt">
+                          <span className="text-11 text-lead mr-1">{f.tag}</span>
+                          <b>{f.title || f.body.slice(0, 24)}</b>
+                        </summary>
+                        <div className="text-12 leading-[1.65] text-sub mt-1 break-words" dangerouslySetInnerHTML={{ __html: fmt(f.body) }} />
+                      </details>
                     ))}
                   </div>
                 )}
 
-                {/* 风险：两列小卡（红边） */}
+                {/* 风险：同样先给结论句 */}
                 {aiData.risks.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                     {aiData.risks.map((r) => (
-                      <div key={r.tag} className="rounded-sm border border-down/30 bg-down/5 px-2.5 py-2 min-w-0">
-                        <div className="text-11 text-down mb-0.5">{r.tag}</div>
-                        <div className="text-12 leading-[1.65] text-txt break-words" dangerouslySetInnerHTML={{ __html: fmt(r.body) }} />
-                      </div>
+                      <details key={r.tag} className="rounded-sm border border-down/25 px-2.5 py-1.5 min-w-0">
+                        <summary className="cursor-pointer text-12 leading-[1.6] text-txt">
+                          <span className="text-11 text-down mr-1">{r.tag}</span>
+                          <b>{firstSentence(r.title || r.body)}</b>
+                        </summary>
+                        <div className="text-12 leading-[1.65] text-sub mt-1 break-words" dangerouslySetInnerHTML={{ __html: fmt(r.body) }} />
+                      </details>
                     ))}
                   </div>
                 )}
@@ -255,6 +268,125 @@ export function Component() {
             </div>
           )}
 
+          {/* 👑 核心演化 + 📎 明日展望：并排一张行 */}
+          {(evoData || outlookData) && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start min-w-0">
+              {evoData && (
+                <Card title="👑 核心演化" extra={<CardBadge>{evoData.outlook.length} 条推演</CardBadge>}>
+                  <div className="flex flex-col gap-2">
+                    {evoData.sections.map((sec) => (
+                      <div key={sec.heading} className="border-l-2 border-line-faint pl-2.5">
+                        <div className="text-11 text-sub mb-0.5">{sec.heading}</div>
+                        {sec.lines.map((ln, i) => {
+                          const { title, body } = splitLabeled(ln)
+                          return (
+                            // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                            <p key={i} className="text-12 leading-[1.65] m-0 text-txt break-words">
+                              {title && <b className="text-txt">{title} </b>}
+                              <span dangerouslySetInnerHTML={{ __html: fmt(body) }} />
+                            </p>
+                          )
+                        })}
+                      </div>
+                    ))}
+                    {evoData.outlook.length > 0 && (
+                      <div className="border-l-2 border-line-faint pl-2.5">
+                        <div className="text-11 text-sub mb-0.5">明日推演</div>
+                        {evoData.outlook.map((it, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 leading-[1.65] m-0 text-txt break-words">
+                            <b>{it.title}</b>
+                            {it.body && <span className="text-sub"> —— </span>}
+                            <span className="text-sub" dangerouslySetInnerHTML={{ __html: fmt(it.body) }} />
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {outlookData && (
+                <Card title="📎 明日展望" extra={<CardBadge>{outlookData.points.length} 个看点</CardBadge>}>
+                  <div className="flex flex-col gap-2">
+                    {outlookData.points.length > 0 && (
+                      <div>
+                        <div className="text-11 text-sub mb-1">看点</div>
+                        <ol className="m-0 p-0 list-none flex flex-col gap-1">
+                          {outlookData.points.map((pt, i) => (
+                            // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                            <li key={i} className="flex gap-1.5 text-12 leading-[1.65]">
+                              <span className="text-lead flex-none">{pt.no}</span>
+                              <span className="min-w-0 break-words">
+                                {pt.title && <b>{pt.title}</b>}
+                                {pt.title && pt.body && <span className="text-sub">　</span>}
+                                <span className="text-sub" dangerouslySetInnerHTML={{ __html: fmt(pt.body) }} />
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {outlookData.repair && (
+                      <div className="rounded-sm border border-line-faint px-2.5 py-1.5">
+                        <div className="text-11 text-sub mb-0.5">{outlookData.repair.heading}</div>
+                        {outlookData.repair.lines.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 leading-[1.65] m-0 break-words" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                        ))}
+                      </div>
+                    )}
+
+                    {outlookData.confirm && (
+                      <div>
+                        <div className="text-11 text-sub mb-1">{outlookData.confirm.heading}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {outlookData.confirm.lines.join('｜').split('｜').filter(Boolean).map((t) => (
+                            <span key={t} className="text-11 px-1.5 py-[1px] rounded-sm border border-line-faint text-sub">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {outlookData.risk && (
+                      <div className="rounded-sm border border-down/30 bg-down/5 px-2.5 py-1.5">
+                        <div className="text-11 text-down mb-0.5">{outlookData.risk.heading}</div>
+                        {outlookData.risk.lines.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 leading-[1.65] m-0 break-words" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                        ))}
+                      </div>
+                    )}
+
+                    {outlookData.follow.length > 0 && (
+                      <div>
+                        <div className="text-11 text-sub mb-1">延续观察</div>
+                        {outlookData.follow.map((it, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 leading-[1.65] m-0 text-sub break-words">
+                            <span className="text-lead mr-1">{it.no}</span>
+                            <span dangerouslySetInnerHTML={{ __html: fmt(it.title || it.body) }} />
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {outlookData.mantra && (
+                      <div className="border-l-2 border-line-strong pl-2.5">
+                        <div className="text-11 text-sub mb-0.5">{outlookData.mantra.heading}</div>
+                        {outlookData.mantra.lines.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 leading-[1.65] m-0 text-sub italic break-words" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+
           {rest.length > 0 && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 items-start min-w-0">
               {rest.map((sec) => (
@@ -272,7 +404,7 @@ export function Component() {
             </div>
           )}
 
-          {!evolution && !ai && !mainline && rest.length === 0 && (
+          {!evolution && !ai && !mainline && !evo && !outlook && rest.length === 0 && (
             <Card title="🧠 复盘点评">
               <EmptyState text="今日暂无复盘点评" hint="复盘数据生成后出现" />
             </Card>
@@ -281,6 +413,13 @@ export function Component() {
       </div>
     </div>
   )
+}
+
+/** 取第一句（到「。」或 42 字），用于折叠卡的摘要行。 */
+function firstSentence(text: string): string {
+  const m = /^(.+?)[。！？]/.exec(text.trim())
+  const s = m ? m[1] : text.trim()
+  return s.length > 42 ? `${s.slice(0, 42)}…` : s
 }
 
 /** 顶部速览用的小指标（label 上、值下，紧凑） */
