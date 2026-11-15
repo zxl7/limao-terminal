@@ -69,7 +69,7 @@ export function Component() {
         title="🧭 今日复盘"
         extra={<CardBadge>{d.date}{d.prev ? ` · ${d.prev}` : ''}</CardBadge>}
       >
-        <div className="review-banner px-3 py-2 mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-2">
             <span className="text-12 text-sub">跌停风险</span>
             <span className={cn('text-20 font-semibold num', risk.level === '高' ? 'text-down' : risk.level === '中' ? 'text-warn' : 'text-up')}>{risk.level}</span>
@@ -167,7 +167,7 @@ export function Component() {
             <Card title="🧠 AI 综合判断" extra={<CardBadge>{aiData.facts.length} 事实 · {aiData.risks.length} 风险</CardBadge>}>
               <div className="flex flex-col gap-3">
                 {/* 判断条：状态 + 一句话结论 */}
-                <div className="review-banner px-3 py-2">
+                <div className="border-l-2 border-line-strong pl-2.5">
                   {aiData.status && <div className="text-11 text-sub mb-0.5">盘面状态 · {aiData.status}</div>}
                   {aiData.verdict && (
                     <div className="text-14 font-semibold leading-[1.6]" dangerouslySetInnerHTML={{ __html: fmt(aiData.verdict) }} />
@@ -217,11 +217,7 @@ export function Component() {
                 return (
                   <div
                     key={`${b.rank}-${b.name}`}
-                    className={cn(
-                      'min-w-0 review-rank-top',
-                      b.rank === '最强' ? 'review-rank-strongest' : b.rank === '次强' ? 'review-rank-second' : 'review-rank-third',
-                      isBranch && 'xl:col-span-3',
-                    )}
+                    className={cn('min-w-0 review-rank-top', isBranch && 'xl:col-span-3')}
                   >
                     <Card
                       title={b.rank ? `${b.rank} · ${b.name || '—'}` : (b.name || '主线')}

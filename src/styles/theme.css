@@ -253,22 +253,16 @@
 
 /* 页面顶部结论条：暖色渐变，给「今天最重要的一句话」一点分量 */
 .review-banner {
-  background: linear-gradient(90deg, var(--color-lead-soft) 0%, transparent 72%);
-  border-left: 3px solid var(--color-lead);
-  border-radius: 2px;
+  /* 2026-11-15 用户「颜色有点夸张，收敛」：去掉渐变底，只留一条细左线 */
+  border-left: 2px solid var(--color-line-strong);
 }
 
 /* 速览小指标：浅底卡片，避免数字散落在白底上 */
 .review-kpi {
-  background: var(--color-bg-soft, #fafbfd);
-  border: 1px solid var(--color-line-faint);
-  border-radius: 3px;
-  padding: 4px 8px;
+  /* 收敛：不铺底色、不描边，只保留最小间距 */
   min-width: 72px;
 }
 
 /* 主线三卡：按排名给顶部主题色（最强=红、次强=金、第三=蓝） */
-.review-rank-top { border-top-width: 3px; border-top-style: solid; }
-.review-rank-strongest { border-top-color: var(--color-up); }
-.review-rank-second { border-top-color: var(--color-lead); }
-.review-rank-third { border-top-color: var(--color-mid); }
+.review-rank-top { border-top: 2px solid var(--color-line-faint); }
+/* 排名色已收敛为统一淡灰，主次靠标题文字与徽章体现 */
