@@ -232,3 +232,43 @@
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ────────────────────────────────────────────────────────────────
+   复盘页主题色（2026-11-15 用户「这个页面带点主题色」）
+
+   为什么单独一块：
+   1. 复盘页是「当日结论页」，需要比行情页更强的视觉锚点，但不能用大面积
+      饱和底（会与涨红跌绿冲突）。做法是**浅底 + 左边框**，颜色只做点缀。
+   2. `fmt()` 输出的 `<span class="tt-red">` 之前**没有对应样式**（lark 颜色
+      在网页端全丢），这里补齐，复盘点评里的红绿才真的显示出来。
+   ──────────────────────────────────────────────────────────────── */
+
+/* lark_md 颜色 → 设计令牌 */
+.tt-red { color: var(--color-up); }
+.tt-green { color: var(--color-down); }
+.tt-blue { color: var(--color-mid); }
+.tt-purple { color: var(--color-rec); }
+.tt-orange { color: var(--color-lead); }
+.tt-grey, .tt-neutral { color: var(--color-sub); }
+
+/* 页面顶部结论条：暖色渐变，给「今天最重要的一句话」一点分量 */
+.review-banner {
+  background: linear-gradient(90deg, var(--color-lead-soft) 0%, transparent 72%);
+  border-left: 3px solid var(--color-lead);
+  border-radius: 2px;
+}
+
+/* 速览小指标：浅底卡片，避免数字散落在白底上 */
+.review-kpi {
+  background: var(--color-bg-soft, #fafbfd);
+  border: 1px solid var(--color-line-faint);
+  border-radius: 3px;
+  padding: 4px 8px;
+  min-width: 72px;
+}
+
+/* 主线三卡：按排名给顶部主题色（最强=红、次强=金、第三=蓝） */
+.review-rank-top { border-top-width: 3px; border-top-style: solid; }
+.review-rank-strongest { border-top-color: var(--color-up); }
+.review-rank-second { border-top-color: var(--color-lead); }
+.review-rank-third { border-top-color: var(--color-mid); }

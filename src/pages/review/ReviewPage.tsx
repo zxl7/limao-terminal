@@ -69,7 +69,7 @@ export function Component() {
         title="🧭 今日复盘"
         extra={<CardBadge>{d.date}{d.prev ? ` · ${d.prev}` : ''}</CardBadge>}
       >
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="review-banner px-3 py-2 mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-2">
             <span className="text-12 text-sub">跌停风险</span>
             <span className={cn('text-20 font-semibold num', risk.level === '高' ? 'text-down' : risk.level === '中' ? 'text-warn' : 'text-up')}>{risk.level}</span>
@@ -167,7 +167,7 @@ export function Component() {
             <Card title="🧠 AI 综合判断" extra={<CardBadge>{aiData.facts.length} 事实 · {aiData.risks.length} 风险</CardBadge>}>
               <div className="flex flex-col gap-3">
                 {/* 判断条：状态 + 一句话结论 */}
-                <div className="border-l-2 border-lead pl-2.5">
+                <div className="review-banner px-3 py-2">
                   {aiData.status && <div className="text-11 text-sub mb-0.5">盘面状态 · {aiData.status}</div>}
                   {aiData.verdict && (
                     <div className="text-14 font-semibold leading-[1.6]" dangerouslySetInnerHTML={{ __html: fmt(aiData.verdict) }} />
@@ -215,7 +215,14 @@ export function Component() {
               {mainlineBlocks.map((b) => {
                 const isBranch = b.rank === '支线'
                 return (
-                  <div key={`${b.rank}-${b.name}`} className={cn('min-w-0', isBranch && 'xl:col-span-3')}>
+                  <div
+                    key={`${b.rank}-${b.name}`}
+                    className={cn(
+                      'min-w-0 review-rank-top',
+                      b.rank === '最强' ? 'review-rank-strongest' : b.rank === '次强' ? 'review-rank-second' : 'review-rank-third',
+                      isBranch && 'xl:col-span-3',
+                    )}
+                  >
                     <Card
                       title={b.rank ? `${b.rank} · ${b.name || '—'}` : (b.name || '主线')}
                       extra={b.meta ? <CardBadge>{b.meta}</CardBadge> : undefined}
@@ -283,7 +290,7 @@ export function Component() {
 /** 顶部速览用的小指标（label 上、值下，紧凑） */
 function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' | 'warn' | 'sub' }) {
   return (
-    <div className="flex flex-col leading-tight">
+    <div className="review-kpi flex flex-col leading-tight">
       <span className="text-11 text-sub">{label}</span>
       <span className={cn('text-15 font-semibold num', tone === 'up' ? 'text-up' : tone === 'down' ? 'text-down' : tone === 'warn' ? 'text-warn' : 'text-txt')}>{value}</span>
     </div>
