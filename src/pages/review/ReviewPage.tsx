@@ -5,6 +5,7 @@ import { Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
 import { Tag, n1, n2 } from '@/features/analytics'
 import { cn } from '@/shared/lib'
 import { parseMainline } from '@/features/review/mainline'
+import { parseAi } from '@/features/review/ai'
 
 /**
  * 今日复盘（2026-11-14 用户「改造成网页类型，连续几天做折线图」）。
@@ -56,6 +57,7 @@ export function Component() {
   const mainline = commentary.find((sec) => sec.heading.includes('主线复盘'))
   const rest = commentary.filter((sec) => sec !== evolution && sec !== ai && sec !== mainline)
   const mainlineBlocks = mainline ? parseMainline(mainline.lines) : []
+  const aiData = ai ? parseAi(ai.lines) : null
   /** 评分轨迹：只取有情绪分的那几天（当前 5 日窗口），不足 2 点不画图 */
   const trendRows = rows.filter((r) => r.sentiment != null).slice(-6)
 
@@ -160,13 +162,48 @@ export function Component() {
 
         {/* 右栏：AI 综合判断 → 主线复盘 → 其余段落 */}
         <div className="flex flex-col gap-3 min-w-0">
-          {ai && (
-            <Card title="🧠 AI 综合判断" extra={<CardBadge>{ai.lines.length} 条</CardBadge>}>
-              <div className="flex flex-col gap-2 text-13 leading-[1.75] text-txt break-words">
-                {ai.lines.map((ln, i) => (
-                  // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                  <CommentLine key={i} text={ln} />
-                ))}
+          {aiData && (
+            <Card title="🧠 AI 综合判断" extra={<CardBadge>{aiData.facts.length} 事实 · {aiData.risks.length} 风险</CardBadge>}>
+              <div className="flex flex-col gap-3">
+                {/* 判断条：状态 + 一句话结论 */}
+                <div className="border-l-2 border-lead pl-2.5">
+                  {aiData.status && <div className="text-11 text-sub mb-0.5">盘面状态 · {aiData.status}</div>}
+                  {aiData.verdict && (
+                    <div className="text-14 font-semibold leading-[1.6]" dangerouslySetInnerHTML={{ __html: fmt(aiData.verdict) }} />
+                  )}
+                </div>
+
+                {/* 事实：两列小卡 */}
+                {aiData.facts.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {aiData.facts.map((f) => (
+                      <div key={f.tag} className="rounded-sm border border-line-faint px-2.5 py-2 min-w-0">
+                        <div className="text-11 text-lead mb-0.5">{f.tag}{f.title ? ` · ${f.title}` : ''}</div>
+                        <div className="text-12 leading-[1.65] text-txt break-words" dangerouslySetInnerHTML={{ __html: fmt(f.body) }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 风险：两列小卡（红边） */}
+                {aiData.risks.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {aiData.risks.map((r) => (
+                      <div key={r.tag} className="rounded-sm border border-down/30 bg-down/5 px-2.5 py-2 min-w-0">
+                        <div className="text-11 text-down mb-0.5">{r.tag}</div>
+                        <div className="text-12 leading-[1.65] text-txt break-words" dangerouslySetInnerHTML={{ __html: fmt(r.body) }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 结论条 */}
+                {aiData.conclusion && (
+                  <div className="rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2">
+                    <div className="text-11 text-warn mb-0.5">{aiData.conclusion.title}</div>
+                    <div className="text-12 leading-[1.65] text-txt break-words" dangerouslySetInnerHTML={{ __html: fmt(aiData.conclusion.body) }} />
+                  </div>
+                )}
               </div>
             </Card>
           )}
