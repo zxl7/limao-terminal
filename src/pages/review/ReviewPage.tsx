@@ -45,6 +45,14 @@ export function Component() {
   const hb = d.high_board
   const last = rows.at(-1)
 
+  // 2026-11-15 用户：删「真实情绪总览」（黑表头已有）；右栏放「情绪演变」+「AI 综合判断」，其余照旧全文。
+  const commentary = (d.commentary ?? []).filter((sec) => !sec.heading.includes('真实情绪'))
+  const evolution = commentary.find((sec) => sec.heading.includes('情绪演变'))
+  const ai = commentary.find((sec) => sec.heading.includes('综合判断'))
+  const rest = commentary.filter((sec) => sec !== evolution && sec !== ai)
+  /** 评分轨迹：只取有情绪分的那几天（当前 5 日窗口），不足 2 点不画图 */
+  const trendRows = rows.filter((r) => r.sentiment != null).slice(-6)
+
   return (
     <div className="flex flex-col gap-3">
       {/* ① 一行速览：风险 + 关键数字 + 信号 chips（删除单独的「风险卡/赚钱效应卡」，避免重复） */}
@@ -77,25 +85,25 @@ export function Component() {
         </div>
       </Card>
 
-      {/* ② 一张图：情绪分 + 晋级率（双轴，20 日）；不再单列涨停柱/最高板图（同一信息重复） */}
-      <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>近 {rows.length} 日</CardBadge>}>
-        {rows.length ? (
-          <LineChart
-            labels={labels}
-            series={[
-              { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
-              { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
-            ]}
-            height={170}
-            format={(v) => n1(v)}
-            refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
-          />
-        ) : <EmptyState text="无序列数据" />}
-      </Card>
-
-      {/* ③ 两栏：左=高标+主线（短），右=复盘点评（主体，双列文本流） */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-3 items-start">
+      {/* ② 两栏：左=情绪分/晋级率图 + 高标 + 主线；右=情绪演变轨迹 + AI 综合判断 + 其余点评 */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-3 items-start">
         <div className="flex flex-col gap-3">
+          {/* 情绪分 + 晋级率（双轴，20 日） */}
+          <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>近 {rows.length} 日</CardBadge>}>
+            {rows.length ? (
+              <LineChart
+                labels={labels}
+                series={[
+                  { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
+                  { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
+                ]}
+                height={165}
+                format={(v) => n1(v)}
+                refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
+              />
+            ) : <EmptyState text="无序列数据" />}
+          </Card>
+
           <Card title="👑 高标" extra={hb ? <CardBadge>{hb.max_boards} 板</CardBadge> : undefined}>
             {hb?.rows?.length ? hb.rows.map((r) => (
               <div key={r.code} className="text-12 leading-relaxed">
@@ -122,23 +130,58 @@ export function Component() {
           </Card>
         </div>
 
-        {/* 每段独立小卡；按原文顺序排列，完整显示，不折叠、不删减。 */}
-        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 items-start min-w-0">
-          {d.commentary?.length ? d.commentary.map((sec) => {
-            const longSection = sec.lines.join('').length > 700
-            return (
-              <div key={sec.heading} className={cn('min-w-0', longSection && '2xl:col-span-2')}>
-                <Card title={sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}>
-                  <div className="flex flex-col gap-2.5 text-13 leading-[1.75] text-txt break-words">
-                    {sec.lines.map((ln, i) => (
-                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                      <CommentLine key={i} text={ln} />
-                    ))}
-                  </div>
-                </Card>
+        {/* 右栏：情绪演变（轨迹图 + 简述）→ AI 综合判断 → 其余段落 */}
+        <div className="flex flex-col gap-3 min-w-0">
+          {evolution && (
+            <Card title="📉 情绪演变" extra={<CardBadge>评分轨迹</CardBadge>}>
+              {trendRows.length > 1 && (
+                <LineChart
+                  labels={trendRows.map((r) => r.date.slice(5))}
+                  series={[{ name: '情绪分', values: trendRows.map((r) => r.sentiment), tone: 'up', area: true }]}
+                  height={130}
+                  format={(v) => n1(v)}
+                  showLegend={false}
+                  refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
+                />
+              )}
+              <div className="flex flex-col gap-1.5 text-12 leading-[1.7] text-txt mt-1.5 break-words">
+                {evolution.lines.map((ln, i) => (
+                  // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                  <CommentLine key={i} text={ln} compact />
+                ))}
               </div>
-            )
-          }) : (
+            </Card>
+          )}
+
+          {ai && (
+            <Card title="🧠 AI 综合判断" extra={<CardBadge>{ai.lines.length} 条</CardBadge>}>
+              <div className="flex flex-col gap-2 text-13 leading-[1.75] text-txt break-words">
+                {ai.lines.map((ln, i) => (
+                  // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                  <CommentLine key={i} text={ln} />
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {rest.length > 0 && (
+            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 items-start min-w-0">
+              {rest.map((sec) => (
+                <div key={sec.heading} className={cn('min-w-0', sec.lines.join('').length > 700 && '2xl:col-span-2')}>
+                  <Card title={sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}>
+                    <div className="flex flex-col gap-2 text-13 leading-[1.75] text-txt break-words">
+                      {sec.lines.map((ln, i) => (
+                        // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                        <CommentLine key={i} text={ln} />
+                      ))}
+                    </div>
+                  </Card>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!evolution && !ai && rest.length === 0 && (
             <Card title="🧠 复盘点评">
               <EmptyState text="今日暂无复盘点评" hint="复盘数据生成后出现" />
             </Card>
