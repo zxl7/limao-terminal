@@ -122,29 +122,28 @@ export function Component() {
           </Card>
         </div>
 
-        {/* 复盘点评：主体内容，双列文本流压高度 */}
-        <Card title="🧠 复盘点评" extra={<CardBadge>{d.commentary?.length ?? 0} 段</CardBadge>}>
-          {d.commentary?.length ? (
-            <div className="flex flex-col">
-              {d.commentary.map((sec, idx) => (
-                <section
-                  key={sec.heading}
-                  className={cn('pl-2.5 border-l-2 border-lead/60', idx > 0 && 'mt-3.5')}
-                >
-                  <h4 className="text-13 font-semibold text-lead m-0 mb-1.5">
-                    {sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}
-                  </h4>
-                  <div className="text-13 leading-[1.75] text-txt">
+        {/* 每段独立小卡；按原文顺序排列，完整显示，不折叠、不删减。 */}
+        <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4 items-start min-w-0">
+          {d.commentary?.length ? d.commentary.map((sec) => {
+            const longSection = sec.lines.join('').length > 700
+            return (
+              <div key={sec.heading} className={cn('min-w-0', longSection && '2xl:col-span-2')}>
+                <Card title={sec.heading.replace(/^[^\u4e00-\u9fa5A-Za-z]+/, '')}>
+                  <div className="flex flex-col gap-2.5 text-13 leading-[1.75] text-txt break-words">
                     {sec.lines.map((ln, i) => (
-                      // oxlint-disable-next-line react/no-array-index-key -- 文案序列，索引即位置
+                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
                       <CommentLine key={i} text={ln} />
                     ))}
                   </div>
-                </section>
-              ))}
-            </div>
-          ) : <EmptyState text="今日暂无复盘点评" hint="15:35 复盘链生成后出现" />}
-        </Card>
+                </Card>
+              </div>
+            )
+          }) : (
+            <Card title="🧠 复盘点评">
+              <EmptyState text="今日暂无复盘点评" hint="复盘数据生成后出现" />
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -190,10 +189,11 @@ function CommentLine({ text, compact = false }: { text: string; compact?: boolea
     )
   }
   if (m) {
+    const shortLabel = m[1].length <= 6 && m[2].trim().length > 0
     return (
-      <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 mb-1">
-        <span className="text-12 text-sub">{m[1]}</span>
-        <span className={cn('leading-[1.55]', compact ? 'text-12' : 'text-13')} dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />
+      <div className={shortLabel ? 'grid grid-cols-[64px_minmax(0,1fr)] gap-3' : 'flex flex-col gap-1'}>
+        <span className={shortLabel ? 'text-12 text-sub leading-[1.75]' : 'text-13 font-semibold text-txt leading-[1.75]'}>{m[1]}</span>
+        {m[2] && <span className={cn('leading-[1.75]', compact ? 'text-12' : 'text-13')} dangerouslySetInnerHTML={{ __html: fmt(m[2]) }} />}
       </div>
     )
   }
