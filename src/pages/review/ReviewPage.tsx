@@ -56,7 +56,8 @@ export function Component() {
   const ai = commentary.find((sec) => sec.heading.includes('综合判断'))
   const mainline = commentary.find((sec) => sec.heading.includes('主线复盘'))
   const rest = commentary.filter((sec) => sec !== evolution && sec !== ai && sec !== mainline)
-  const mainlineBlocks = mainline ? parseMainline(mainline.lines) : []
+  // 2026-11-15 用户：「支线」不展示
+  const mainlineBlocks = (mainline ? parseMainline(mainline.lines) : []).filter((b) => b.rank !== '支线')
   const aiData = ai ? parseAi(ai.lines) : null
   /** 评分轨迹：只取有情绪分的那几天（当前 5 日窗口），不足 2 点不画图 */
   const trendRows = rows.filter((r) => r.sentiment != null).slice(-6)
@@ -208,7 +209,7 @@ export function Component() {
             </Card>
           )}
 
-          {/* 🎯 主线复盘：最强/次强/第三 三卡并排（各占 1/3），支线整行；个股仍是小卡 */}
+          {/* 🎯 主线复盘：最强/次强/第三 三卡并排（各占 1/3）；支线不展示 */}
           {mainlineBlocks.length > 0 && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 min-w-0 items-start">
               {mainlineBlocks.map((b) => {
