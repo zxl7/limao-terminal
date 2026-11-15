@@ -73,8 +73,8 @@ export function Component() {
     <div className="flex flex-col gap-3">
       {/* ① 一行速览：风险 + 关键数字 + 信号 chips（删除单独的「风险卡/赚钱效应卡」，避免重复） */}
       <Card
-        title="🧭 今日复盘"
-        extra={<CardBadge>{d.date}{d.prev ? ` · ${d.prev}` : ''}</CardBadge>}
+        title={`🧭 ${cnDate(d.date)}复盘`}
+        extra={<CardBadge>{d.prev ? `对比 ${d.prev}` : '当日'}</CardBadge>}
       >
         <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-2">
@@ -413,6 +413,12 @@ export function Component() {
       </div>
     </div>
   )
+}
+
+/** `2026-11-13` → `2026年11月13日`（标题用，解析失败原样返回） */
+function cnDate(d: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d)
+  return m ? `${m[1]}年${Number(m[2])}月${Number(m[3])}日` : d
 }
 
 /** 取第一句（到「。」或 42 字），用于折叠卡的摘要行。 */
