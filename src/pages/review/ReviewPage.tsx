@@ -46,7 +46,7 @@ export function Component() {
   const hb = d.high_board
   const last = rows.at(-1)
 
-  // 2026-11-15 用户：删「真实情绪总览」（黑表头已有）；右栏放「情绪演变」+「AI 综合判断」，其余照旧全文。
+  // 2026-11-15：删「真实情绪总览/轮动复盘/板块资金」；情绪演变放左栏主线之下，右栏 AI 综合判断 + 主线复盘 + 其余。
   // 2026-11-15：删「真实情绪总览 / 轮动复盘 / 板块资金」；「主线复盘」单独结构化渲染。
   const commentary = (d.commentary ?? []).filter(
     (sec) => !/真实情绪|轮动复盘|板块资金/.test(sec.heading),
@@ -91,7 +91,7 @@ export function Component() {
         </div>
       </Card>
 
-      {/* ② 两栏：左=情绪分/晋级率图 + 高标 + 主线；右=情绪演变轨迹 + AI 综合判断 + 其余点评 */}
+      {/* ② 两栏：左=情绪分图 + 高标 + 主线 + 情绪演变；右=AI 综合判断 + 主线复盘 + 其余点评 */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-3 items-start">
         <div className="flex flex-col gap-3">
           {/* 情绪分 + 晋级率（双轴，20 日） */}
@@ -134,23 +134,21 @@ export function Component() {
               ))}
             </ul>
           </Card>
-        </div>
 
-        {/* 右栏：情绪演变（轨迹图 + 简述）→ AI 综合判断 → 其余段落 */}
-        <div className="flex flex-col gap-3 min-w-0">
+          {/* 2026-11-15 用户：情绪演变做成小卡，放左栏主线之下 */}
           {evolution && (
             <Card title="📉 情绪演变" extra={<CardBadge>评分轨迹</CardBadge>}>
               {trendRows.length > 1 && (
                 <LineChart
                   labels={trendRows.map((r) => r.date.slice(5))}
                   series={[{ name: '情绪分', values: trendRows.map((r) => r.sentiment), tone: 'up', area: true }]}
-                  height={130}
+                  height={105}
                   format={(v) => n1(v)}
                   showLegend={false}
                   refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
                 />
               )}
-              <div className="flex flex-col gap-1.5 text-12 leading-[1.7] text-txt mt-1.5 break-words">
+              <div className="flex flex-col gap-1 text-11 leading-[1.65] text-txt mt-1.5 break-words">
                 {evolution.lines.map((ln, i) => (
                   // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
                   <CommentLine key={i} text={ln} compact />
@@ -158,7 +156,10 @@ export function Component() {
               </div>
             </Card>
           )}
+        </div>
 
+        {/* 右栏：AI 综合判断 → 主线复盘 → 其余段落 */}
+        <div className="flex flex-col gap-3 min-w-0">
           {ai && (
             <Card title="🧠 AI 综合判断" extra={<CardBadge>{ai.lines.length} 条</CardBadge>}>
               <div className="flex flex-col gap-2 text-13 leading-[1.75] text-txt break-words">
