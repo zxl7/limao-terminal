@@ -171,42 +171,46 @@ export function Component() {
             </Card>
           )}
 
-          {/* 🎯 主线复盘：每条主线一张卡，个股做成小卡片 */}
+          {/* 🎯 主线复盘：最强/次强/第三 三卡并排（各占 1/3），支线整行；个股仍是小卡 */}
           {mainlineBlocks.length > 0 && (
-            <div className="flex flex-col gap-3 min-w-0">
-              {mainlineBlocks.map((b) => (
-                <Card
-                  key={`${b.rank}-${b.name}`}
-                  title={b.rank ? `${b.rank} · ${b.name || '—'}` : (b.name || '主线')}
-                  extra={b.meta ? <CardBadge>{b.meta}</CardBadge> : undefined}
-                >
-                  <div className="flex flex-col gap-2">
-                    {b.stocks.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-1.5">
-                        {b.stocks.map((st, i) => (
-                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                          <div key={`${st.name}-${i}`} className="rounded-sm border border-line-faint px-2 py-1 min-w-0">
-                            <div className="text-12 font-semibold text-txt truncate">{st.name || '—'}</div>
-                            <div className="text-11 text-sub leading-snug break-words">{st.detail || '—'}</div>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 min-w-0 items-start">
+              {mainlineBlocks.map((b) => {
+                const isBranch = b.rank === '支线'
+                return (
+                  <div key={`${b.rank}-${b.name}`} className={cn('min-w-0', isBranch && 'xl:col-span-3')}>
+                    <Card
+                      title={b.rank ? `${b.rank} · ${b.name || '—'}` : (b.name || '主线')}
+                      extra={b.meta ? <CardBadge>{b.meta}</CardBadge> : undefined}
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        {b.stocks.length > 0 && (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {b.stocks.map((st, i) => (
+                              // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                              <div key={`${st.name}-${i}`} className="rounded-sm border border-line-faint px-2 py-1 min-w-0">
+                                <div className="text-12 font-semibold text-txt truncate">{st.name || '—'}</div>
+                                <div className="text-11 text-sub leading-snug break-words">{st.detail || '—'}</div>
+                              </div>
+                            ))}
                           </div>
+                        )}
+                        {b.logic.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-11 text-sub leading-[1.65] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                        ))}
+                        {b.risk.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-11 text-warn leading-[1.65] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                        ))}
+                        {b.text.map((ln, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <p key={i} className="text-12 text-txt leading-[1.65] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
                         ))}
                       </div>
-                    )}
-                    {b.logic.map((ln, i) => (
-                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                      <p key={i} className="text-12 text-sub leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
-                    ))}
-                    {b.risk.map((ln, i) => (
-                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                      <p key={i} className="text-12 text-warn leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
-                    ))}
-                    {b.text.map((ln, i) => (
-                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                      <p key={i} className="text-12 text-txt leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
-                    ))}
+                    </Card>
                   </div>
-                </Card>
-              ))}
+                )
+              })}
             </div>
           )}
 
