@@ -4,6 +4,7 @@ import type { ReviewPanel, ReviewSeries } from '@/shared/api/types'
 import { Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
 import { Tag, n1, n2 } from '@/features/analytics'
 import { cn } from '@/shared/lib'
+import { parseMainline } from '@/features/review/mainline'
 
 /**
  * 今日复盘（2026-11-14 用户「改造成网页类型，连续几天做折线图」）。
@@ -46,10 +47,15 @@ export function Component() {
   const last = rows.at(-1)
 
   // 2026-11-15 用户：删「真实情绪总览」（黑表头已有）；右栏放「情绪演变」+「AI 综合判断」，其余照旧全文。
-  const commentary = (d.commentary ?? []).filter((sec) => !sec.heading.includes('真实情绪'))
+  // 2026-11-15：删「真实情绪总览 / 轮动复盘 / 板块资金」；「主线复盘」单独结构化渲染。
+  const commentary = (d.commentary ?? []).filter(
+    (sec) => !/真实情绪|轮动复盘|板块资金/.test(sec.heading),
+  )
   const evolution = commentary.find((sec) => sec.heading.includes('情绪演变'))
   const ai = commentary.find((sec) => sec.heading.includes('综合判断'))
-  const rest = commentary.filter((sec) => sec !== evolution && sec !== ai)
+  const mainline = commentary.find((sec) => sec.heading.includes('主线复盘'))
+  const rest = commentary.filter((sec) => sec !== evolution && sec !== ai && sec !== mainline)
+  const mainlineBlocks = mainline ? parseMainline(mainline.lines) : []
   /** 评分轨迹：只取有情绪分的那几天（当前 5 日窗口），不足 2 点不画图 */
   const trendRows = rows.filter((r) => r.sentiment != null).slice(-6)
 
@@ -164,6 +170,45 @@ export function Component() {
             </Card>
           )}
 
+          {/* 🎯 主线复盘：每条主线一张卡，个股做成小卡片 */}
+          {mainlineBlocks.length > 0 && (
+            <div className="flex flex-col gap-3 min-w-0">
+              {mainlineBlocks.map((b) => (
+                <Card
+                  key={`${b.rank}-${b.name}`}
+                  title={b.rank ? `${b.rank} · ${b.name || '—'}` : (b.name || '主线')}
+                  extra={b.meta ? <CardBadge>{b.meta}</CardBadge> : undefined}
+                >
+                  <div className="flex flex-col gap-2">
+                    {b.stocks.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-1.5">
+                        {b.stocks.map((st, i) => (
+                          // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                          <div key={`${st.name}-${i}`} className="rounded-sm border border-line-faint px-2 py-1 min-w-0">
+                            <div className="text-12 font-semibold text-txt truncate">{st.name || '—'}</div>
+                            <div className="text-11 text-sub leading-snug break-words">{st.detail || '—'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {b.logic.map((ln, i) => (
+                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                      <p key={i} className="text-12 text-sub leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                    ))}
+                    {b.risk.map((ln, i) => (
+                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                      <p key={i} className="text-12 text-warn leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                    ))}
+                    {b.text.map((ln, i) => (
+                      // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
+                      <p key={i} className="text-12 text-txt leading-[1.7] m-0" dangerouslySetInnerHTML={{ __html: fmt(ln) }} />
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {rest.length > 0 && (
             <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 items-start min-w-0">
               {rest.map((sec) => (
@@ -181,7 +226,7 @@ export function Component() {
             </div>
           )}
 
-          {!evolution && !ai && rest.length === 0 && (
+          {!evolution && !ai && !mainline && rest.length === 0 && (
             <Card title="🧠 复盘点评">
               <EmptyState text="今日暂无复盘点评" hint="复盘数据生成后出现" />
             </Card>
