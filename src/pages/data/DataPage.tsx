@@ -242,7 +242,7 @@ export function Component() {
             ) : snapshots.isError && !snapshots.data ? (
               <EmptyState text="题材映射读取失败" />
             ) : frozenThemeRows.length === 0 ? (
-              <EmptyState text="暂无题材映射快照" />
+              <EmptyState text="暂无题材映射" />
             ) : (
               <DataTable
                 rows={frozenThemeRows}
@@ -261,7 +261,7 @@ export function Component() {
                     ),
                   },
                   { label: '主题', cell: (row) => <span className="text-rec">{row.theme ?? '—'}</span> },
-                  // 全列无逻辑时不渲染（题材快照多数没有 logic 字段）
+                  // 全列无逻辑时不渲染（题材数据多数没有 logic 项）
                   ...(hasValue(frozenThemeRows, (r) => r.logic)
                     ? [{ label: '逻辑', cell: (row: (typeof frozenThemeRows)[number]) => <span className="text-sub">{row.logic || '—'}</span> }]
                     : []),

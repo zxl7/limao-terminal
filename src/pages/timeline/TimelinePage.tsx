@@ -152,7 +152,7 @@ export function Component() {
   const day = useMemo<ZtHistoryDay | null | undefined>(() => {
     const today = bjDateString(now)
     return days.find((f) => f.file === dayFile)?.data ??
-      // 盘前当日 zt_history 尚未落盘时，仍要切到今天，不能回显上一交易日的时间轴。
+      // 盘前当日 zt_history 尚未生成时，仍要切到今天，不能回显上一交易日的时间轴。
       // 当天的逐事件账本会从 09:25 起逐步填充；此前保持空轴才符合当前盘面。
       (inTrading(undefined, now) ? days.find((f) => f.data?.date === today)?.data ?? { date: today } as ZtHistoryDay : undefined) ??
       days.find((f) => hasPool(f.data))?.data ??
@@ -245,7 +245,7 @@ export function Component() {
         fbt: r.fbt,
         zbc: 0,
         hs: 0,
-        // ⚠️ 来源字段叫 `sector`，但**取值是题材名**（医药/房地产/国产芯片…），
+        // ⚠️ 来源项叫 `sector`，但**取值是题材名**（医药/房地产/国产芯片…），
         //    不是 `zt_list` 里的行业（医疗服务/中药）。故同时写进题材归属 `themeTags`。
         sector: r.theme,
         seal: 0,
@@ -392,7 +392,7 @@ export function Component() {
    *
    * 两个来源合并：
    *   ① `bursts.tags`（题材事件 + 决策档案 `hot_spots` 的成员表）—— 覆盖窄（实测 20/102）；
-   *   ② **盘中逐事件的 `stock_up.sector`** —— 该字段取值是**题材名**（医药/房地产/国产芯片…），
+   *   ② **盘中逐事件的 `stock_up.sector`** —— 该项取值是**题材名**（医药/房地产/国产芯片…），
    *      当日盘中封板的票几乎都有 → 这是「与题材相关的大量个股」的主要来源。
    *
    * ⚠️ 必须**复制** `bursts.tags` 的条目再改（那是一个共享 Map，直接 push 会污染上游）。

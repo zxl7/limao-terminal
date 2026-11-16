@@ -534,7 +534,7 @@ export function projectNextDay(
   if (!dist) {
     return {
       stages: [], poolTotal: 0, expPromoteCount: null, gainPremMed: null, lossFailMed: null,
-      uncovered: [], caveats: ['当前快照未提供有效连板梯队，无法生成条件期望'],
+      uncovered: [], caveats: ['当前数据未提供有效连板梯队，无法生成条件期望'],
     }
   }
   if (rows.length === 0) {

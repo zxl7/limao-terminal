@@ -333,7 +333,7 @@ export function Component() {
               会把照明/造纸/园林混进「大消费」，两套数打架时无从查起。 */}
           <p className="text-sub text-11 mt-0.5 leading-relaxed">
             家数口径：按<b className="text-txt">选股宝题材归属</b>（今天属于这条线、且今日涨停）计，
-            与上面涨停家数图同源。仅在题材快照里对不上这条线时，才退回「历史成员今天有几只涨停」
+            与上面涨停家数图同源。仅在题材库里对不上这条线时，才退回「历史成员今天有几只涨停」
             估算 —— 那种行会标<b className="text-txt">估算</b>，数偏高，只作参考。
           </p>
         </div>

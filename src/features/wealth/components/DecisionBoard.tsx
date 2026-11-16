@@ -84,7 +84,7 @@ export function DecisionBoard({
 }: {
   dossier?: DecisionDossier
   callFile?: PoolCallFile
-  /** 与 `callFile.trade_date` 同日的收盘结算；取不到就是「未落盘」，⛔ 不回落昨日 */
+  /** 与 `callFile.trade_date` 同日的收盘结算；取不到就是「未生成」，⛔ 不回落昨日 */
   ledger?: PoolLedger
   quotes?: ParticipationQuotes
   // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
@@ -95,7 +95,7 @@ export function DecisionBoard({
       <div className="flex flex-col gap-3">
         <TodayVerdict callFile={callFile} ledger={ledger} />
         <PoolLedgerCard callFile={callFile} ledger={ledger} quotes={quotes} participateCount={callFile?.meta?.participate?.length} />
-        <EmptyState text="本期决策档案未落盘" hint="wealth_code/cache/candidates-<日期>.json 未生成" />
+        <EmptyState text="本期决策档案未生成" hint="wealth_code/cache/candidates-<日期>.json 未生成" />
       </div>
     )
   }
@@ -119,7 +119,7 @@ export function DecisionBoard({
       />
 
       {/* ③ 今晨竞价：读数层（只留两个能读出结论的计数） */}
-      <Card title="今晨竞价" extra={<CardBadge>{callFile?.trade_date ?? '未落盘'}</CardBadge>}>
+      <Card title="今晨竞价" extra={<CardBadge>{callFile?.trade_date ?? '未生成'}</CardBadge>}>
         <EnvPanel callFile={callFile} />
       </Card>
 

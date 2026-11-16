@@ -250,7 +250,7 @@ export function Component() {
               <>
                 <div className="text-sub text-12 mb-2 leading-relaxed">
                   以下是**决策时点冻结的原件**（`cache/decision_log/&lt;日期&gt;/candidates.json`）。
-                  与「候选」tab 的原卷逐字段对不上时，说明归档之后脚本又写过该日数据 ——
+                  与「候选」tab 的原卷逐项对不上时，说明归档之后脚本又写过该日数据 ——
                   这正是黑匣子存在的意义。
                 </div>
                 <DossierView d={activeFrozen} />

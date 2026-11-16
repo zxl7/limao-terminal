@@ -65,7 +65,7 @@ describe('板块资金与跌幅榜状态', () => {
     expect(screen.getByText('板块资金更新：11-05 10:00:00')).toBeInTheDocument()
     expect(screen.getByText('弱势板块更新：11-05 10:10:00')).toBeInTheDocument()
     expect(screen.queryByText(/快照年龄|过期|参考|采集提示|资金源超时/)).not.toBeInTheDocument()
-    expect(screen.getByText('该时点快照暂无达到阈值的弱势板块')).toBeInTheDocument()
+    expect(screen.getByText('该时点暂无达到门槛的弱势板块')).toBeInTheDocument()
   })
 
   it.each([600, 601])('旧契约年龄 %i 秒不影响更新时间展示', (age) => {
@@ -82,7 +82,7 @@ describe('板块资金与跌幅榜状态', () => {
     mount(false, undefined, true)
     expect(screen.getByText('板块资金更新：未更新')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(screen.queryByText('该时点快照暂无达到阈值的弱势板块')).not.toBeInTheDocument()
+    expect(screen.queryByText('该时点暂无达到门槛的弱势板块')).not.toBeInTheDocument()
   })
 
   it.each([false, true])('刷新期间或请求失败时保留整份上次数据（失败=%s）', (failed) => {

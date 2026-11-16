@@ -27,7 +27,7 @@ import { cn } from '@/shared/lib'
  *
  * ## ⚠️ `theme_source` 必须显式提示
  *
- * 题材快照 2026-10-18 才上线，之前的日子降级用**申万行业**分组（`sector_fallback`）。
+ * 题材数据 2026-10-18 才上线，之前的日子降级用**申万行业**分组（`sector_fallback`）。
  * 行业口径与题材口径不是同一把尺子（行业内 ≥2 家才算一条线，同一只票可能被归到
  * 不同「板块」），所以降级日的格子必须带标记 —— 横跨两种口径比板数是没有意义的。
  *
@@ -190,7 +190,7 @@ export function Component() {
             {degradedDays > 0 && (
               <p className="mb-2 text-12 leading-relaxed text-sub">
                 窗口内 <b className="text-warn">{degradedDays}</b> 天的题材数据缺失、
-                已降级为<b className="text-txt">申万行业</b>分组（列头标 <code className="text-11">行</code>）。
+                已退回<b className="text-txt">申万行业</b>分组（列头标 <code className="text-11">行</code>）。
                 行业分类和题材分类不是一把尺子，<b className="text-txt">跨着比板数没有意义</b>，
                 只用于看「这条线有没有延续」。
               </p>

@@ -337,7 +337,7 @@ function SummaryView({
 
       <p className="text-sub text-11 mt-2 leading-relaxed">
         注：溢价样本数（n_prem）是「有竞价溢价数据」的子样本，可能小于成功数 ——
-        2026-09-14 起账本口径切换后部分历史日缺竞价快照。
+        2026-09-14 起账本口径切换后部分历史日缺竞价数据。
       </p>
     </>
   )

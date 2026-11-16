@@ -59,7 +59,7 @@ export function SectorFlowCard() {
         <div className="mb-1.5 flex items-baseline justify-between gap-2 flex-wrap">
           <span className="text-11 font-medium text-txt">弱势板块 · 跌幅榜</span>
           <span className="text-11 text-sub">
-            阈值 {risk?.threshold != null ? `${risk.threshold}%` : '—'}
+            门槛 {risk?.threshold != null ? `${risk.threshold}%` : '—'}
             {risk?.count != null && ` · ${risk.count} 个`}
           </span>
         </div>
@@ -80,7 +80,7 @@ export function SectorFlowCard() {
           </div>
         ) : (
           <p className="m-0 rounded-sm bg-line-faint px-2 py-2 text-11 text-sub">
-            {breadthAvailable ? '该时点快照暂无达到阈值的弱势板块' : '弱势板块数据暂不可用'}
+            {breadthAvailable ? '该时点暂无达到门槛的弱势板块' : '弱势板块数据暂不可用'}
           </p>
         )}
       </div>

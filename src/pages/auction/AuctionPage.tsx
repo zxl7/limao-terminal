@@ -21,10 +21,10 @@ import { cn, fmtPct, regimeText, tradableStocks } from '@/shared/lib'
  *
  * ## ⚠️ 两套情绪读数必须并列（不可只留一套）
  *
- * `environment`（脚本自算）与 `real_env`（盘中快照）是**两套独立读数** ——
+ * `environment`（脚本自算）与 `real_env`（盘中数据）是**两套独立读数** ——
  * 两者背离本身就是「脚本环境失真」的证据。只展示一套会掩盖这个信号。
  *
- * ## ⚠️ 已知字段陷阱
+ * ## ⚠️ 已知项陷阱
  *
  *   · `DossierStock.price` 实测**恒为 null**（选股阶段未回填）→ 渲染「—」，不是 0
  *   · `real_env.limit_down` / `broken` 形态不统一（可能是数字，也可能是 `{count,names}`）
@@ -107,7 +107,7 @@ export function Component() {
    * 竞价资金榜（2026-10-19）。
    *
    * `decision/auction-history` 按文件名升序返回多日存档 → 取最后一份（最新交易日）。
-   * ⛔ 只用**真实落盘字段**（prev_close / auction_price / auction_amount_yi）：
+   * ⛔ 只用**真实停止更新项**（prev_close / auction_price / auction_amount_yi）：
    *    净额需要逐笔委托方向，我们不造（见 lib/auction-money.ts 头注）。
    */
   const auctionFiles = (auctionHist.data ?? []) as Array<{
@@ -385,7 +385,7 @@ export function Component() {
             {auctionRetired ? (
               <EmptyState
                 text="该链路已停更"
-                hint="盘口竞价实时报价（auction_live.json）已无写入方 · 最后一份 2026-09-25。真实竞价数据请看「竞价报价存档」（/api/decision/auction-history · 每交易日 09:25 落盘）。"
+                hint="盘口竞价实时报价（auction_live.json）已停止更新 · 最后一份 2026-09-25。真实竞价数据请看「竞价报价存档」（/api/decision/auction-history · 每交易日 09:25 停止更新）。"
               />
             ) : quotes.length ? (
               <ul className="space-y-1">
@@ -457,7 +457,7 @@ export function Component() {
       </Card>
 
       {/* ── 接力权重影子模式（只观察 · 不改产池）──
-          影子模式在**同一份决策输入**上跑另一套接力权重排序，与实际入池并行落盘，
+          影子模式在**同一份决策输入**上跑另一套接力权重排序，与实际入池并行停止更新，
           用来回答「如果换权重，今天会不会选出不一样的票」。
           ⛔ 它不参与任何真实决策 —— 这个前提必须在页面上写明，否则会被当成第二套买入信号。
           对应升级项 P2-13 的观测入口。 */}
@@ -612,7 +612,7 @@ export function Component() {
                 </div>
 
                 <div className="border-t border-line-faint pt-1.5 text-sub text-11 leading-relaxed">
-                  环境指纹是影子判定当时的盘面快照 —— 复盘影子排序是否合理时，
+                  环境指纹是影子判定当时的盘面数据 —— 复盘影子排序是否合理时，
                   必须先看当时的 regime 与情绪分，否则等于用今天的盘面评判当时的排序。
                 </div>
               </div>

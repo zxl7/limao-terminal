@@ -154,7 +154,7 @@ export function Component() {
             {
               label: '确认',
               cell: () =>
-                // confirmed 为可选字段（部分归档无此字段），缺省时不下结论
+                // confirmed 为可选项（部分归档无此项），缺省时不下结论
                 <Tag tone="up">已确认</Tag>,
             },
           ]}

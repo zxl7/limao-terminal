@@ -249,11 +249,11 @@ describe('T+1 条件期望：小样本只呈现不裁决', () => {
     expect(p.lossFailMed).toBeCloseTo(-0.93, 1)
   })
 
-  it('④ 当前快照没有有效梯队 → 空态 + caveat（⛔ 不编造分布）', () => {
+  it('④ 当前数据没有有效梯队 → 空态 + caveat（⛔ 不编造分布）', () => {
     const p = projectNextDay(null, promo)
     expect(p.expPromoteCount).toBeNull()
     expect(p.poolTotal).toBe(0)
-    expect(p.caveats.join(' ')).toContain('当前快照')
+    expect(p.caveats.join(' ')).toContain('当前数据')
   })
 
   it('⑤ 基线缺失 → 仍给出池子总数，期望为 null（⛔ 不伪造成功率）', () => {

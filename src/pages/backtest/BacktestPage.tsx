@@ -219,7 +219,7 @@ export function Component() {
                    实测 2026-10-27~11-06 共 8 期 `summary.sentiment_diff` **全部 null**，
                    后端 `metrics.sentiment_align.status = contract_missing`，原因是：
                    「『情绪X/10』为昨日实际分（回顾语境），非明日预判，不采用」——
-                   即盘前卡没有「明日预判情绪分」的结构化字段，这个指标根本算不出来。
+                   即盘前卡没有「明日预判情绪分」的结构化项，这个指标根本算不出来。
                    画一张空白柱图等于让读者以为「偏差都是 0」，那是伪造读数；
                    必须把「算不出来 + 为什么」直接写在图的位置上。
               */}
@@ -230,7 +230,7 @@ export function Component() {
                   </div>
                   <p className="text-13 leading-relaxed">
                     这段时间的情绪偏差 <b className="text-txt">算不出来</b>：盘前卡里没有「明日预判情绪分」
-                    这个结构化字段（卡片上写的「情绪 X/10」是<b className="text-txt">昨日实际分</b>，
+                    这一项（卡片上写的「情绪 X/10」是<b className="text-txt">昨日实际分</b>，
                     属回顾语境，解析器已拒绝采用）。
                   </p>
                   <p className="text-sub text-12 mt-1">
@@ -450,13 +450,13 @@ export function Component() {
 }
 
 /**
- * 明细行是宽松对象（各指标字段不同），此处按**第一行的实际 keys** 动态生成列 ——
- * 这比写死列名更抗契约变化：原系统新增字段时自动出现，删除字段时自动消失。
+ * 明细行是宽松对象（各指标项不同），此处按**第一行的实际 keys** 动态生成列 ——
+ * 这比写死列名更抗契约变化：原系统新增项时自动出现，删除项时自动消失。
  */
 function pickColumns(sample: Record<string, unknown>) {
   return Object.keys(sample).map((k) => ({
-    // ⛔ 表头不得直接打印原始 key（`candidate_hit` / `range_hit` 这类英文内部字段名）。
-    // 未登记字段也不静默直出，而是标成「未登记字段(xxx)」，逼后续补进词表。
+    // ⛔ 表头不得直接打印原始 key（`candidate_hit` / `range_hit` 这类英文内部项名）。
+    // 未登记项也不静默直出，而是标成「未登记项(xxx)」，逼后续补进词表。
     label: backtestFieldText(k),
     num: typeof sample[k] === 'number',
     className: typeof sample[k] === 'string' && String(sample[k]).length > 30 ? 'whitespace-normal min-w-[240px]' : undefined,

@@ -329,10 +329,10 @@ describe('AiJudgeDetail · 判断明细（AI 判断 × 接力卡）', () => {
     expect(articles[1].textContent).toContain('龙头')
   })
 
-  it('⑫ 无终态 → 明说「今晨裁决未落盘」，且不渲染裁决段', () => {
+  it('⑫ 无终态 → 明说「今晨裁决未生成」，且不渲染裁决段', () => {
     const { container } = render(<AiJudgeDetail rows={[row]} />)
     const txt = container.textContent ?? ''
-    expect(txt).toContain('今晨裁决未落盘')
+    expect(txt).toContain('今晨裁决未生成')
     expect(txt, '⛔ 无终态不得凭空长出一段裁决').not.toContain('裁决语')
   })
 

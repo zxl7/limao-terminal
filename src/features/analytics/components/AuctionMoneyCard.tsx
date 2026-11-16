@@ -59,7 +59,7 @@ export function AuctionMoneyCard({
       title="💰 竞价资金榜"
       extra={
         <span className="flex items-center gap-2">
-          <CardBadge>{date ? `${date} · 09:25 结算` : '今日未落盘'}</CardBadge>
+          <CardBadge>{date ? `${date} · 09:25 结算` : '今日未生成'}</CardBadge>
           <SegTabs
             items={[
               { key: 'amount', label: '竞额' },
@@ -104,7 +104,7 @@ export function AuctionMoneyCard({
 
       {rows.length === 0 ? (
         <div className="text-center text-sub text-xs py-4">
-          今日竞价报价未落盘（09:25 后生成 auction_quotes-&lt;date&gt;.json）
+          今日竞价报价未生成（09:25 后生成 auction_quotes-&lt;date&gt;.json）
         </div>
       ) : (
         <>

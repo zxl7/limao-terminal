@@ -38,7 +38,7 @@ export function ScreenFunnel({ screen }: { screen?: ScreenFile }) {
   if (!screen) {
     return (
       <div className="text-12 text-sub leading-relaxed">
-        全量过筛未启用或未落盘。
+        全量过筛未启用或未生成。
         <div className="mt-0.5 text-11">开启后每日盘后写 cache/daily_screen/</div>
       </div>
     )
@@ -122,7 +122,7 @@ export function ScreenFunnel({ screen }: { screen?: ScreenFile }) {
         <div className="flex max-h-[260px] flex-col gap-1 overflow-y-auto border-t border-line pt-1.5">
           {groups.find((g) => g.key === openGroup)!.rows.length === 0 && (
             <div className="text-11 text-sub">
-              共 {groups.find((g) => g.key === openGroup)!.n} 只，明细未随档案落盘
+              共 {groups.find((g) => g.key === openGroup)!.n} 只，明细未随档案保存
             </div>
           )}
           {groups

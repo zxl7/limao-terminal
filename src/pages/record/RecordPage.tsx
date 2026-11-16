@@ -13,17 +13,17 @@ import { useContractIssues } from '@/shared/hooks'
  *
  * 排查一次异常渲染，通常要连问三个问题，而它们的答案在不同地方：
  *   ① **数据在不在** → `/api/health`（文件存在性 + mtime + 体积 + 龄期）
- *   ② **数据变没变** → `/api/market/latest` vs `/api/market/prev` 的字段级环比
+ *   ② **数据变没变** → `/api/market/latest` vs `/api/market/prev` 的项级环比
  *   ③ **结构对不对** → 契约守卫捕获的异常（`useContractIssues`）
  *
  * 三者一起看才能定性：例如「涨停数从 40 掉到 3」看起来是情绪冰点，
- * 但若 `health` 显示最新快照 12 分钟未更新、`contractIssues` 又报了字段缺失，
+ * 但若 `health` 显示最新快照 12 分钟未更新、`contractIssues` 又报了项缺失，
  * 那真实原因是**数据没刷进来**，而不是市场崩了。
  *
  * ## ⚠️ 契约异常不是「错误」，是「降级」
  *
  * 原系统哲学：结构不符契约时**数据照用 + 显式提示**，而不是整页报错。
- * 本页因此把异常列出来但不阻断 —— 提示的作用是让人知道「该字段可能不可信」。
+ * 本页因此把异常列出来但不阻断 —— 提示的作用是让人知道「该项可能不可信」。
  */
 
 export function Component() {
@@ -35,11 +35,11 @@ export function Component() {
   const cur = latest.data
   const old = prev.data
 
-  /** 环比差异行 —— 只列原系统口径里真正会变的字段 */
+  /** 环比差异行 —— 只列原系统口径里真正会变的项 */
   const diffRows = useMemo(() => {
     if (!cur || !old) return []
     return [
-      { key: '快照时间', a: old.ts, b: cur.ts, plain: true },
+      { key: '数据时间', a: old.ts, b: cur.ts, plain: true },
       { key: '全市场涨停', a: old.total_zt, b: cur.total_zt, better: 'up' as const },
       { key: '跌停家数', a: old.limit_down?.count, b: cur.limit_down?.count, better: 'down' as const },
       { key: '炸板家数', a: old.broken?.count, b: cur.broken?.count, better: 'down' as const },
@@ -116,17 +116,17 @@ export function Component() {
           <StatPair label="龄期超阈值" value={stale.length} tone={stale.length ? 'warn' : 'sub'} />
           <StatPair label="业务日期落后" value={behind.length} tone={behind.length ? 'warn' : 'sub'} />
           <StatPair label="已停更(留档)" value={retiredFiles.length} tone="sub" />
-          <StatPair label="环比变化字段" value={`${changed} / ${diffRows.length}`} />
+          <StatPair label="环比变化项" value={`${changed} / ${diffRows.length}`} />
           <StatPair label="数据根" value={health.data?.data_root ?? '—'} />
         </div>
         <p className="text-sub text-12 leading-relaxed">
           三层诊断合看才能定性：涨停数骤降可能是真冰点，也可能是**数据没刷进来** ——
           后者会同时体现在「文件龄期偏大」与「契约异常」上。契约异常不阻断渲染（数据照用），
-          它的作用是提示该字段可能不可信。
+          它的作用是提示该项可能不可信。
         </p>
       </Card>
 
-      {/* 主工作区 = 快照环比（latest ↔ prev 逐字段对照，列多需要宽表）；
+      {/* 主工作区 = 快照环比（latest ↔ prev 逐项对照，列多需要宽表）；
           辅助区 = 契约守卫 + 文件新鲜度（诊断类，次要）。
           ⛔ 旧版 4 张卡等宽纵向平铺，主次不分且 4K 下右侧大片空白。 */}
       <ZoneRow>
@@ -143,7 +143,7 @@ export function Component() {
             rowKey={(r) => r.key}
             rowClass={(r) => (String(r.a) !== String(r.b) ? 'bg-up/5' : undefined)}
             columns={[
-              { label: '字段', cell: (r) => <span className="text-txt">{r.key}</span> },
+              { label: '项', cell: (r) => <span className="text-txt">{r.key}</span> },
               {
                 label: 'prev',
                 num: true,
@@ -165,7 +165,7 @@ export function Component() {
                   }
                   const d = nb - na
                   if (d === 0) return <span className="text-sub">—</span>
-                  /** 改善红 / 恶化绿 —— 由 better 字段决定方向，而非数值正负 */
+                  /** 改善红 / 恶化绿 —— 由 better 项决定方向，而非数值正负 */
                   const good = r.better === 'up' ? d > 0 : r.better === 'down' ? d < 0 : null
                   return (
                     <span className={good == null ? 'text-txt' : good ? 'text-up' : 'text-down'}>

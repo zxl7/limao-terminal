@@ -328,7 +328,7 @@ export function Component() {
               <EmptyState text="天梯未生成" hint="cache/hithink_ladder.json 缺失" />
             )}
             <p className="text-sub text-11 leading-relaxed mt-2">
-              天梯仅收 2 板以上（无首板），用途是**板数校验**与 12 日窗口外兜底，不作涨停池主源。
+              天梯仅收 2 板以上（无首板），用途是**板数校验**与 12 日窗口外补充，不作涨停池主源。
             </p>
           </Card>
         </Zone>

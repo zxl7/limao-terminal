@@ -79,7 +79,7 @@ export function TodayVerdict({
                 !hasCall ? 'text-sub' : empty ? 'text-warn' : 'text-up',
               )}
             >
-              {!hasCall ? '今晨裁决未落盘' : empty ? '今天空仓' : `系统买入 ${picks.length} 只（非券商成交）`}
+              {!hasCall ? '今晨裁决未生成' : empty ? '今天空仓' : `系统买入 ${picks.length} 只（非券商成交）`}
             </span>
             {hasCall && (
               <span className="text-12 text-sub">
@@ -127,7 +127,7 @@ export function TodayVerdict({
                   （当日合计 {signedPct(boughtAgg.avg)}）
                 </span>
               )}
-              {!sameDay && <span className="text-11 text-sub">今日结算 16:00 后落盘</span>}
+              {!sameDay && <span className="text-11 text-sub">今日结算 16:00 后生成</span>}
             </div>
           )}
 
@@ -184,7 +184,7 @@ export function TodayVerdict({
                 </ul>
               ) : (
                 <div className="text-11 text-sub">
-                  {level === 'block' ? '防守腿命中达上限（明细未落盘）' : '命中条数已达拦截线'}
+                  {level === 'block' ? '防守腿命中达上限（明细未生成）' : '命中条数已达拦截线'}
                 </div>
               )}
             </>

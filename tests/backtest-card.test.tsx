@@ -133,7 +133,7 @@ describe('BacktestCard 回测战绩', () => {
   it('无快照时明确「未生成」，⛔ 不渲染空表冒充 0', () => {
     const { container } = render(<BacktestCard />)
     expect(container.textContent).toContain('未生成')
-    expect(container.textContent).toContain('回测快照未生成')
+    expect(container.textContent).toContain('回测结果未生成')
   })
 
   it('指标为 null 时渲染 — ，不渲染 0', () => {

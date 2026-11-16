@@ -22,7 +22,7 @@ import { marketQueries } from '../api/queries'
  *    空组不渲染，避免用空标题占掉网格高度。
  */
 const GROUP: { key: 'new' | 'surging' | 'ongoing'; label: string; cls: string; hint: string }[] = [
-  { key: 'new', label: '新晋', cls: 'bg-rec-soft text-rec', hint: '昨快照无此板块' },
+  { key: 'new', label: '新晋', cls: 'bg-rec-soft text-rec', hint: '昨日数据里没有这个板块' },
   { key: 'surging', label: '升温', cls: 'bg-up-soft text-up', hint: '涨停数 +3 / 增幅≥50%' },
   { key: 'ongoing', label: '持续', cls: 'bg-line-faint text-sub', hint: '与前一日基本持平' },
 ]
@@ -61,7 +61,7 @@ export function SectorDeltaCard() {
           </div>
         </div>
       ) : (
-        <EmptyState text="无板块增减数据（快照对比未生成）" />
+        <EmptyState text="无板块增减数据（时点对比未生成）" />
       )}
     </Card>
   )

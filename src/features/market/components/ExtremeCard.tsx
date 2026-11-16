@@ -32,7 +32,7 @@ export function ExtremeCard() {
   const ld = data?.limit_down
   const broken = data?.broken
 
-  // 只有后台明确返回零值才能断言无风险，缺字段不能当作零。
+  // 只有后台明确返回零值才能断言无风险，缺项不能当作零。
   const ldNames = ld?.names ?? []
   const brokenNames = broken?.names ?? []
   // 核按钮是昨日涨停股的负反馈，与当日跌停名单不互相代替。
@@ -104,7 +104,7 @@ export function ExtremeCard() {
             </div>
           ) : (
             <div className="text-11 text-sub mt-1">
-              {feedbackPending ? '正在加载核按钮数据…' : feedbackError && !fb ? '暂无法确认核按钮状态' : fb?.error ? `反馈矩阵异常：${fb.error}` : nukeCount === 0 ? '当前快照无核按钮' : nukeCount != null ? '核按钮明细未提供' : '核按钮数据未提供'}
+              {feedbackPending ? '正在加载核按钮数据…' : feedbackError && !fb ? '暂无法确认核按钮状态' : fb?.error ? `反馈矩阵异常：${fb.error}` : nukeCount === 0 ? '当前数据无核按钮' : nukeCount != null ? '核按钮明细未提供' : '核按钮数据未提供'}
             </div>
           )}
         </div>
@@ -113,14 +113,14 @@ export function ExtremeCard() {
           hint={hasPct(ld?.items) ? '按跌幅 · 首封时点排序' : '按封单额排序 · 无代码详情'}
           rows={toRows(ldNames, ld?.items)}
           chipClass="bg-down-soft text-down"
-          emptyText={isPending ? '正在加载跌停数据…' : isError && !data ? '暂无法确认跌停状态' : ld?.count === 0 ? '当前快照无跌停' : ld?.count != null ? '跌停名单未提供' : '跌停数据未提供'}
+          emptyText={isPending ? '正在加载跌停数据…' : isError && !data ? '暂无法确认跌停状态' : ld?.count === 0 ? '当前数据无跌停' : ld?.count != null ? '跌停名单未提供' : '跌停数据未提供'}
         />
         <NameGroup
           label="炸板"
           hint="曾涨停后打开 · 承接不足"
           rows={toRows(brokenNames, broken?.items)}
           chipClass="bg-line-faint text-down"
-          emptyText={isPending ? '正在加载炸板数据…' : isError && !data ? '暂无法确认炸板状态' : broken?.count === 0 ? '当前快照无炸板' : broken?.count != null ? '炸板名单未提供' : '炸板数据未提供'}
+          emptyText={isPending ? '正在加载炸板数据…' : isError && !data ? '暂无法确认炸板状态' : broken?.count === 0 ? '当前数据无炸板' : broken?.count != null ? '炸板名单未提供' : '炸板数据未提供'}
         />
       </div>
     </Card>

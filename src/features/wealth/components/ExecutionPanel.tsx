@@ -18,7 +18,7 @@ import { cn, fmtPct, tradableStocks } from '@/shared/lib'
  * | 模块 | 回答什么 | 为什么不能省 |
  * |---|---|---|
  * | **竞价资金榜** | 09:25 钱往哪去 | 唯一能验证「昨天选的票今早有没有人要」的地方 |
- * | **早鸟埋伏** | 爆发前夜的埋伏位 | 决策档案独有字段，接力池里没有 |
+ * | **早鸟埋伏** | 爆发前夜的埋伏位 | 决策档案独有项，接力池里没有 |
  * | **盘中候选池** | 盘中滚动候选 | 盘中口径与盘后不同，混在一起会误读 |
  * | **全局旁白** | 决策原件的自然语言 | 复盘时读「当时怎么想的」唯一来源 |
  *
@@ -48,7 +48,7 @@ export function ExecutionPanel({
 
   /**
    * 竞价资金榜：`decision/auction-history` 按文件名升序返回多日存档 → 取最后一份。
-   * ⛔ 只用真实落盘字段（prev_close / auction_price / auction_amount_yi），
+   * ⛔ 只用真实落盘项（prev_close / auction_price / auction_amount_yi），
    *    净额需要逐笔委托方向，我们不造。
    */
   const auctionFiles = (auctionHist.data ?? []) as Array<{

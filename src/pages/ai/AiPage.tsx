@@ -62,7 +62,7 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.aiView())
   await queryClient.ensureQueryData(analyticsQueries.aiDecisions())
   await queryClient.ensureQueryData(analyticsQueries.aiNav())
-  // 判断明细要关联「尾盘财富密码接力卡」的真实字段（区间/量能/指标/标签）
+  // 判断明细要关联「尾盘财富密码接力卡」的真实项（区间/量能/指标/标签）
   await queryClient.ensureQueryData(analyticsQueries.decisionCandidates())
   // 「判断」一栏取**今晨 09:25 裁决终态**（实际怎么做），而非昨日盘后预案
   await queryClient.ensureQueryData(analyticsQueries.decisionPoolCall())
@@ -93,7 +93,7 @@ export function AiWealthView() {
   const nav = useQuery(analyticsQueries.aiNav())
   /** T+1 口径（竞价买→次日收盘卖）：独立序列，只用于并列对照 */
   const navT1 = useQuery(analyticsQueries.aiNavT1())
-  /** 尾盘财富密码接力卡存档（近 3 期）—— 判断明细的「真实字段」来源 */
+  /** 尾盘财富密码接力卡存档（近 3 期）—— 判断明细的「真实项」来源 */
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
   const poolCalls = useQuery({ ...analyticsQueries.decisionPoolCall(), refetchInterval: 30_000, staleTime: 0 })
@@ -134,8 +134,8 @@ export function AiWealthView() {
    *
    * 实证 2026-11-06 16:30：`ai_view_2026-11-09.json` 已经存在（`decision_date = 11-06`），
    * 而 `pool_call` / `pool_ledger` 最新只到 11-06。若默认取最新：
-   *   · 「今天买了没」→ 显示「今晨裁决未落盘」
-   *   · 「今日账本」→ 显示「未落盘」
+   *   · 「今天买了没」→ 显示「今晨裁决未生成」
+   *   · 「今日账本」→ 显示「未生成」
    * 用户收盘后打开页面，**今天的结算一个字都看不到**，看到的是一个还没到竞价时刻的未来日。
    *
    * ✅ 默认执行日固定北京时间今天；缺今日裁决就明说，不用昨日名单。
@@ -208,7 +208,7 @@ export function AiWealthView() {
    * ⚠️ 日期口径：`ai_view.date`（执行日）=== `ai_view.decision_date + 1 交易日`，
    *    而 `pool_call.trade_date` 正是**执行日** → 两者直接相等。
    *    ⛔ 不要用 `decision_date`（那是预案写作日）去匹配 `pool_call`，会整体错位一天。
-   * ⛔ **无 fallback**：配不上就该显示「今晨裁决未落盘」——用最近一期顶上会把
+   * ⛔ **无 fallback**：配不上就该显示「今晨裁决未生成」——用最近一期顶上会把
    *    别天的成交结论安到本日头上（用户 2026-09-22 明确要求显示「今天 9:25 的这个」）。
    */
   const executionDate = viewDate || today
@@ -222,7 +222,7 @@ export function AiWealthView() {
   /**
    * 与所选执行日**同一天**的收盘结算（`pool_ledger.date`）。
    *
-   * ⛔ 与 `callFile` 一样**无 fallback**：台账当日 16:00 才落盘，配不上就该显示「未落盘」。
+   * ⛔ 与 `callFile` 一样**无 fallback**：台账当日 16:00 才落盘，配不上就该显示「未生成」。
    *    用昨日结算顶替 = 把别天的收益安到今天头上，正是 11-06 那次
    *    「基线把 +2.56% 虚报成 +13.22%」的同型错误（缺的那笔往往就是当天唯一那笔）。
    */
@@ -249,7 +249,7 @@ export function AiWealthView() {
   }, [screens.data, dossier])
 
   /**
-   * 判断明细行 = **今晨 09:25 终态**（结论）× 接力卡真实字段（依据）+ bias 越权兜底留痕。
+   * 判断明细行 = **今晨 09:25 终态**（结论）× 接力卡真实项（依据）+ bias 越权兜底留痕。
    *
    * ⛔ 展示的「判断」取 `call.view`；`view`/`bias` 保留为「昨日预案」对照 —— 两者不一致
    *    时正是最该被看见的地方（AI 判反 vs 机械裁决救回）。
@@ -479,7 +479,7 @@ export function AiWealthView() {
             <AiHitLogic file={callFile} tradeDate={callFile?.trade_date ?? activeView?.date} />
           </Card>
 
-          {/* 判断明细 = 今晨 09:25 裁决终态 × 接力卡真实字段 */}
+          {/* 判断明细 = 今晨 09:25 裁决终态 × 接力卡真实项 */}
           <Card title="判断明细">
             {activeView && (
               <div className="text-sub text-12 mb-2 flex flex-col gap-0.5">

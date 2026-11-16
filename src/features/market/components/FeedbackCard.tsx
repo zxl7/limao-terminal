@@ -89,7 +89,7 @@ export function FeedbackCard() {
               value={fb.broken_rate ?? '—'}
               unit="%"
               tone={fb.broken_rate == null ? 'sub' : feedbackTone(breakWarn)}
-              sub="当前快照 · >30% 封板质差"
+              sub="当前数据 · >30% 封板质差"
             />
             <Kpi
               label="均涨幅"

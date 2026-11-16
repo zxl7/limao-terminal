@@ -75,7 +75,7 @@ const TURN_TONE: Record<string, { label: string; cls: string }> = {
  *
  * ⚠️ 为什么要收窄：归档存在**两种形态** ——
  *   · 新形态：带 `intraday_points`（当日逐窗口快照）
- *   · 旧形态：只有 `zt_count` / `ladder` / `zt_list` 等收盘字段，无逐窗口数据
+ *   · 旧形态：只有 `zt_count` / `ladder` / `zt_list` 等收盘项，无逐窗口数据
  * 旧形态日混进「盘中时序」表会因为读不到点而整行渲染错乱，故在过滤阶段就用
  * 类型守卫剔除，而不是在渲染里逐处可选链兜底（那样会产出「0 个盘中点」的
  * 假数据，让人误以为该日盘中全程无涨停）。
@@ -209,8 +209,8 @@ export function Component() {
    * ⚠️ 数据源刻意的选择：`trajectory.zt_seq` 实测**全为 null**（summary 生成器
    *    未回填该序列），若照直渲染就是一张空图。而 `zt_history` 每天都有真值 ——
    *    优先取当日**最后一个盘中点**的 `total`（=`intraday_only` 归档日没有
-   *    `zt_count` 字段，但 intraday_points 一定有末点），回退到 `zt_count`。
-   *    这样 21 天里有值的日子全都能画出来，而不是被一个空字段挡住。
+   *    `zt_count` 项，但 intraday_points 一定有末点），回退到 `zt_count`。
+   *    这样 21 天里有值的日子全都能画出来，而不是被一个空项挡住。
    */
   const ztTrend = useMemo(() => {
     const rows = (ztHist.data ?? [])
@@ -244,7 +244,7 @@ export function Component() {
 
   /**
    * 多日周期样本只读已经归档的交易日；当日盘中信息由时间轴承接，避免重复。
-   * 各字段按日期从自己的事实源合并，缺字段保留空值，绝不拿别日数据补齐。
+   * 各项按日期从自己的事实源合并，缺项保留空值，绝不拿别日数据补齐。
    */
   const tideWindow = useMemo<TideWindowDay[]>(() => {
     const feedbackDays = new Map((feedback.data?.trend?.history ?? []).map((x) => [x.date, x]))
@@ -314,7 +314,7 @@ export function Component() {
       >
         {feedback.isError && (
           <p role="status" className="text-11 text-warn mb-2">
-            {feedback.data ? '反馈更新失败，显示上次快照' : '反馈加载失败，潮位待确认'}
+            {feedback.data ? '反馈更新失败，显示上次数据' : '反馈加载失败，潮位待确认'}
           </p>
         )}
         <TideCard tide={tide} window={tideWindow} />
@@ -458,7 +458,7 @@ export function Component() {
         </p>
       </Card>
 
-      {/* ── 涨停家数趋势：数据源刻意绕开空字段 ── */}
+      {/* ── 涨停家数趋势：数据源刻意绕开空项 ── */}
       <Card
         title="📊 收盘涨停家数"
         extra={<CardBadge tone="up">近 {ztTrend.bars.length} 个交易日</CardBadge>}
@@ -582,7 +582,7 @@ export function Component() {
                 <SeqRow label="核按钮" seq={historicTrajectory.map((day) => (day.nuke == null ? '—' : String(day.nuke)))} tone="nu" />
                 <SeqRow label="涨停数" seq={historicTrajectory.map((day) => (day.zt == null ? '—' : String(day.zt)))} tone="plain" />
                 <p className="text-sub text-12 mt-1 leading-relaxed">
-                  序列按时间正序；`—` = 该日数据未落盘，不是 0。
+                  序列按时间正序；`—` = 该日数据未生成，不是 0。
                 </p>
               </>
             ) : (

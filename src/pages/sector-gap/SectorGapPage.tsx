@@ -10,7 +10,7 @@ import { Card, CardBadge, EmptyState, StockLink } from '@/shared/ui'
  *
  * ⚠️ 本页是**对账页**，不是交易页：
  *   09:25 真正决定买不买的算法是 `ai_caliber.gap_zone`（逐票预期 DEV）。
- *   三环联动（板块 / 梯队 / 量能）目前只写进冻结件的影子字段，恒不改 view/zone/
+ *   三环联动（板块 / 梯队 / 量能）目前只写进冻结件的影子项，恒不改 view/zone/
  *   quota/仓位。本页把「若开守卫会砍谁」与事后收益并排，用来决定将来要不要转正。
  *
  * 两套收益**分列**：
@@ -95,7 +95,7 @@ export function SectorGapView() {
           <b className="text-txt">「影子」是什么：</b>同一批 09:25 竞价数据算两份结果 ——
           一份是真正下单用的裁决（逐票质量预期 <span className="num">DEV</span>），
           另一份是「板块 → 梯队 → 量能 → 预期」三环联动的<b className="text-txt">平行判断</b>。
-          影子只写进冻结件的留痕字段，<b className="text-up">从不参与买不买、不改名额与仓位</b>。
+          影子只写进冻结件的备注，<b className="text-up">从不参与买不买、不改名额与仓位</b>。
           之所以不直接合并，是因为历史窗口的证据只够描述、不够开硬闸：先并行记账，
           攒够 T+1 可执行收益再决定要不要转正。
         </p>
@@ -108,7 +108,7 @@ export function SectorGapView() {
           <StatPair label="砍对天数" value={`${s?.cut_better_days ?? '—'} / ${s?.cut_worse_days ?? '—'}`} />
         </div>
         <p className="text-11 text-sub mt-3">
-          三条硬约束：缺选股宝题材快照不裁决 · 缺任一环不裁决 · 量能只证伪不打分。
+          三条硬约束：缺选股宝题材数据不裁决 · 缺任一环不裁决 · 量能只证伪不打分。
           最新交易日的 T+1 收益要等次一交易日收盘才有，显示「—」属正常。
         </p>
       </Card>
@@ -148,7 +148,7 @@ export function SectorGapView() {
           empty="尚无有效交易日"
           columns={[
             { label: '日期', cell: (r) => r.date },
-            { label: '题材源', cell: (r) => <Tag tone={r.theme_src === 'plates' ? 'up' : 'neutral'}>{r.theme_src === 'plates' ? '选股宝' : '行业兜底'}</Tag> },
+            { label: '题材源', cell: (r) => <Tag tone={r.theme_src === 'plates' ? 'up' : 'neutral'}>{r.theme_src === 'plates' ? '选股宝' : '按行业归类'}</Tag> },
             { label: '可买', num: true, cell: (r) => r.n_tradable },
             { label: '现判据', num: true, cell: (r) => r.n_v0 },
             { label: '影子砍', num: true, cell: (r) => r.cut_codes.length },

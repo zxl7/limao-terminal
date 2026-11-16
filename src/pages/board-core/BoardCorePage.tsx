@@ -161,7 +161,7 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title="⚡ 今日核心核验" extra={<CardBadge tone={liveLeaders.length ? 'up' : 'neutral'}>{latest.data?.ts?.slice(11, 19) ?? '等待行情快照'}</CardBadge>}>
+      <Card title="⚡ 今日核心核验" extra={<CardBadge tone={liveLeaders.length ? 'up' : 'neutral'}>{latest.data?.ts?.slice(11, 19) ?? '等待行情数据'}</CardBadge>}>
         {liveLeaders.length ? (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-12">
             {liveLeaders.map(({ theme, leader }) => <span key={theme}><b className="text-rec">{leader?.name}</b><span className="text-sub"> · {theme}</span></span>)}

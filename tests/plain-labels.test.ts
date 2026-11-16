@@ -216,7 +216,7 @@ describe('白话层 · 真实落盘数据全量扫', () => {
       }
       const pairs = collect(data, keys)
       if (pairs.length === 0) {
-        // 数据未落盘（如盘后链未跑）→ 跳过，⛔ 不拿空数据假装通过
+        // 数据未生成（如盘后链未跑）→ 跳过，⛔ 不拿空数据假装通过
         expect(true).toBe(true)
         return
       }

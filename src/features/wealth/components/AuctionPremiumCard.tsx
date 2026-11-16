@@ -40,7 +40,7 @@ function verdictMeta(v: string): { label: string; tone: 'up' | 'down' | 'neutral
 export function AuctionPremiumCard({ board }: { board?: AuctionPremiumBoard }) {
   if (!board || board.count === 0) {
     return (
-      <Card title="昨日连板 · 今晨竞价" extra={<CardBadge>未落盘</CardBadge>}>
+      <Card title="昨日连板 · 今晨竞价" extra={<CardBadge>未生成</CardBadge>}>
         <EmptyState
           text="今日竞价溢价榜未生成"
           hint="09:25 竞价裁决（verify）跑完即产出 · 昨日无 2 板以上或报价缺失时为空"

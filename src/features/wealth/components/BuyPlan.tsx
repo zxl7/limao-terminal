@@ -27,7 +27,7 @@ import { boardsText, num, yiText } from '../lib/format'
  *
  * 旧冻结件（11-10 及以前）的 `forecast.reasons[0]` 是**整段档位统计**——同档所有票一字不差。
  * 冻结件不改写，所以在展示层做规范化：能拿到 `stat_note`（新件）就直接用后端短句；
- * 拿不到就从**这只票自己的字段**拼一句，统计交给上方的「本档统计」行（只显示一次）。
+ * 拿不到就从**这只票自己的项**拼一句，统计交给上方的「本档统计」行（只显示一次）。
  */
 function shortReason(s: DossierStock): string {
   const fc = s.forecast

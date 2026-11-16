@@ -54,14 +54,14 @@ describe('首页数据状态不能伪装成无风险', () => {
     mount(<ExtremeCard />, marketQueries.latest().queryKey, {})
     expect(screen.getByText('跌停数据未提供')).toBeInTheDocument()
     expect(screen.getByText('炸板数据未提供')).toBeInTheDocument()
-    expect(screen.queryByText(/当前快照无/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/当前数据无/)).not.toBeInTheDocument()
   })
 
   it('明确的零值可以显示无风险；非零但缺名单必须提示缺名单', () => {
     mount(<ExtremeCard />, marketQueries.latest().queryKey, {
       limit_down: { count: 0, names: [] }, broken: { count: 3, names: [] },
     })
-    expect(screen.getByText('当前快照无跌停')).toBeInTheDocument()
+    expect(screen.getByText('当前数据无跌停')).toBeInTheDocument()
     expect(screen.getByText('炸板名单未提供')).toBeInTheDocument()
   })
 

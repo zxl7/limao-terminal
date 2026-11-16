@@ -154,7 +154,7 @@ export function Component() {
                     <td className="py-1.5 pr-3 text-right num">{r.max_boards}</td>
                     <td className="py-1.5 pr-3 num whitespace-nowrap text-sub">{r.break_day?.slice(5) ?? '—'}</td>
                     <td
-                      title={r.a_kill_threshold != null ? `阈值 ${r.a_kill_threshold}%（${r.limit_pct}cm 一个跌停板）` : undefined}
+                      title={r.a_kill_threshold != null ? `门槛 ${r.a_kill_threshold}%（${r.limit_pct}cm 一个跌停板）` : undefined}
                       className={cn('py-1.5 pr-3 text-right num whitespace-nowrap',
                         r.a_kill === true ? 'text-down' : r.a_kill === false ? 'text-up' : 'text-sub')}>
                       {pct(r.post_2d_pct)}

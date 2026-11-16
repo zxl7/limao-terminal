@@ -20,7 +20,7 @@ import { pctTone } from '../model/labels'
  *
  * ## 三条兜底纪律
  *
- * 1. 旧数据没有 `signals_today` → 回退 `signals`（向后兼容，不因字段缺失而空卡）；
+ * 1. 旧数据没有 `signals_today` → 回退 `signals`（向后兼容，不因项缺失而空卡）；
  * 2. ⛔ 科创板（688/689）无交易权限 → 全卡剔除（后端未滤，前端兜底）；
  * 3. ⚠️ 沉淀里的**历史条目只有身份与时刻**（由事件流回填，没有 pct / 资金 / 理由）
  *    → 一律 `—` 兜底，⛔ 不得退化成 0 或空白。
@@ -29,7 +29,7 @@ export function SignalsCard() {
   const { data } = useQuery(marketQueries.signals())
   const sessionText = data?.session === 'morning' ? '早盘' : '午后'
 
-  /** `ShortSpiritSignal` 的字段是 `ShortSpiritDeposit` 的子集 → 可直接并入同一列表 */
+  /** `ShortSpiritSignal` 的项是 `ShortSpiritDeposit` 的子集 → 可直接并入同一列表 */
   const deposited = data?.signals_today ?? []
   const rows: ShortSpiritDeposit[] = deposited.length > 0 ? deposited : (data?.signals ?? [])
 

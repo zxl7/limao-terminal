@@ -15,7 +15,7 @@ import { cn } from '@/shared/lib'
  * 对「高位票的隐形风险」没有输出。`risk_watch` 正是补这一块的 ——
  * 它按涨停池板数 Top 取高标，逐个查质押比例与公告，给出**风险标签**。
  *
- * ## 三个字段读法
+ * ## 三个项读法
  *
  *   · `pledge_pct`   —— 股权质押比例。高质押 = 大股东资金紧张，
  *     在连续涨停后容易出现被动减持（这是高标最常见的隐性杀跌来源）。
@@ -200,12 +200,12 @@ export function Component() {
   )
 }
 
-/** 公告条目为宽松对象，优先取常见标题字段 */
+/** 公告条目为宽松对象，优先取常见标题项 */
 function summarizeNotice(n: Record<string, unknown>): string {
   const keys = ['title', 'name', 'notice_title', 'type', 'desc']
   for (const k of keys) {
     const v = n[k]
     if (typeof v === 'string' && v.trim()) return v
   }
-  return '（公告明细字段未识别）'
+  return '（公告明细暂未识别）'
 }

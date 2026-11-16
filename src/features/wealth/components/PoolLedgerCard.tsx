@@ -24,8 +24,8 @@ import { num, signedPct } from '../lib/format'
  *    看当天收盘赚没赚」。`oc_ret`（开盘价买）与 `chg_pct`（昨收→收盘）只作对照，⛔ 不可替代。
  * 2. `one_word`（一字板）/ `sealed_auction`（竞价已封死）**买不进** —— 标 `═`/`锁`、
  *    **不计入任何汇总**。把买不进的涨停算成收益是虚报（11-06 海源复材 +9.97% 封死、当日 −10.69%）。
- * 3. 台账文件**缺失 = 当日收盘 K 线未落盘**（脚本 `exit 2` 不写半截文件），
- *    ⛔ 不是「今天没票」、更不是 0 收益。缺就明说「未落盘」，不拿昨日顶上。
+ * 3. 台账文件**缺失 = 当日收盘 K 线未生成**（脚本 `exit 2` 不写半截文件），
+ *    ⛔ 不是「今天没票」、更不是 0 收益。缺就明说「未生成」，不拿昨日顶上。
  */
 
 /** 裁决 → 展示文案与语义色。⛔ 与 `AiPage.VIEW_META` 同义，别造第二套措辞。 */
@@ -108,7 +108,7 @@ const COLUMNS: Column<PoolLedgerRow>[] = [
     num: true,
     cell: (r) =>
       r.dev === null || r.dev === undefined ? (
-        <span className="text-sub" title="该日冻结件无 quality 预期字段">
+        <span className="text-sub" title="该日冻结件无 quality 预期项">
           —
         </span>
       ) : (
@@ -145,7 +145,7 @@ const COLUMNS: Column<PoolLedgerRow>[] = [
   },
   {
     // 📏 T+1 另立口径：竞价买 → **次日**收盘卖（A 股当天买的当天不能卖）。
-    //    ⛔ 与「竞价→收盘」并列展示，不可互相替代；次日未落盘时是 `—` 不是 0。
+    //    ⛔ 与「竞价→收盘」并列展示，不可互相替代；次日未生成时是 `—` 不是 0。
     label: 'T+1',
     num: true,
     cell: (r) => (
@@ -154,7 +154,7 @@ const COLUMNS: Column<PoolLedgerRow>[] = [
           'text-sub',
           r.t1_ret === null || r.t1_ret === undefined ? '' : (r.t1_ret ?? 0) >= 0 ? 'text-up' : 'text-down',
         )}
-        title={r.t1_date ? `竞价价买 → ${r.t1_date} 收盘卖` : '次日行情未落盘'}
+        title={r.t1_date ? `竞价价买 → ${r.t1_date} 收盘卖` : '次日行情未生成'}
       >
         {signedPct(r.t1_ret)}
       </span>
@@ -200,9 +200,9 @@ export function PoolLedgerCard({
   const buyList = (
     <div className="flex flex-col gap-2">
       <div className="text-11 text-sub">
-        系统买入名单 · 09:25 冻结裁决，非券商成交 · 已结算显示「竞价价买→收盘卖」，未结算显示实时快照（昨收对比，非持仓收益）
+        系统买入名单 · 09:25 冻结裁决，非券商成交 · 已结算显示「竞价价买→收盘卖」，未结算显示实时数据（昨收对比，非持仓收益）
       </div>
-      {!callFile ? <div className="text-12 text-sub">该执行日裁决未落盘，不使用昨日名单</div> : !picks.length ? <div className="text-12 text-sub">该执行日系统无参与票</div> : picks.map((code) => {
+      {!callFile ? <div className="text-12 text-sub">该执行日裁决未生成，不使用昨日名单</div> : !picks.length ? <div className="text-12 text-sub">该执行日系统无参与票</div> : picks.map((code) => {
         const quote = callFile.trade_date === today && quotes?.date === today ? quotes.quotes[code] : undefined
         const stamp = quote && new Date(quote.ts)
         const clock = stamp && Number.isFinite(stamp.getTime()) ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(stamp) : ''
@@ -210,8 +210,8 @@ export function PoolLedgerCard({
         const row = ledger?.rows.find((r) => r.code === code)
         /**
          * ⛔ 2026-11-10 用户「同一只票一处 +5.54%、一处暂无报价」：
-         *    账本已落盘时**以账本为主口径**（竞价价买→收盘卖），实时快照只作未结算时的兜底。
-         *    原来无条件走实时快照，收盘后 quotes 过期 → 明明有结算却显示「暂无报价」。
+         *    账本已落盘时**以账本为主口径**（竞价价买→收盘卖），实时数据只作未结算时的兜底。
+         *    原来无条件走实时数据，收盘后 quotes 过期 → 明明有结算却显示「暂无报价」。
          */
         const settled = row != null && typeof row.au_ret === 'number' && Number.isFinite(row.au_ret)
         const pct = settled ? (row!.au_ret as number) : valid ? quote.pct : null
@@ -220,7 +220,7 @@ export function PoolLedgerCard({
           ? '收盘结算 · 竞价价买 → 收盘卖'
           : valid
             ? `${quote.source} · 快照 ${quote.ts}`
-            : callFile.trade_date !== today ? '历史执行日不套用今日行情' : '实时快照未到 · 结算见下表'
+            : callFile.trade_date !== today ? '历史执行日不套用今日行情' : '实时数据未到 · 结算见下表'
         const name = callFile.views[code]?.name || row?.name || '名称暂无'
         return <div key={code} className="flex flex-wrap items-baseline gap-3 text-12">
           <StockLink code={code}>{name}</StockLink><span className="num text-sub">{code}</span>
@@ -232,10 +232,10 @@ export function PoolLedgerCard({
   )
   if (!ledger) {
     return (
-      <Card title="今日账本" extra={<CardBadge tone="warn">未落盘</CardBadge>}>
+      <Card title="今日账本" extra={<CardBadge tone="warn">未生成</CardBadge>}>
         {buyList}
         <EmptyState
-          text="今日收盘结算未落盘"
+          text="今日收盘结算未生成"
           hint="16:00 收盘 K 线确认后由 scripts/pool_ledger.py 生成；不是「今天没票」，也不是 0 收益"
         />
       </Card>
@@ -243,7 +243,7 @@ export function PoolLedgerCard({
   }
 
   /**
-   * 🕳️ 空列治理（2026-11-10）：T+1 次日行情未落盘时整列为 `—`。
+   * 🕳️ 空列治理（2026-11-10）：T+1 次日行情未生成时整列为 `—`。
    * 它既占宽度（把「为什么」挤出视口），又让读者以为「今天 T+1 是 0」。
    * 全列都空 → 整列不渲染；有任意一行有值才显示。
    */

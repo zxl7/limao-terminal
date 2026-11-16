@@ -33,7 +33,7 @@ import { cn, staleLabel } from '@/shared/lib'
  *
  * 一个安静的日子与一条断掉的链路，在结果上完全一样（都没有推送）。
  * 判据就是 `pushed_signals` 的体积与内容 —— 因此本页把它的**体积**与
- * **各字段计数**一起放在页首，让「安静」和「坏了」一眼可分。
+ * **各项计数**一起放在页首，让「安静」和「坏了」一眼可分。
  */
 
 export async function loader() {
@@ -358,7 +358,7 @@ function SigList({ title, items, wide }: { title: string; items?: string[]; wide
   )
 }
 
-/** 审计条目字段随事件类型变化，此处只做简短摘要 */
+/** 审计条目项随事件类型变化，此处只做简短摘要 */
 function brief(a: AuditEntry): string {
   const parts: string[] = []
   if (a.before !== undefined) parts.push(`before=${condense(a.before)}`)

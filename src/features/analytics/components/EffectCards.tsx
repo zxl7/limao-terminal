@@ -234,7 +234,7 @@ export function NextDayProjectionCard({
   return (
     <div className="flex flex-col gap-2.5 min-w-0">
       <div className="flex flex-wrap gap-x-5 gap-y-1 text-11 text-sub">
-        <span>当前结构快照：<span className="num text-txt">{snapshot?.ts || '—'}</span></span>
+        <span>当前结构：<span className="num text-txt">{snapshot?.ts || '—'}</span></span>
         <span>最高板：<span className="num text-txt">{snapshot?.highestBoards == null ? '—' : `${snapshot.highestBoards} 板`}</span></span>
         <span>历史基线：晋级样本</span>
       </div>
@@ -263,7 +263,7 @@ export function NextDayProjectionCard({
       {p.stages.length > 0 && (
         <div className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1">
           <div className="rounded-[var(--radius-sm)] border border-line p-2">
-            <div className="mb-1.5 text-11 text-sub">当前快照 · 梯队家数</div>
+            <div className="mb-1.5 text-11 text-sub">当前数据 · 梯队家数</div>
             <div className="flex flex-col gap-1.5">
               {p.stages.map((s) => (
                 <div key={s.stage} className="grid grid-cols-[38px_1fr_26px] items-center gap-1.5 text-11">
@@ -328,7 +328,7 @@ export function NextDayProjectionCard({
           </div>
         ))}
         <div className="text-11 text-sub leading-relaxed">
-          当前快照仅提供梯队家数；收益与成功率均来自全历史阶段统计（{decisiveStages.length} 个阶段样本 ≥{STAGE_MIN_SAMPLE}）的条件期望，非预测；展示中位数（均值受尾部极值影响）。
+          当前数据仅提供梯队家数；收益与成功率均来自全历史阶段统计（{decisiveStages.length} 个阶段样本 ≥{STAGE_MIN_SAMPLE}）的条件期望，非预测；展示中位数（均值受尾部极值影响）。
         </div>
       </div>
     </div>
@@ -432,7 +432,7 @@ export function EffectWindowCard({
         ))}
       </div>
       <p className="text-11 text-sub leading-relaxed">
-        实线格 = 已落盘事实（T-3~T）；虚线格 = 推演（T+1 条件期望 / T+2~T+4 三情景）。
+        实线格 = 已确认事实（T-3~T）；虚线格 = 推演（T+1 条件期望 / T+2~T+4 三情景）。
       </p>
     </div>
   )

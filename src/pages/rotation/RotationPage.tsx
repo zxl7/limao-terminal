@@ -14,7 +14,7 @@ import { cn, capitalText, klineText, phaseText, ztDirText, tradableStocks } from
  * ## 这一页承载三块互不重叠的信息
  *
  * 1. **回流候选**（`candidates`）——「哪些炒过的题材快回来了」。
- *    核心字段是 `cooled_days`（冷却天数）与 `confidence`（置信度）。
+ *    核心项是 `cooled_days`（冷却天数）与 `confidence`（置信度）。
  *    `confidence_factors` 把置信度拆成**五因子**（催化 / 大盘 / 资金 / 阶段 / K线止跌），
  *    这是**可核查的**置信度，不是拍脑袋的分数。
  * 2. **板块资金 5 日**（`flow_5d`）——「钱往哪去」。区间累计净额 + 流入天数
@@ -231,7 +231,7 @@ export function Component() {
           <CardBadge
             tone={sentiment == null ? 'neutral' : sentiment >= 6 ? 'up' : sentiment <= 2 ? 'down' : 'neutral'}
           >
-            数据时间 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}{ctxRef ? ` · 大盘参考态 ${ctxAge} 分钟前` : ''}
+            数据时间 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 涨停 {mc?.zt_count_today ?? '—'}{ctxRef ? ` · 大盘参考态 ${ctxAge} 分钟前` : ''}
           </CardBadge>
         }
       >
@@ -253,7 +253,7 @@ export function Component() {
           <StatPair label="涨停源" value={d?.data_meta?.zt_source ?? '—'} />
         </div>
         {d?.note && <p className="text-sub text-12 leading-relaxed">{d.note}</p>}
-        {d?.generated_ts && <p className="text-warn text-12 leading-relaxed">本页轮动候选与资金榜取自 {d.generated_ts.replace('T', ' ').slice(0, 19)} 的快照，盘中变化以“盘中实时”页的当前快照为准。</p>}
+        {d?.generated_ts && <p className="text-warn text-12 leading-relaxed">本页轮动候选与资金榜取自 {d.generated_ts.replace('T', ' ').slice(0, 19)} 的数据，盘中变化以“盘中实时”页的当前值为准。</p>}
         {!rot.isLoading && !d && (
           <EmptyState text="题材轮动数据未生成" hint="cache/rotation.json 缺失" />
         )}
@@ -534,7 +534,7 @@ function ThemeLibraryCard() {
   return (
     <Card title="📚 题材库沉淀" extra={<CardBadge>{d.day_count} 天 · {d.code_count} 只</CardBadge>}>
       <p className="text-11 text-sub m-0 mb-1.5">
-        选股宝快照每日累计（{d.days[0]} ~ {d.days.at(-1)}）；下面的「只」＝出现过该题材的股票数
+        每日题材数据累计（{d.days[0]} ~ {d.days.at(-1)}）；下面的「只」＝出现过该题材的股票数
       </p>
       <ul className="text-12 leading-relaxed m-0">
         {rows.map(([name, v]) => (
@@ -586,7 +586,7 @@ function ThemeLifecycleFunnel({ counts }: { counts: Record<ThemeLifecycle['key']
   )
 }
 
-/** 回流候选单行卡片 —— 字段多且分四因子，横向铺开比塞进表格更易读 */
+/** 回流候选单行卡片 —— 项多且分四因子，横向铺开比塞进表格更易读 */
 function ReflowRow({ c, stage, lifecycle }: { c: RotationCandidate; stage: RotationStage; lifecycle: ThemeLifecycle }) {
   const f = c.confidence_factors
   const [open, setOpen] = useState(false)

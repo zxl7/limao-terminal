@@ -16,7 +16,7 @@ import { n1, n2, pct, rangePct, tone as valueTone } from '../lib/format'
  *   不能只显示股票代码，然后再加上理由，**不要统一为 5%**。我们不是有区间吗？
  *   我们不仅有区间，还有量能，还有指标，还有各种 tag 都要显示在这里。」
  *
- * 故本组件把**接力卡真实字段**铺开：名称+代码 / 预期开盘**区间**（`expected_range`，非 5%）/
+ * 故本组件把**接力卡真实项**铺开：名称+代码 / 预期开盘**区间**（`expected_range`，非 5%）/
  * 竞价量能（`auction_amount_min_yi` + 昨量区间 + 爆量线）/ 封板形态与板块地位 /
  * 逐维打分（`dim_panel`）/ 量价指标（成交额·封单·换手·主力）/ 标签（`tags`）/
  * AI 理由 + 脚本计划原文（`expected_text`）。
@@ -64,7 +64,7 @@ export interface JudgeRow {
    * AI 判断：participate / watch / skip。
    *
    * ⚠️ 这是**昨日盘后预案**的同义派生（`ai_view` 的 `view`）。展示用的「判断」
-   * 应取 `call.view`（今晨 09:25 终态）；本字段在无终态时兜底。
+   * 应取 `call.view`（今晨 09:25 终态）；本项在无终态时兜底。
    */
   view?: string
   /** AI 盘后理由（长文，含换行 · 前一交易日 15:30 写） */
@@ -131,7 +131,7 @@ function dimEntries(v: unknown): Array<{ key: string; label: string; score: numb
   if (!v || typeof v !== 'object') return []
   const out: Array<{ key: string; label: string; score: number | null }> = []
   for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-    if (k.startsWith('_')) continue // `_mid_carry` / `_band` 等内部字段不展示
+    if (k.startsWith('_')) continue // `_mid_carry` / `_band` 等内部项不展示
     if (!val || typeof val !== 'object') continue
     const o = val as { score?: unknown; label?: unknown }
     out.push({
@@ -185,7 +185,7 @@ function actionableWarning(warning?: string): string | undefined {
 export function AiJudgeDetail({ rows, decisionDate, hasCallFile = false }: {
   rows: JudgeRow[]
   decisionDate?: string
-  /** 当日 09:25 裁决文件是否存在 —— 用来区分「未进池」与「裁决未落盘」（⛔ 两件事） */
+  /** 当日 09:25 裁决文件是否存在 —— 用来区分「未进池」与「裁决未生成」（⛔ 两件事） */
   hasCallFile?: boolean
 }) {
   const [search, setSearch] = useState('')
@@ -262,14 +262,14 @@ export function AiJudgeDetail({ rows, decisionDate, hasCallFile = false }: {
               >
                 {m.label}
               </span>
-              {/* 来源标注（2026-11-11 三态）：⛔ 「未进池」与「裁决未落盘」是两件事，
-                  以前都写成「未落盘」，导致「判断」页里 9 只预案票看起来像系统没跑 */}
+              {/* 来源标注（2026-11-11 三态）：⛔ 「未进池」与「裁决未生成」是两件事，
+                  以前都写成「未生成」，导致「判断」页里 9 只预案票看起来像系统没跑 */}
               <span className="text-11 text-sub flex-none">
                 {c
                   ? '今晨 09:25 裁决'
                   : hasCallFile
                     ? '预案有 · 未进 09:25 池'
-                    : '昨日预案·今晨裁决未落盘'}
+                    : '昨日预案·今晨裁决未生成'}
               </span>
               {c?.quotaRank != null && <Chip tone="rec">买入名额 #{c.quotaRank}</Chip>}
               {/* 身份统一在下方展示，机械证据融入原有理由，不另增指标。 */}
@@ -296,7 +296,7 @@ export function AiJudgeDetail({ rows, decisionDate, hasCallFile = false }: {
             )}
 
             {/* ── 🌅 今晨 09:25 池内裁决终态（**结论** · 用户 2026-09-22「不应该显示昨天的」）──
-                ⛔ 本段必须在接力卡字段（依据）之前 —— 先看做了什么，再看凭什么做。 */}
+                ⛔ 本段必须在接力卡项（依据）之前 —— 先看做了什么，再看凭什么做。 */}
             {c && (
               <div className="mb-1.5 rounded-sm border border-line-faint px-2 py-1 flex flex-col gap-0.5">
                 <Row label="今晨">
@@ -324,7 +324,7 @@ export function AiJudgeDetail({ rows, decisionDate, hasCallFile = false }: {
               </div>
             )}
 
-            {/* ── 接力卡真实字段（无卡数据时整段不渲染，只留 AI 判断那一半）── */}
+            {/* ── 接力卡真实项（无卡数据时整段不渲染，只留 AI 判断那一半）── */}
             {s && (
               <div className="flex flex-col gap-0.5 border-t border-line-faint pt-1.5">
                 {e && (

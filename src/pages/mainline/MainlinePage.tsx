@@ -51,7 +51,7 @@ function stateLabel(delta: string | undefined): string | null {
 }
 
 /**
- * 主线题材 —— 数据源 `cache/pulse_snapshots/latest.json` 的 `top5` 字段（原系统 `render_theme_compare`）。
+ * 主线题材 —— 数据源 `cache/pulse_snapshots/latest.json` 的 `top5` 项（原系统 `render_theme_compare`）。
  *
  * ## 判读主线要看的三组数
  *
@@ -266,7 +266,7 @@ export function Component() {
           title={`${expanded.name} · 题材详情`}
           extra={<DeltaBadge cur={expanded.zt_count} prev={expanded.zt_prev} />}
         >
-          {/* 龙头逻辑为实时快照原文；题材催化已随左侧每张强度卡展示。 */}
+          {/* 龙头逻辑为实时数据原文；题材催化已随左侧每张强度卡展示。 */}
           {expanded.leader?.desc && (
             <div className="rounded-sm border border-lead/35 bg-lead/[0.035] px-3 py-2.5 mb-3">
               <div className="text-12 text-lead font-semibold mb-1">龙头炒作逻辑</div>
@@ -451,7 +451,7 @@ function netTone(v: number | null): string {
  * ## 不重复
  *
  * 行摘要里**不再**重复股数与资金额 —— 展开面板给了完整信息，折叠状态只保留
- * 系统原有的涨停/环比/龙头字段。同一笔数据在页面上只出现一次。
+ * 系统原有的涨停/环比/龙头项。同一笔数据在页面上只出现一次。
  */
 function CorePanel({ facts, genes, fundMaxAbs }: {
   facts: ThemeCoreFacts

@@ -319,7 +319,7 @@ describe('MainlinePage —— 题材涨停家数 今日 vs 昨日', () => {
      * ⛔ 不能把「盘前数据缺失」误判成「渲染失败」（原写法每个交易日盘前都会红）。
      */
     if (top5Count() === 0) {
-      expect(container.textContent, 'top5 为空却没给空态').toMatch(/暂无|未落盘|无题材/)
+      expect(container.textContent, 'top5 为空却没给空态').toMatch(/暂无|未生成|无题材/)
       return
     }
 

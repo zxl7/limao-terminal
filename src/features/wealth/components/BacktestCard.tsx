@@ -228,7 +228,7 @@ export function BacktestCard({ data }: { data?: BacktestSummary }) {
     return (
       <Card title="回测战绩" extra={<CardBadge tone="warn">未生成</CardBadge>}>
         <EmptyState
-          text="回测快照未生成"
+          text="回测结果未生成"
           hint="由 scripts/build_backtest_summary.py 产出 cache/research/backtest_summary.json"
         />
       </Card>

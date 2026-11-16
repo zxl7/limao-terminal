@@ -754,7 +754,7 @@ function downTagOf(summary: BlockSummary): SnakeThemeTag | null {
    */
   if (summary.news.length > 0) {
     const first = summary.news[0]
-    // `title` 在事件上是开放字段（`[k: string]: unknown`）→ 先收窄再压字
+    // `title` 在事件上是开放项（`[k: string]: unknown`）→ 先收窄再压字
     const raw = typeof first.title === 'string' ? first.title : first.name
     const title = shortNewsTitle(raw)
     const extra = summary.news.length > 1 ? `+${summary.news.length - 1}` : ''

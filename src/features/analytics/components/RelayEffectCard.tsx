@@ -33,7 +33,7 @@ export function RelayEffectCard() {
   const detail = scope.find(s => s.code === selected)
   const chooseGroup = (key: string) => { setGroup(key); setSelected(null) }
   return <Card className="min-w-0 w-full" title="连板量能与承接" extra={<span className="text-11 text-sub">{data ? `${historical ? '历史回放 · ' : ''}${data.prev_date} → ${data.date}` : '等待数据'}</span>}>
-    {!data ? <p role="status" className="text-sub text-xs py-4">{query.isPending ? '正在读取连板观察数据…' : '连板观察快照尚未提供，等待数据层发布。'}</p> : <div className="flex flex-col gap-4">
+    {!data ? <p role="status" className="text-sub text-xs py-4">{query.isPending ? '正在读取连板观察数据…' : '连板观察数据尚未提供，等待数据层发布。'}</p> : <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-x-6 gap-y-2">
         <StatPair label="昨日连板" value={`${data.overview.count} 只`} />
         <StatPair label="涨幅中位数" value={fmt(data.overview.median_pct, '%')} />
@@ -43,8 +43,8 @@ export function RelayEffectCard() {
         <StatPair label="行情覆盖" value={`${data.overview.quote_count}/${data.overview.count}`} />
       </div>
       <p role="status" className={cn('text-11', expired || query.isError ? 'text-warn' : 'text-sub')}>
-        {historical ? data.source_note : expired ? '快照已过期，保留最后读数并暂停承接排名。' : query.isError ? '更新失败，保留最后快照。' : '固定昨日样本，失败股仍保留。'}
-        {' '}更新于 {data.generated_ts.replace('T', ' ').slice(0, 19)} · {data.phase === 'closed' ? '收盘快照' : afterClose ? '盘后最后快照' : '盘中快照'}。涨幅为相对昨收表现，成交额表示交易规模。
+        {historical ? data.source_note : expired ? '数据已过期，保留最后读数并暂停承接排名。' : query.isError ? '更新失败，保留最后读数。' : '固定昨日样本，失败股仍保留。'}
+        {' '}更新于 {data.generated_ts.replace('T', ' ').slice(0, 19)} · {data.phase === 'closed' ? '收盘数据' : afterClose ? '盘后最后数据' : '盘中数据'}。涨幅为相对昨收表现，成交额表示交易规模。
       </p>
       <DataTable dense rows={data.groups} rowKey={g => g.key} rowClass={g => g.key === group ? 'bg-up-soft/40' : undefined} columns={[
         { label: '昨日梯队', cell: g => <button type="button" className="text-txt underline decoration-line underline-offset-4" onClick={() => chooseGroup(g.key)}>{labels[g.key]}</button> },
@@ -71,7 +71,7 @@ export function RelayEffectCard() {
         { label: '封单', num: true, cell: s => fmt(s.seal_yi, '亿') },
         { label: '首封', num: true, cell: s => s.today_fbt?.replace(/(\d{2})(\d{2})(\d{2})/, '$1:$2:$3') ?? '—' },
       ]} />
-      {detail && (historical ? <p className="text-xs text-sub">{detail.name}：历史快照时间 {detail.at?.replace('T', ' ').slice(0, 19) ?? '未提供'}。未归档逐分钟记录，无法还原日内曲线。</p> : <RelayDetail stock={detail} />)}
+      {detail && (historical ? <p className="text-xs text-sub">{detail.name}：历史数据时间 {detail.at?.replace('T', ' ').slice(0, 19) ?? '未提供'}。未归档逐分钟记录，无法还原日内曲线。</p> : <RelayDetail stock={detail} />)}
     </div>}
   </Card>
 }
@@ -99,10 +99,10 @@ function RelayDetail({ stock }: { stock: RelayStock }) {
   })
   const changes = points.filter((p, i) => p.sealed != null && (i === 0 || p.sealed !== points[i - 1].sealed))
   return <div className="border-t border-line pt-3">
-    <StockLink code={stock.code}>{stock.name}</StockLink><span className="ml-2 text-xs text-sub">当日观察记录 · {points.length} 个快照</span>
+    <StockLink code={stock.code}>{stock.name}</StockLink><span className="ml-2 text-xs text-sub">当日观察记录 · {points.length} 个时点</span>
     <div className="grid gap-3 lg:grid-cols-2">
       <LineChart labels={points.map(p => p.at.slice(11, 16))} series={[{ name: '涨幅', values: points.map(p => p.pct), tone: 'up' }]} height={170} format={v => `${v.toFixed(1)}%`} />
-      <LineChart labels={points.map(p => p.at.slice(11, 16))} series={[{ name: '相邻快照成交额增量', values: deltas, tone: 'sub' }]} height={170} format={v => `${v.toFixed(2)}亿`} />
+      <LineChart labels={points.map(p => p.at.slice(11, 16))} series={[{ name: '相邻两个时点的成交额增量', values: deltas, tone: 'sub' }]} height={170} format={v => `${v.toFixed(2)}亿`} />
     </div>
     <p className="text-10 text-sub">成交增量按相邻采样区间展示，不等同于固定每分钟成交额；空档不补数据。</p>
     <div className="mt-2 flex flex-wrap gap-2 text-11">{changes.map(p => <span key={p.at} className="rounded-sm bg-line-faint px-2 py-1">{p.at.slice(11, 19)} {p.sealed ? '观察到封板' : '观察到未封板'}</span>)}</div>

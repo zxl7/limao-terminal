@@ -379,7 +379,7 @@ export function Component() {
                       cell: (r) => <span className="num text-sub">{rate(r.promo_rate)}</span>,
                     },
                     {
-                      // ⚠️ 字段名叫 rate 但**不是百分比**：源码为 broken_sum / zt_n
+                      // ⚠️ 项名叫 rate 但**不是百分比**：源码为 broken_sum / zt_n
                       //   （每次涨停的平均炸板次数），实测出现 1.67 > 1。
                       //   渲染成 % 会输出「1.7%」这种量级错误，故标「均值·次」。
                       label: '炸板均值',

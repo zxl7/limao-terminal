@@ -11,28 +11,28 @@ import { fmtFbt, n1, n2, pct, rangeLow, rangePct } from '../lib/format'
  * ## 这是全系统信息密度最高的一份数据
  *
  * 每日选股脚本把它一次性写出，包含：情绪环境 + 真实盘面 + 接力池 + 观察池 +
- * 早鸟埋伏 + 诊断计数 + 全局旁白。每一只入选的票都带 **70 余个字段** ——
+ * 早鸟埋伏 + 诊断计数 + 全局旁白。每一只入选的票都带 **70 余个项** ——
  * 包括逐维打分、预期区间、主力资金四段、筹码结构、历史同高度接力概率。
  *
- * ## 为什么只挑一部分字段展示
+ * ## 为什么只挑一部分项展示
  *
- * 70 个字段全铺开会长到没人看。本视图按「决策时会真正用到」筛选：
+ * 70 个项全铺开会长到没人看。本视图按「决策时会真正用到」筛选：
  *   ① 结果层：分数 / 排名 / 板数 / 涨幅 —— 这只票凭什么入选
  *   ② 可交易层：预期区间 / 换手 / 炸板 / 封单 —— 明天能不能买到、买到值不值
  *   ③ 结构层：主轴题材 / 带动家数 / 梯队等级 / 历史接力概率 —— 接力质量
  *   ④ 资金层：主力资金四段 + 筹码获利比例 —— 谁在买、成本在哪
- * 其余字段保留在 JSON 里备查，不占版面。
+ * 其余项保留在 JSON 里备查，不占版面。
  *
  * ## ⚠️ 两个必须显式提示的口径
  *
  * 1. `theme`（东财题材名）与 `core_theme`（脚本判定的主轴）**可能不同轴**。
  *    原系统铁律是「按个股真实主轴归类」，故两者并列展示而非二选一 ——
  *    差异本身即信号（标签与真实主线不符）。
- * 2. `price` 实测为 `null`（该字段在选股阶段未回填，价格由竞价阶段提供）。
+ * 2. `price` 实测为 `null`（该项在选股阶段未回填，价格由竞价阶段提供）。
  *    渲染成「—」而不是 0。
  */
 
-/** 接力池 / 观察池共用列定义 —— 两池字段完全同构，仅排名字段名不同 */
+/** 接力池 / 观察池共用列定义 —— 两池项完全同构，仅排名项名不同 */
 function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
   return [
     {
@@ -244,7 +244,7 @@ function poolColumns(rankKey: 'relay_rank' | 'watch_rank') {
   ]
 }
 
-/** 盘后候选卡按冻结总分展示；同分保留上游原顺序，原池内排名字段不被改写。 */
+/** 盘后候选卡按冻结总分展示；同分保留上游原顺序，原池内排名项不被改写。 */
 function byFrozenScore<T extends DossierStock>(rows: T[] | undefined): T[] {
   return [...(rows ?? [])].sort((a, b) => (b.score ?? -Infinity) - (a.score ?? -Infinity))
 }
@@ -306,14 +306,14 @@ export function DossierView({ d }: { d: DecisionDossier }) {
                   <StatPair label="下跌" value={real.breadth.down ?? '—'} tone="down" />
                 </>
               )}
-              <StatPair label="快照时间" value={real.ts?.slice(11, 19) ?? '—'} />
+              <StatPair label="数据时间" value={real.ts?.slice(11, 19) ?? '—'} />
             </div>
 
             {/* ── 双套情绪读数对照 —— 「脚本环境是否失真」的唯一证据 ── */}
             {real.feedback && (
               <div className="mt-2">
                 <div className="text-12 text-sub mb-1">
-                  情绪读数对照（左＝选股脚本自算 · 右＝盘中快照真实值）
+                  情绪读数对照（左＝选股脚本自算 · 右＝盘中数据真实值）
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5">
                   <Delta label="情绪分" script={env.sentiment_score} real={real.feedback.sentiment_score} />

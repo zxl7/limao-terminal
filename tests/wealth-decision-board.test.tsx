@@ -395,7 +395,7 @@ describe('TodayVerdict 今天买没买', () => {
     expect(container.textContent).toContain('-2.30%')
     expect(container.textContent).toContain('暂无报价')
     expect(container.textContent).toContain('快照')
-    expect(container.textContent).toContain('未落盘')
+    expect(container.textContent).toContain('未生成')
   })
 
   it('DecisionBoard 无档案也透传冻结名单和行情', () => {
@@ -404,7 +404,7 @@ describe('TodayVerdict 今天买没买', () => {
     const { container } = render(<DecisionBoard callFile={call} quotes={{ date: today, ts: `${today}T10:00:00+08:00`, call_available: true, missing: [], quotes: { '002388': { pct: 1.25, ts: `${today}T10:00:00+08:00`, source: 'market/latest' } } }} />)
     expect(container.textContent).toContain('+1.25%')
     expect(container.textContent).toContain('002388')
-    expect(container.textContent).toContain('本期决策档案未落盘')
+    expect(container.textContent).toContain('本期决策档案未生成')
   })
 
   it('竞价涨幅与异日行时间不得充当当前行情', () => {
@@ -426,7 +426,7 @@ describe('TodayVerdict 今天买没买', () => {
     expect(verdict.container.textContent).not.toContain('新亚制程')
     const card = render(<PoolLedgerCard callFile={call} ledger={{ ...ledger(), date: '2020-01-01' }} />)
     expect(card.container.textContent).toContain('冻结名称')
-    expect(card.container.textContent).toContain('今日收盘结算未落盘')
+    expect(card.container.textContent).toContain('今日收盘结算未生成')
     expect(card.container.textContent).not.toContain('+16.00%')
   })
 
@@ -446,9 +446,9 @@ describe('TodayVerdict 今天买没买', () => {
     expect(txt).toContain('+16.00%')
   })
 
-  it('裁决未落盘时明说，不猜', () => {
+  it('裁决未生成时明说，不猜', () => {
     const { container } = render(<TodayVerdict dossier={dossier()} />)
-    expect(container.textContent).toContain('今晨裁决未落盘')
+    expect(container.textContent).toContain('今晨裁决未生成')
   })
 })
 
@@ -472,7 +472,7 @@ describe('PoolLedgerCard 赚没赚', () => {
     // ⛔ 这里同时断表头文字：以后再插列会直接红，而不是静默断言到错的列。
     const head = container.querySelector('thead')?.textContent ?? ''
     expect(head).toContain('DEV')
-    // 2026-11-10：T+1 整列全空（次日未落盘）→ 整列不渲染；空列既占宽度又误导「今天是 0」
+    // 2026-11-10：T+1 整列全空（次日未生成）→ 整列不渲染；空列既占宽度又误导「今天是 0」
     expect(head).not.toContain('T+1')
     // ⛔ 按表头定位列，不写死下标：2026-11-10 起 T+1 空列会按需隐藏，下标会漂。
     const heads = [...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim() ?? '')
@@ -491,10 +491,10 @@ describe('PoolLedgerCard 赚没赚', () => {
     expect(txt).toContain('没过接力准入')
   })
 
-  it('未落盘时说清是「收盘未到」，不是 0 收益', () => {
+  it('未生成时说清是「收盘未到」，不是 0 收益', () => {
     const { container } = render(<PoolLedgerCard />)
     const txt = container.textContent ?? ''
-    expect(txt).toContain('未落盘')
+    expect(txt).toContain('未生成')
     expect(txt).toContain('不是')
   })
 })
@@ -637,9 +637,9 @@ describe('ScreenFunnel 全量过筛（诊断层）', () => {
     expect(txt).toContain('45')
   })
 
-  it('未落盘时明说，不伪造数字', () => {
+  it('未生成时明说，不伪造数字', () => {
     const { container } = render(<ScreenFunnel />)
-    expect(container.textContent).toContain('未落盘')
+    expect(container.textContent).toContain('未生成')
   })
 })
 
@@ -668,9 +668,9 @@ describe('DecisionBoard 版面顺序对回四个问题', () => {
     expect(txt).not.toContain('暂无数据')
   })
 
-  it('无档案时提示未落盘', () => {
+  it('无档案时提示未生成', () => {
     const { container } = render(<DecisionBoard />)
-    expect(container.textContent).toContain('未落盘')
+    expect(container.textContent).toContain('未生成')
   })
 
   it('⛔ 全量过筛不得出现在决策页（调参诊断层）', () => {
