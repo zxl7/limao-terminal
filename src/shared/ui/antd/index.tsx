@@ -71,4 +71,4 @@ export function AntdProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export { Table as AntTable } from 'antd'
+export { Table as AntTable, Drawer as AntDrawer, Descriptions as AntDescriptions, Tag as AntTag } from 'antd'

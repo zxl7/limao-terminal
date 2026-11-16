@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
 import { Tag } from '@/features/analytics'
-import { AntdProvider, AntTable } from '@/shared/ui/antd'
+import { AntDescriptions, AntdProvider, AntDrawer, AntTable } from '@/shared/ui/antd'
 import { boardsText } from '@/features/wealth/lib/format'
 import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
@@ -91,7 +91,7 @@ export function DecisionBoard({
  * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
  */
 export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
+  const [picked, setPicked] = useState<DecisionDossier['relay'][number] | null>(null)
   if (!dossier) {
     return (
       <div className="flex flex-col gap-3">
@@ -104,16 +104,6 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   const rows = [...relay, ...watch].filter(
     (s, i, arr) => arr.findIndex((x) => x.code === s.code) === i,
   )
-
-  const toggle = (row: DecisionDossier['relay'][number], key: string) => {
-    const next = new Set(open)
-    // 子级内容按「代码」存，避免行序变化后展开错行
-    if (next.has(row.code)) next.delete(row.code)
-    else next.add(row.code)
-    setOpen(next)
-    void key
-  }
-  void toggle
 
   return (
     <div className="flex flex-col gap-3">
@@ -141,14 +131,10 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             locale={{ emptyText: '本期无候选 —— 接力池留空是允许的结论，不是数据缺失' }}
             dataSource={rows as unknown as Array<Record<string, unknown>>}
             sticky
-            expandable={{
-              expandedRowRender: (r) => {
-                const row = r as unknown as DecisionDossier['relay'][number]
-                return <PlanDetail s={row} />
-              },
-              expandRowByClick: true,
-              rowExpandable: () => true,
-            }}
+            onRow={(r) => ({
+              onClick: () => setPicked(r as unknown as DecisionDossier['relay'][number]),
+              style: { cursor: 'pointer' },
+            })}
             columns={[
               {
                 title: '标的',
@@ -210,6 +196,17 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             ]}
           />
         </AntdProvider>
+
+        {/* 右侧抽屉：点行弹出这只票的完整明细（今日涨停事实 + 明日竞价预案） */}
+        <AntDrawer
+          open={!!picked}
+          onClose={() => setPicked(null)}
+          width={560}
+          title={picked ? `${picked.name}（${picked.code}） · 明日预案` : ''}
+          destroyOnClose
+        >
+          {picked && <PlanDetail s={picked} />}
+        </AntDrawer>
       </Card>
     </div>
   )
@@ -217,10 +214,8 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
 
 /** 二级：明天的竞价预案（区间 / 条件 / 金额 / 身位说明） */
 /**
- * 二级明细（2026-11-16）：
- * 1. **横排**（项目当列，一行值），不要竖排；
- * 2. **不重复**：板数/身位/封板/晋级率/涨停原因一级已有 → 这里不再列；
- * 3. 主题色 + Tag 全部用上。
+ * 抽屉详情（2026-11-16 用户选 B：一级表格 + 右侧抽屉）。
+ * 竖排分组：今日（涨停事实） / 明日（竞价预案），主题色 + Tag 沿用页面口径。
  */
 function PlanDetail({ s }: { s: DecisionDossier['relay'][number] }) {
   const r = s.expectation?.expected_range
@@ -230,78 +225,97 @@ function PlanDetail({ s }: { s: DecisionDossier['relay'][number] }) {
   const exp = s.expectation as
     | { expected_text?: string; super_text?: string; low_text?: string; phase?: string; confidence?: number }
     | undefined
+  const cp = (s as { conditional_promotion?: { quality?: string; rate?: number; n?: number } }).conditional_promotion
   const conf = exp?.confidence
 
-  const cell = (v: ReactNode) => <span className="text-12 whitespace-normal">{v}</span>
-  const cols = [
+  const today: DetailRow[] = [
     {
-      title: '方向',
-      width: 150,
-      render: () =>
-        cell(
-          <span>
-            <Tag tone="up">{s.core_theme || s.theme || '—'}</Tag>
-            <span className="text-sub ml-1">
-              {s.theme_mates_cnt ? `同题材 ${s.theme_mates_cnt} 家` : '独苗'}
-            </span>
-          </span>,
+      k: '方向',
+      v: () => (
+        <span className="flex flex-wrap items-center gap-1">
+          <Tag tone="up">{s.core_theme || s.theme || '—'}</Tag>
+          <span className="text-sub">{s.theme_mates_cnt ? `同题材 ${s.theme_mates_cnt} 家` : '独苗'}</span>
+        </span>
+      ),
+    },
+    { k: '身位', v: () => (s.dragon_rank == null ? '—' : `方向内第 ${s.dragon_rank}`) },
+    {
+      k: '封板',
+      v: () =>
+        `${s.cje_yi == null ? '—' : `${s.cje_yi.toFixed(2)} 亿`}` +
+        `${s.seal_ratio_pct != null ? ` · 占流通 ${s.seal_ratio_pct.toFixed(2)}%` : ''}`,
+    },
+    {
+      k: '晋级率',
+      v: () =>
+        cp?.quality === 'ok' && cp.rate != null ? (
+          <span className={cn('num', cp.rate >= 30 ? 'text-up' : 'text-warn')}>
+            {cp.rate.toFixed(1)}%（样本 {cp.n} 次）
+          </span>
+        ) : (
+          <span className="text-sub">样本不足</span>
         ),
     },
+    { k: '涨停原因', v: () => <span className="text-txt">{s.limit_up_reason || '—'}</span> },
+    { k: '带动', v: () => (s.carry_cnt ? `${s.carry_cnt} 家` : '—') },
+  ]
+
+  const tomorrow: DetailRow[] = [
     {
-      title: '带动',
-      width: 80,
-      align: 'right' as const,
-      render: () => cell(<span className="num">{s.carry_cnt ? `${s.carry_cnt} 家` : '—'}</span>),
+      k: '竞价落在',
+      v: () => (
+        <b className="num text-warn">
+          {lo != null && hi != null ? `${lo.toFixed(1)}% ~ ${hi.toFixed(1)}%` : '未给出'}
+        </b>
+      ),
+    },
+    { k: '什么情况下买', v: () => <span className="text-txt">{buyCondition(s)}</span> },
+    {
+      k: '竞价额要够',
+      v: () => (
+        <b className="num text-rec">{typeof amt === 'number' && amt > 0 ? `${amt.toFixed(2)} 亿` : '—'}</b>
+      ),
+    },
+    { k: '正常预期', v: () => <span className="text-sub">{exp?.expected_text || '—'}</span> },
+    { k: '超预期', v: () => <span className="text-up">{exp?.super_text || '—'}</span> },
+    { k: '低于预期', v: () => <span className="text-down">{exp?.low_text || '—'}</span> },
+    {
+      k: '情绪阶段',
+      v: () => (exp?.phase ? <Tag tone="warn">{exp.phase}</Tag> : <span className="text-sub">—</span>),
     },
     {
-      title: '竞价落在',
-      width: 110,
-      align: 'right' as const,
-      render: () =>
-        cell(
-          <b className="num text-warn">
-            {lo != null && hi != null ? `${lo.toFixed(1)}% ~ ${hi.toFixed(1)}%` : '未给出'}
-          </b>,
-        ),
+      k: '置信度',
+      v: () => (
+        <span className={cn('num', (conf ?? 0) >= 0.7 ? 'text-up' : 'text-sub')}>
+          {conf == null ? '—' : conf.toFixed(2)}
+        </span>
+      ),
     },
-    { title: '什么情况下买', width: 260, render: () => cell(<span className="text-txt">{buyCondition(s)}</span>) },
-    {
-      title: '竞价额要够',
-      width: 100,
-      align: 'right' as const,
-      render: () => cell(<b className="num text-rec">{typeof amt === 'number' && amt > 0 ? `${amt.toFixed(2)} 亿` : '—'}</b>),
-    },
-    {
-      title: '情绪阶段',
-      width: 90,
-      render: () => cell(exp?.phase ? <Tag tone="warn">{exp.phase}</Tag> : <span className="text-sub">—</span>),
-    },
-    {
-      title: '置信度',
-      width: 80,
-      align: 'right' as const,
-      render: () =>
-        cell(
-          <span className={cn('num', (conf ?? 0) >= 0.7 ? 'text-up' : 'text-sub')}>
-            {conf == null ? '—' : conf.toFixed(2)}
-          </span>,
-        ),
-    },
-    { title: '正常预期', width: 220, render: () => cell(<span className="text-sub">{exp?.expected_text || '—'}</span>) },
-    { title: '超预期', width: 200, render: () => cell(<span className="text-up">{exp?.super_text || '—'}</span>) },
-    { title: '低于预期', width: 200, render: () => cell(<span className="text-down">{exp?.low_text || '—'}</span>) },
   ]
 
   return (
-    <AntTable
-      rowKey={() => 'detail'}
+    <div className="flex flex-col gap-3">
+      <DetailGroup title="今日 · 涨停事实" rows={today} />
+      <DetailGroup title="明日 · 竞价预案" rows={tomorrow} />
+    </div>
+  )
+}
+
+interface DetailRow {
+  k: string
+  v: () => ReactNode
+}
+
+/** 抽屉里的分组明细块（组件外定义，避免 render 期创建组件） */
+function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
+  return (
+    <AntDescriptions
+      title={<span className="text-12 font-semibold text-txt">{title}</span>}
+      column={1}
       size="small"
       bordered
-      pagination={false}
-      showHeader
-      dataSource={[s]}
-      scroll={{ x: 'max-content' }}
-      columns={cols}
+      labelStyle={{ width: 96, background: '#fafbfd', color: '#6b7280' }}
+      items={rows.map((row, i) => ({ key: String(i), label: row.k, children: row.v() }))}
     />
   )
 }

@@ -665,17 +665,14 @@ describe('DecisionBoard 版面顺序对回四个问题', () => {
     for (const k of ['标的', '板数', '身位', '封板', '晋级率', '涨停原因']) {
       expect(mt, `缺一级列：${k}`).toContain(k)
     }
-    // 二级内容未展开前不该出现（「竞价额要够」只在子级里）
-    expect(mt).not.toContain('竞价额要够')
-    // 点开第一行 → 子级出现
-    // antd 表格首行是测宽用的隐藏行，要点真正的数据行 / 展开图标
-    const firstRow =
-      tomorrow.container.querySelector('.ant-table-row') ??
-      tomorrow.container.querySelector('.ant-table-row-expand-icon')
+    // 点一行 → 右侧抽屉打开，出现「今日 / 明日」两组明细
+    const firstRow = tomorrow.container.querySelector('.ant-table-row')
     expect(firstRow).toBeTruthy()
     fireEvent.click(firstRow as HTMLElement)
     await waitFor(() => {
-      expect(tomorrow.container.textContent ?? '').toContain('竞价额要够')
+      const doc = document.body.textContent ?? ''
+      expect(doc).toContain('明日 · 竞价预案')
+      expect(doc).toContain('竞价额要够')
     })
   })
 
