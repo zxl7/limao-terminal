@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
-import { DataTable } from '@/features/analytics'
+import { AntdProvider, AntTable } from '@/shared/ui/antd'
 import { boardsText } from '@/features/wealth/lib/format'
 import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
@@ -131,82 +131,95 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
           这份是 <b className="text-txt">{dossier.date}</b> 收盘后写的，等下一次收盘再刷新；
           买卖结论要到明早 9:25 竞价后统一裁。
         </p>
-        <DataTable
-          rows={rows}
-          rowKey={(r) => r.code}
-          dense
-          stickyHeader
-          empty="本期无候选 —— 接力池留空是允许的结论，不是数据缺失"
-          expandedKeys={open}
-          onToggleRow={(row) => {
-            const next = new Set(open)
-            if (next.has(row.code)) next.delete(row.code)
-            else next.add(row.code)
-            setOpen(next)
-          }}
-          renderExpanded={(r) => (
-            <div className="flex flex-col gap-2">
-              {/* 原始卡片全量数据（方向/身位/封板/…），先全部保留，按用户要求后面再删 */}
-              <PickCard
-                stock={r}
-                bucket={r.watch_group ? 'watch' : 'relay'}
-                rank={r.relay_rank ?? r.watch_rank ?? undefined}
-                marketMaxBoards={dossier.market_max_boards}
-              />
-              <PlanDetail s={r} />
-            </div>
-          )}
-          columns={[
-            {
-              label: '标的',
-              cell: (r) => (
-                <span className="flex items-baseline gap-1.5">
-                  <span className="text-txt font-semibold">{r.name}</span>
-                  <span className="num text-11 text-sub">{r.code}</span>
-                  {r.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
-                </span>
-              ),
-            },
-            { label: '板数', num: true, cell: (r) => boardsText(r.boards) },
-            {
-              label: '身位',
-              num: true,
-              cell: (r) =>
-                r.dragon_rank == null ? <span className="text-sub">—</span> : `第 ${r.dragon_rank}`,
-            },
-            {
-              label: '封板',
-              num: true,
-              cell: (r) => (
-                <span className="text-sub">
-                  {r.cje_yi == null ? '—' : `${r.cje_yi.toFixed(2)} 亿`}
-                  {r.seal_ratio_pct != null ? ` · 占流通 ${r.seal_ratio_pct.toFixed(2)}%` : ''}
-                </span>
-              ),
-            },
-            {
-              label: '晋级率',
-              num: true,
-              cell: (r) => {
-                const cp = (r as { conditional_promotion?: { quality?: string; rate?: number } }).conditional_promotion
-                const rate = cp?.rate
-                const ok = cp?.quality === 'ok'
+        <AntdProvider>
+          <AntTable
+            rowKey="code"
+            size="small"
+            bordered
+            pagination={false}
+            locale={{ emptyText: '本期无候选 —— 接力池留空是允许的结论，不是数据缺失' }}
+            dataSource={rows as unknown as Array<Record<string, unknown>>}
+            sticky
+            expandable={{
+              expandedRowRender: (r) => {
+                const row = r as unknown as DecisionDossier['relay'][number]
                 return (
-                  <span className={cn('num', !ok ? 'text-sub' : (rate ?? 0) >= 30 ? 'text-up' : 'text-warn')}>
-                    {ok && rate != null ? `${rate.toFixed(1)}%` : '—'}
-                  </span>
+                  <div className="flex flex-col gap-2">
+                    {/* 原卡片全量（方向/身位/封板/原因…），按用户要求先全部保留 */}
+                    <PickCard
+                      stock={row}
+                      bucket={row.watch_group ? 'watch' : 'relay'}
+                      rank={row.relay_rank ?? row.watch_rank ?? undefined}
+                      marketMaxBoards={dossier.market_max_boards}
+                    />
+                    <PlanDetail s={row} />
+                  </div>
                 )
               },
-            },
-            {
-              label: '涨停原因',
-              className: 'whitespace-normal min-w-[260px]',
-              cell: (r) => (
-                <span className="text-sub text-12">{r.limit_up_reason || '—'}</span>
-              ),
-            },
-          ]}
-        />
+              expandRowByClick: true,
+              rowExpandable: () => true,
+            }}
+            columns={[
+              {
+                title: '标的',
+                dataIndex: 'name',
+                render: (_v, r) => {
+                  const row = r as unknown as DecisionDossier['relay'][number]
+                  return (
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="text-txt font-semibold">{row.name}</span>
+                      <span className="num text-11 text-sub">{row.code}</span>
+                      {row.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
+                    </span>
+                  )
+                },
+              },
+              { title: '板数', dataIndex: 'boards', align: 'right', width: 72, render: (v) => boardsText(Number(v)) },
+              {
+                title: '身位',
+                dataIndex: 'dragon_rank',
+                align: 'right',
+                width: 72,
+                render: (v) => (v == null ? <span className="text-sub">—</span> : `第 ${v}`),
+              },
+              {
+                title: '封板',
+                align: 'right',
+                width: 190,
+                render: (_v, r) => {
+                  const row = r as unknown as DecisionDossier['relay'][number]
+                  return (
+                    <span className="text-sub">
+                      {row.cje_yi == null ? '—' : `${row.cje_yi.toFixed(2)} 亿`}
+                      {row.seal_ratio_pct != null ? ` · 占流通 ${row.seal_ratio_pct.toFixed(2)}%` : ''}
+                    </span>
+                  )
+                },
+              },
+              {
+                title: '晋级率',
+                align: 'right',
+                width: 90,
+                render: (_v, r) => {
+                  const row = r as unknown as DecisionDossier['relay'][number]
+                  const cp = (row as { conditional_promotion?: { quality?: string; rate?: number } }).conditional_promotion
+                  const ok = cp?.quality === 'ok'
+                  const rate = cp?.rate
+                  return (
+                    <span className={cn('num', !ok ? 'text-sub' : (rate ?? 0) >= 30 ? 'text-up' : 'text-warn')}>
+                      {ok && rate != null ? `${rate.toFixed(1)}%` : '—'}
+                    </span>
+                  )
+                },
+              },
+              {
+                title: '涨停原因',
+                dataIndex: 'limit_up_reason',
+                render: (v) => <span className="text-sub text-12">{String(v || '—')}</span>,
+              },
+            ]}
+          />
+        </AntdProvider>
       </Card>
     </div>
   )

@@ -27,10 +27,12 @@
     "dev:bundle": "vite"
   },
   "dependencies": {
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
     "@skyroc/tailwind-plugin": "^1.0.0",
     "@skyroc/web-ui": "^0.2.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.102.8",
+    "antd": "^6.7.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.3.1",
