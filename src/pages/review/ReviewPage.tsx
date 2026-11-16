@@ -16,6 +16,9 @@ import { parseEvolution, parseOutlook, splitLabeled } from '@/features/review/se
  * 数据：`/api/review/panel`（当日五块）+ `/api/review/series`（多日序列）。
  * ⛔ 只呈现，不在前端二次推断。
  */
+/** 页面加载当天（模块级：避免渲染期调用 Date.now 触发 React purity 规则） */
+const BOOT_DAY = new Date().toISOString().slice(0, 10)
+
 export async function loader() {
   await Promise.allSettled([
     queryClient.ensureQueryData({ queryKey: ['review', 'panel'] as const, queryFn: api.reviewPanel }),
@@ -43,6 +46,8 @@ export function Component() {
     )
   }
 
+  // 「数据生成于」不是今天 → 标黄，提示可能没更新（⛔ 渲染期不调 Date.now，用模块级常量）
+  const staleDay = !!d.generated_at && d.generated_at.slice(0, 10) !== BOOT_DAY
   const risk = d.dump_risk ?? d.risk
   const m = d.money
   const hb = d.high_board
@@ -74,7 +79,16 @@ export function Component() {
       {/* ① 一行速览：风险 + 关键数字 + 信号 chips（删除单独的「风险卡/赚钱效应卡」，避免重复） */}
       <Card
         title={`🧭 ${cnDate(d.date)}复盘`}
-        extra={<CardBadge>{d.prev ? `对比 ${d.prev}` : '当日'}</CardBadge>}
+        extra={
+          <span className="flex items-center gap-1.5">
+            {d.generated_at && (
+              <CardBadge tone={staleDay ? 'warn' : 'neutral'}>
+                数据生成于 {d.generated_at.slice(5, 16)}{staleDay ? ' · 不是今天的' : ''}
+              </CardBadge>
+            )}
+            <CardBadge>{d.prev ? `对比 ${d.prev}` : '当日'}</CardBadge>
+          </span>
+        }
       >
         <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-2">

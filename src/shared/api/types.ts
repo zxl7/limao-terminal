@@ -3961,6 +3961,8 @@ export interface ReviewLadderRow {
 }
 export interface ReviewPanel {
   date: string
+  /** 生成时间（2026-11-16）：前端标「数据生成于 X」，避免把旧数据当今天 */
+  generated_at?: string
   prev: string | null
   risk: ReviewRisk
   dump_risk?: ReviewRisk
