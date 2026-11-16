@@ -110,15 +110,6 @@ function tagsOf(s: DecisionDossier['relay'][number]): Array<{ label: string; ton
   const out: Array<{ label: string; tone: Tone }> = []
   if (!e) return out
 
-  const ar = e.amount_ratio
-  if (Array.isArray(ar) && ar.length >= 2) {
-    const hiPct = Math.round(ar[1] * 100)
-    out.push(
-      hiPct <= 10
-        ? { label: `温和放量 ${Math.round(ar[0] * 100)}~${hiPct}%`, tone: 'neutral' }
-        : { label: `放量 ${Math.round(ar[0] * 100)}~${hiPct}%`, tone: 'warn' },
-    )
-  }
   if (e.boom_label) out.push({ label: e.boom_label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ''), tone: 'up' })
   if (e.seal_form) out.push({ label: e.seal_form, tone: e.seal_form.includes('一字') ? 'up' : 'warn' })
   if (e.sector_tier === 'dragon') out.push({ label: '板块龙', tone: 'rec' })
