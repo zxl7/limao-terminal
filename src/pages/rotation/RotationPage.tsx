@@ -136,6 +136,10 @@ function themeLifecycle(c: RotationCandidate): ThemeLifecycle {
 export function Component() {
   const rot = useQuery(marketQueries.rotation())
   const d = rot.data
+  // 大盘上下文是「参考态」时（接口不全/超时），情绪/核按钮只是参考值，⛔ 不能当实时读数
+  const ctx = d?.market_context as { reference_only?: boolean; age_seconds?: number } | undefined
+  const ctxRef = Boolean(ctx?.reference_only)
+  const ctxAge = ctx?.age_seconds ? Math.max(1, Math.round(ctx.age_seconds / 60)) : 0
   const [tab, setTab] = useState<'reflow' | 'trend' | 'flow' | 'avoid'>('reflow')
 
   /** 候选列表：`d?.candidates ?? []` 每次渲染都会生成新数组，故显式 memo 稳定引用 */
@@ -227,7 +231,7 @@ export function Component() {
           <CardBadge
             tone={sentiment == null ? 'neutral' : sentiment >= 6 ? 'up' : sentiment <= 2 ? 'down' : 'neutral'}
           >
-            轮动快照 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}
+            轮动快照 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}{ctxRef ? ` · 大盘参考态 ${ctxAge} 分钟前` : ''}
           </CardBadge>
         }
       >
@@ -238,9 +242,9 @@ export function Component() {
           <StatPair label="等待确认" value={stageCounts.confirm} tone="rec" />
           <StatPair label="已启动" value={stageCounts.started} tone="warn" />
           <StatPair label="回流失效" value={stageCounts.invalid} tone="down" />
-          <StatPair label="晋级率" value={mc ? `${n1(mc.promote_rate)}%` : '—'} />
+          <StatPair label={ctxRef ? '晋级率(参考)' : '晋级率'} value={mc ? `${n1(mc.promote_rate)}%` : '—'} />
           <StatPair
-            label="核按钮"
+            label={ctxRef ? '核按钮(参考)' : '核按钮'}
             value={mc?.nuke_count ?? '—'}
             tone={(mc?.nuke_count ?? 0) >= 3 ? 'down' : 'sub'}
           />
