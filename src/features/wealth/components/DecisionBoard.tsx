@@ -5,6 +5,7 @@ import { boardsText } from '@/features/wealth/lib/format'
 import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { buyCondition } from './BuyPlan'
+import { PickCard } from './PickCard'
 import { EnvPanel } from './EnvPanel'
 import { PoolLedgerCard } from './PoolLedgerCard'
 import { TodayVerdict } from './TodayVerdict'
@@ -142,7 +143,18 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             else next.add(row.code)
             setOpen(next)
           }}
-          renderExpanded={(r) => <PlanDetail s={r} />}
+          renderExpanded={(r) => (
+            <div className="flex flex-col gap-2">
+              {/* 原始卡片全量数据（方向/身位/封板/…），先全部保留，按用户要求后面再删 */}
+              <PickCard
+                stock={r}
+                bucket={r.watch_group ? 'watch' : 'relay'}
+                rank={r.relay_rank ?? r.watch_rank ?? undefined}
+                marketMaxBoards={dossier.market_max_boards}
+              />
+              <PlanDetail s={r} />
+            </div>
+          )}
           columns={[
             {
               label: '标的',
