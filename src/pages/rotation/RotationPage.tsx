@@ -59,18 +59,18 @@ function rotationStage(c: RotationCandidate): RotationStage {
   const started = c.today_hot || f.phase === 'boom'
 
   if (capitalWeak || f.market === false || c.zt_dir === 'falling') {
-    return { key: 'invalid', label: '回流失效', tone: 'down', action: '不介入', reason: '资金转弱、市场拖累或涨停方向转弱' }
+    return { key: 'invalid', label: '已经不成立', tone: 'down', action: '不买', reason: '钱在撤、大盘拖累，或涨停家数在减少' }
   }
   if (started) {
-    return { key: 'started', label: '已启动', tone: 'warn', action: '只跟踪', reason: '题材已爆发或今日已动，不再属于提前埋伏' }
+    return { key: 'started', label: '已经启动', tone: 'warn', action: '只观察', reason: '今天已经涨起来了，错过了提前布局的位置' }
   }
   if (klineMissing || f.capital === 'no_data') {
-    return { key: 'incomplete', label: '数据待补', tone: 'neutral', action: '不介入', reason: '资金或K线证据缺失，不能把未知当作止跌' }
+    return { key: 'incomplete', label: '数据不够', tone: 'neutral', action: '不买', reason: '资金或走势数据缺失，没看清就不动手' }
   }
   if (capitalReady && klineReady && c.catalyst_fresh && f.market === true) {
-    return { key: 'ambush', label: '埋伏就绪', tone: 'up', action: '候选优先', reason: '资金转入、K线止跌、催化新鲜，尚未启动' }
+    return { key: 'ambush', label: '可以提前布局', tone: 'up', action: '优先看', reason: '钱回来了、走势止跌、消息也新，但还没启动' }
   }
-  return { key: 'confirm', label: '等待确认', tone: 'rec', action: '观察', reason: '尚缺新催化、资金转入、K线止跌或大盘配合中的至少一项' }
+  return { key: 'confirm', label: '还要再看', tone: 'rec', action: '观察', reason: '钱、走势、消息、大盘这几项里还差至少一项' }
 }
 
 const STAGE_ORDER: Record<RotationStage['key'], number> = {
@@ -82,7 +82,7 @@ const STAGE_ORDER: Record<RotationStage['key'], number> = {
 }
 
 /**
- * 题材生命周期只解释题材所处位置；`RotationStage` 单独回答当前是否值得放进埋伏漏斗。
+ * 题材走到哪了只解释题材所处位置；`RotationStage` 单独回答当前是否值得放进埋伏漏斗。
  * 两者不混用，避免把“爆发扩散”误读成“可提前埋伏”。
  */
 type ThemeLifecycle = {
@@ -110,13 +110,13 @@ function themeLifecycle(c: RotationCandidate): ThemeLifecycle {
   const capitalWeak = ['inflow_fading', 'outflow_widening', 'outflow'].includes(f.capital)
 
   if (capitalWeak || f.market === false || c.zt_dir === 'falling' || phase === 'dead' || phase === 'no-reentry') {
-    return { key: 'fade', label: '退潮失效', tone: 'down', description: '资金撤离或方向走弱，退出轮动观察' }
+    return { key: 'fade', label: '已经结束', tone: 'down', description: '资金撤了、方向也弱了，不再看' }
   }
   if (phase === 'boom') {
-    return { key: 'boom', label: '爆发扩散', tone: 'warn', description: '板块已集中走强，只跟踪强度与分歧' }
+    return { key: 'boom', label: '正热', tone: 'warn', description: '板块已经集中走强，只跟踪还热不热' }
   }
   if (phase === '分歧' || phase === 'cooling') {
-    return { key: 'cooling', label: '分歧冷却', tone: 'neutral', description: '热度回落，等待止跌和资金回流' }
+    return { key: 'cooling', label: '开始降温', tone: 'neutral', description: '热度下来了，等它止跌、等钱回来' }
   }
   if (phase === 're-entry-candidate') {
     if (stage.key === 'ambush') {
@@ -125,10 +125,10 @@ function themeLifecycle(c: RotationCandidate): ThemeLifecycle {
     if (c.today_hot) {
       return { key: 'reflow-confirm', label: '回流确认', tone: 'rec', description: '已有价格响应，验证是否形成新一轮扩散' }
     }
-    return { key: 'reflow-watch', label: '回流观察', tone: 'rec', description: '原主线出现回流线索，等待关键证据补齐' }
+    return { key: 'reflow-watch', label: '可能回来', tone: 'rec', description: '老主线有了回来的迹象，还差临门一脚' }
   }
   if (c.today_hot || c.zt_dir === 'new' || c.zt_dir === 'rising') {
-    return { key: 'start', label: '启动试盘', tone: 'rec', description: '出现初始价格响应，尚未确认爆发扩散' }
+    return { key: 'start', label: '刚开始动', tone: 'rec', description: '价格有反应，但还没确认真的起来' }
   }
   return { key: 'potential', label: '酝酿潜伏', tone: 'neutral', description: '题材仍在沉淀，暂不形成介入结论' }
 }
@@ -237,19 +237,19 @@ export function Component() {
       >
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
           <StatPair label="数据日" value={d?.date ?? '—'} />
-          <StatPair label="回流候选" value={candidates.length} />
-          <StatPair label="埋伏就绪" value={stageCounts.ambush} tone="up" />
-          <StatPair label="等待确认" value={stageCounts.confirm} tone="rec" />
-          <StatPair label="已启动" value={stageCounts.started} tone="warn" />
-          <StatPair label="回流失效" value={stageCounts.invalid} tone="down" />
+          <StatPair label="可能回来的题材" value={candidates.length} />
+          <StatPair label="可以提前布局" value={stageCounts.ambush} tone="up" />
+          <StatPair label="还要再看" value={stageCounts.confirm} tone="rec" />
+          <StatPair label="已经启动" value={stageCounts.started} tone="warn" />
+          <StatPair label="已经不成立" value={stageCounts.invalid} tone="down" />
           <StatPair label={ctxRef ? '晋级率(参考)' : '晋级率'} value={mc ? `${n1(mc.promote_rate)}%` : '—'} />
           <StatPair
             label={ctxRef ? '核按钮(参考)' : '核按钮'}
             value={mc?.nuke_count ?? '—'}
             tone={(mc?.nuke_count ?? 0) >= 3 ? 'down' : 'sub'}
           />
-          <StatPair label="对齐天数" value={d?.data_meta?.aligned_days ?? '—'} />
-          <StatPair label="窗口" value={d?.data_meta?.window ?? '—'} />
+          <StatPair label="有多少天数据" value={d?.data_meta?.aligned_days ?? '—'} />
+          <StatPair label="覆盖范围" value={d?.data_meta?.window ?? '—'} />
           <StatPair label="涨停源" value={d?.data_meta?.zt_source ?? '—'} />
         </div>
         {d?.note && <p className="text-sub text-12 leading-relaxed">{d.note}</p>}
@@ -269,10 +269,10 @@ export function Component() {
         extra={
           <SegTabs
             items={[
-              { key: 'reflow', label: `埋伏漏斗 (${sorted.length})` },
-              { key: 'trend', label: `涨停趋势 (${d?.sector_zt_trends?.length ?? 0})` },
-              { key: 'flow', label: '5日资金' },
-              { key: 'avoid', label: `规避 (${d?.avoidance_sweep?.length ?? 0})` },
+              { key: 'reflow', label: `可能回来的 (${sorted.length})` },
+              { key: 'trend', label: `涨停家数变化 (${d?.sector_zt_trends?.length ?? 0})` },
+              { key: 'flow', label: '近 5 日资金' },
+              { key: 'avoid', label: `要回避的 (${d?.avoidance_sweep?.length ?? 0})` },
             ]}
             value={tab}
             onChange={(k) => setTab(k as typeof tab)}
@@ -299,8 +299,8 @@ export function Component() {
             ))}
             {sorted.length > 0 && (
               <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5">
-                铁律：观察池的题材标签不可直接采信 —— 须按个股**真实主轴**核对（如通信 / CPO 算力票
-                通常不会被题材名准确覆盖）。板块归属已并列展示供核对。
+                提醒：题材名只是标签，不等于这只票真正在炒什么。
+                比如通信、算力票常被挂到别的题材下 —— 下单前请对一眼个股本身的业务。
               </p>
             )}
           </div>
@@ -349,13 +349,12 @@ export function Component() {
                   ))}
                 </div>
                 <p className="text-sub text-11 mt-1.5 leading-relaxed">
-                  折线着色按方向（<b className="text-up">红=升温</b> / <b className="text-down">绿=降温</b> /
-                  <b className="text-txt"> 灰=走平</b>），与表格「方向」列同源。
-                  形状比数字更易辨：<b className="text-txt">持续爬升</b>=题材在扩散，
-                  <b className="text-txt"> 单根尖峰</b>=一日游，
-                  <b className="text-txt"> 逐日衰减</b>=资金撤离。
-                  <b className="text-txt"> 序列中间的缺口是断线</b> —— `zt_series` 里的 null 表示该日无有效数据，
-                  不补 0（补 0 会画出一个并不存在的「归零」）。
+                  看形状比看数字快：<b className="text-up">红线往上</b>＝这条线在变热，
+                  <b className="text-down">绿线往下</b>＝在退烧，<b className="text-txt">灰线</b>＝没变化。
+                  <b className="text-txt">一路爬升</b>＝参与的人在变多；
+                  <b className="text-txt">只冒一根尖</b>＝一日游；
+                  <b className="text-txt">一天比一天少</b>＝钱在撤。
+                  线上<b className="text-txt">中间断开</b>＝那天没有可用数据（不是跌到 0）。
                 </p>
               </div>
             )}
@@ -555,19 +554,19 @@ function ThemeLibraryCard() {
 /** 生命周期总览：按时间顺序呈现，数值为当前候选落在该阶段的数量。 */
 function ThemeLifecycleFunnel({ counts }: { counts: Record<ThemeLifecycle['key'], number> }) {
   const steps: ThemeLifecycle[] = [
-    { key: 'potential', label: '酝酿潜伏', tone: 'neutral', description: '沉淀' },
+    { key: 'potential', label: '还没动静', tone: 'neutral', description: '在底部待着' },
     { key: 'start', label: '启动试盘', tone: 'rec', description: '试强' },
     { key: 'boom', label: '爆发扩散', tone: 'warn', description: '扩散' },
-    { key: 'cooling', label: '分歧冷却', tone: 'neutral', description: '降温' },
+    { key: 'cooling', label: '开始降温', tone: 'neutral', description: '热度在退' },
     { key: 'reflow-watch', label: '回流观察', tone: 'rec', description: '等证据' },
-    { key: 'reflow-ambush', label: '回流埋伏', tone: 'up', description: '优先候选' },
-    { key: 'reflow-confirm', label: '回流确认', tone: 'rec', description: '验扩散' },
+    { key: 'reflow-ambush', label: '可以埋伏', tone: 'up', description: '优先看' },
+    { key: 'reflow-confirm', label: '确认回来了', tone: 'rec', description: '看能不能扩散' },
     { key: 'fade', label: '退潮失效', tone: 'down', description: '退出' },
   ]
 
   return (
     <div className="border border-line rounded-sm px-2.5 py-2">
-      <div className="text-12 font-semibold mb-1.5">题材生命周期</div>
+      <div className="text-12 font-semibold mb-1.5">题材走到哪了</div>
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5">
         {steps.map((step, index) => (
           <span key={step.key} className="inline-flex items-center gap-1">
@@ -580,7 +579,7 @@ function ThemeLifecycleFunnel({ counts }: { counts: Record<ThemeLifecycle['key']
         ))}
       </div>
       <p className="text-sub text-11 leading-relaxed mt-1.5">
-        “回流埋伏”需同时满足资金转入、K线止跌、催化新鲜、大盘配合且尚未启动；“回流确认”已有价格响应，等待扩散验证。
+        想“提前布局”，要同时满足四件事：钱在回来、走势止跌、消息是新的、大盘不拖后腿，而且还没真正启动；已经有了价格反应的，就进入“确认回来了”，看能不能扩散。
       </p>
     </div>
   )
