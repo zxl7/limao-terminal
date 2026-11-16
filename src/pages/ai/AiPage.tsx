@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, fetchRoute, queryClient } from '@/shared/api'
-import type { AiTiltState } from '@/shared/api'
+import { fetchRoute, queryClient } from '@/shared/api'
 import { SectorGapView } from '@/pages/sector-gap/SectorGapPage'
 import { ExecutionAuditView } from '@/pages/execution-audit/ExecutionAuditPage'
 import { AmbushView } from '@/pages/ambush/AmbushPage'
@@ -436,7 +435,6 @@ export function AiWealthView() {
       {/* ① 今日决策 = 一天的完整决策链（该不该做 → 什么环境 → 筛掉谁 → 选了什么 → 怎么买） */}
       {tab === 'board' && (
         <>
-          <AiTiltCard />
           <DecisionBoard dossier={dossier} callFile={callFile} ledger={ledger} quotes={quotes.data} screen={screenFile} />
           {/* 竞价现场（原独立 tab）——与 DecisionBoard 的「今晨竞价」同源，合到一处看 */}
           <Card
@@ -732,54 +730,3 @@ export function TomorrowView() {
   return <TomorrowBoard dossier={latest} />
 }
 
-/**
- * 🧠 智能层状态（2026-11-11 用户「在财富密码对应模块记录数据维度和迭代情况」）
- *
- * 只显示三件事，⛔ 不做开关（开关在环境变量 `AI_TILT_MODE`，由交易员判断）：
- *   ① 当前模型与运行模式（shadow = 只建议不执行）；
- *   ② **数据维度**（12 维特征名）；
- *   ③ **迭代记录**（每次训练的样本/AUC，看它是怎么变过来的）。
- */
-function AiTiltCard() {
-  const q = useQuery<AiTiltState>({
-    queryKey: ['ai-tilt'],
-    queryFn: () => api.aiTilt(),
-    retry: 1,
-  })
-  const d = q.data
-  if (!d) return null
-  return (
-    <Card
-      title="🧠 智能层"
-      extra={<CardBadge tone="rec">{d.mode} · {d.model}</CardBadge>}
-    >
-      <div className="flex flex-col gap-1.5 text-12">
-        <div className="text-sub">
-          验证 AUC <span className="num text-txt">{d.auc_valid}</span>
-          （训练 <span className="num">{d.auc_train}</span>）· 样本{" "}
-          <span className="num">{d.samples}</span> · 窗口 {d.window?.[0]} ~ {d.window?.[1]}
-        </div>
-        <div className="text-11 leading-relaxed text-sub">
-          <span className="text-txt">数据维度（{d.features.length}）</span>：{d.features.join(" · ")}
-        </div>
-        {d.iterations?.length > 0 && (
-          <div className="mt-1">
-            <div className="text-11 text-sub mb-0.5">迭代记录（最近 {Math.min(d.iterations.length, 5)} 次）</div>
-            <div className="flex flex-col gap-0.5">
-              {d.iterations.slice(-5).reverse().map((it) => (
-                <div key={it.version} className="flex flex-wrap items-baseline gap-x-2 text-11 text-sub">
-                  <span className="num text-txt">{it.version}</span>
-                  <span className="num">{it.n_features} 维</span>
-                  <span className="num">{it.samples} 样本</span>
-                  <span>AUC 验证 <span className="num text-txt">{it.auc_valid}</span></span>
-                  <span className="num">{it.at}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="text-11 text-sub">{d.note}</div>
-      </div>
-    </Card>
-  )
-}
