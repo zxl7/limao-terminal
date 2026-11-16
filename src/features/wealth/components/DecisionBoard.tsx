@@ -90,6 +90,46 @@ export function DecisionBoard({
  * 内容：明日标的（每只票都给「什么情况下买」）+ 接力池 + 观察（明早竞价判）。
  * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
  */
+/**
+ * 标签：从预期数据里读出这只票的「性格」（2026-11-16 用户：「可以再添加一些 tag，比如温和放量」）。
+ * ⛔ 全部来自已有字段；认不出就不打标签。
+ */
+type Tone = 'up' | 'down' | 'warn' | 'rec' | 'neutral'
+
+function tagsOf(s: DecisionDossier['relay'][number]): Array<{ label: string; tone: Tone }> {
+  const e = s.expectation as
+    | {
+        seal_form?: string
+        sector_tier?: string
+        amount_ratio?: number[]
+        gap_strength_hint?: string
+        boom_label?: string
+        phase?: string
+      }
+    | undefined
+  const out: Array<{ label: string; tone: Tone }> = []
+  if (!e) return out
+
+  const ar = e.amount_ratio
+  if (Array.isArray(ar) && ar.length >= 2) {
+    const hiPct = Math.round(ar[1] * 100)
+    out.push(
+      hiPct <= 10
+        ? { label: `温和放量 ${Math.round(ar[0] * 100)}~${hiPct}%`, tone: 'neutral' }
+        : { label: `放量 ${Math.round(ar[0] * 100)}~${hiPct}%`, tone: 'warn' },
+    )
+  }
+  if (e.boom_label) out.push({ label: e.boom_label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ''), tone: 'up' })
+  if (e.seal_form) out.push({ label: e.seal_form, tone: e.seal_form.includes('一字') ? 'up' : 'warn' })
+  if (e.sector_tier === 'dragon') out.push({ label: '板块龙', tone: 'rec' })
+  if (e.gap_strength_hint) {
+    const t = e.gap_strength_hint.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '')
+    if (t) out.push({ label: t, tone: 'neutral' })
+  }
+  if (e.phase) out.push({ label: e.phase, tone: 'warn' })
+  return out.slice(0, 4)
+}
+
 export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   const [pickedCode, setPickedCode] = useState<string>('')
   if (!dossier) {
@@ -130,6 +170,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             rowKey="code"
             size="small"
             bordered
+            tableLayout="auto"
             pagination={false}
             locale={{ emptyText: '本期无候选 —— 接力池留空是允许的结论，不是数据缺失' }}
             dataSource={rows as unknown as Array<Record<string, unknown>>}
@@ -145,26 +186,31 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
                 render: (_v, r) => {
                   const row = r as unknown as DecisionDossier['relay'][number]
                   return (
-                    <span className="flex items-baseline gap-1.5">
-                      <span className="text-txt font-semibold">{row.name}</span>
-                      <span className="num text-11 text-sub">{row.code}</span>
-                      {row.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="text-txt font-semibold">{row.name}</span>
+                        <span className="num text-11 text-sub">{row.code}</span>
+                        {row.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
+                      </span>
+                      <span className="flex flex-wrap gap-1">
+                        {tagsOf(row).map((t) => (
+                          <Tag key={t.label} tone={t.tone}>{t.label}</Tag>
+                        ))}
+                      </span>
+                    </div>
                   )
                 },
               },
-              { title: '板数', dataIndex: 'boards', align: 'right', width: 72, render: (v) => boardsText(Number(v)) },
+              { title: '板数', dataIndex: 'boards', align: 'right', render: (v) => boardsText(Number(v)) },
               {
                 title: '身位',
                 dataIndex: 'dragon_rank',
                 align: 'right',
-                width: 72,
                 render: (v) => (v == null ? <span className="text-sub">—</span> : `第 ${v}`),
               },
               {
                 title: '封板',
                 align: 'right',
-                width: 190,
                 render: (_v, r) => {
                   const row = r as unknown as DecisionDossier['relay'][number]
                   return (
@@ -178,7 +224,6 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
               {
                 title: '晋级率',
                 align: 'right',
-                width: 90,
                 render: (_v, r) => {
                   const row = r as unknown as DecisionDossier['relay'][number]
                   const cp = (row as { conditional_promotion?: { quality?: string; rate?: number } }).conditional_promotion
