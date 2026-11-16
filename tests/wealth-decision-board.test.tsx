@@ -645,19 +645,34 @@ describe('ScreenFunnel 全量过筛（诊断层）', () => {
 })
 
 describe('DecisionBoard 版面顺序对回四个问题', () => {
-  it('六块齐全且顺序为：今天 → 账本 → 今晨竞价 → 明日标的 → 接力池 → 观察（明早竞价判）', () => {
+  it('今日 / 明日 分两个 tab：今日 = 今天 → 账本 → 今晨竞价；明日 = 明日标的 → 接力池 → 观察', async () => {
+    // 2026-11-16 用户：「今日策略和明日分隔开，新开一个明日 tab」。
+    // 默认 tab 取决于当前小时（≥12 点默认「明日」），所以这里把两个 tab 都点一遍。
     const { container } = render(
       <DecisionBoard dossier={dossier()} callFile={poolCall()} ledger={ledger()} screen={screenFile()} />,
     )
-    const txt = container.textContent ?? ''
-    // 2026-11-11：观察池 → 「观察（明早竞价判）」（单池口径，watch 只剩高度观察）
-    const order = ['今天', '今日账本', '今晨竞价', '明日标的', '接力池', '观察（明早竞价判）']
-    const idx = order.map((k) => txt.indexOf(k))
-    for (const [i, v] of idx.entries()) {
-      expect(v, `缺块：${order[i]}`).toBeGreaterThanOrEqual(0)
+    const clickTab = async (label: string) => {
+      const btn = [...container.querySelectorAll('button')].find((b) => (b.textContent ?? '').includes(label))
+      expect(btn, `找不到 tab：${label}`).toBeTruthy()
+      btn!.click()
+      await new Promise((r) => setTimeout(r, 0))
     }
-    // 顺序必须递增（账本在竞价之前 —— 先看赚没赚，再看读数）
-    expect(idx).toEqual([...idx].sort((a, b) => a - b))
+
+    await clickTab('今日策略')
+    let txt = container.textContent ?? ''
+    const today = ['今天', '今日账本', '今晨竞价']
+    const ti = today.map((k) => txt.indexOf(k))
+    for (const [i, v] of ti.entries()) expect(v, `缺块：${today[i]}`).toBeGreaterThanOrEqual(0)
+    expect(ti).toEqual([...ti].sort((a, b) => a - b))
+    // 明日内容不能在「今日」tab 里出现
+    expect(txt).not.toContain('接力池')
+
+    await clickTab('明日标的')
+    txt = container.textContent ?? ''
+    const tomorrow = ['明日标的', '接力池', '观察（明早竞价判）']
+    const mi = tomorrow.map((k) => txt.indexOf(k))
+    for (const [i, v] of mi.entries()) expect(v, `缺块：${tomorrow[i]}`).toBeGreaterThanOrEqual(0)
+    expect(mi).toEqual([...mi].sort((a, b) => a - b))
   })
 
   it('接力池为空时明说「留空是允许的结论」，不说没数据', () => {

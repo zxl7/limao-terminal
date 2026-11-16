@@ -1,4 +1,6 @@
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
+import { useState } from 'react'
+import { SegTabs } from '@/features/analytics'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { BuyPlan } from './BuyPlan'
 import { EnvPanel } from './EnvPanel'
@@ -90,6 +92,10 @@ export function DecisionBoard({
   // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
   screen?: ScreenFile
 }) {
+  // 今日 / 明日 两个 tab（2026-11-16 用户要求分开）：12 点后默认看「明日」。
+  // ⛔ Hook 必须在早退之前调用（规则 of hooks）。
+  const [tab, setTab] = useState<'today' | 'tomorrow'>(() => (new Date().getHours() >= 12 ? 'tomorrow' : 'today'))
+
   if (!dossier) {
     return (
       <div className="flex flex-col gap-3">
@@ -104,8 +110,25 @@ export function DecisionBoard({
   const relay = dossier.relay ?? []
   const watch = dossier.watch ?? []
 
+  /**
+   * 今日 / 明日 分两个 tab（2026-11-16 用户：「今日策略和明日分隔开，新开一个明日 tab，
+   * 过了 12 点再自动切换」）。
+   *
+   * 默认值的规则：**中午 12 点后默认看「明日」**（上午盘面已走完，重点转成明天怎么做）；
+   * 12 点前默认「今日」。⛔ 默认值只算一次（模块级日期），手动切换后不再被时间抢回。
+   */
   return (
     <div className="flex flex-col gap-3">
+      <SegTabs
+        items={[
+          { key: 'today', label: '今日策略' },
+          { key: 'tomorrow', label: `明日标的（${relay.length + watch.length}）` },
+        ]}
+        value={tab}
+        onChange={(k) => setTab(k as 'today' | 'tomorrow')}
+      />
+      {tab === 'today' && (
+      <>
       {/* ① 今天：买了没有 + 为什么是这个结果（全页第一眼） */}
       <TodayVerdict dossier={dossier} callFile={callFile} ledger={ledger} />
 
@@ -123,6 +146,11 @@ export function DecisionBoard({
         <EnvPanel callFile={callFile} />
       </Card>
 
+      </>
+      )}
+
+      {tab === 'tomorrow' && (
+      <>
       {/* ④ 明日标的：买什么、竞价落在哪、要多少钱。
           ⚠️ 日期口径：`dossier` 是**今天盘后写的预案**，执行日是**次一交易日** ——
               与上方 ①②③（今日执行日）不是同一天，⛔ 必须在卡头标明，否则会把
@@ -166,6 +194,8 @@ export function DecisionBoard({
         marketMaxBoards={dossier.market_max_boards}
         emptyText="无观察标的"
       />
+      </>
+      )}
     </div>
   )
 }

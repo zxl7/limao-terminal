@@ -294,6 +294,10 @@ describe('财富密码真实数据：四问必须同屏', () => {
       expect(client.isFetching()).toBe(0)
     })
 
+    // 2026-11-16：今日/明日已拆成两个 tab（12 点后默认「明日」），这里先切到「今日策略」
+    const tab = [...container.querySelectorAll('button')].find((b) => (b.textContent ?? '').includes('今日策略'))
+    tab?.click()
+    await new Promise((r) => setTimeout(r, 0))
     const text = (container.textContent ?? '').replace(/\s+/g, ' ')
 
     // ① 买了没有（**三态**必须说清，⛔ 不许既不说买了也不说空仓）
