@@ -158,7 +158,9 @@ export function BuyPlan({
           cell: ({ s }) => <span className="num text-txt">{yiText(s.expectation?.auction_amount_min_yi)}</span>,
         },
         {
-          label: '明日结论',
+          // ⛔ 2026-11-16 用户：全池判定要等 09:25 竞价，盘后给「结论」不合逻辑。
+          //    这里只是**预案倾向**（历史档位统计 + 位置判断），9:25 才定生死。
+          label: '预案倾向（9:25 定）',
           className: 'whitespace-normal min-w-[260px]',
           cell: ({ s }) => {
             const v = s.forecast?.verdict

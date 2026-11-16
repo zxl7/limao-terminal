@@ -136,6 +136,10 @@ export function DecisionBoard({
           </span>
         }
       >
+        <p className="text-11 text-sub m-0 mb-1.5">
+          盘后只给<b className="text-txt">预案</b>：竞价区间、要多少钱、大概什么档位。
+          <b className="text-txt">买卖结论要到明早 9:25 竞价后</b>，对整个池子统一裁一次。
+        </p>
         <BuyPlan relay={relay} watch={watch} />
       </Card>
 

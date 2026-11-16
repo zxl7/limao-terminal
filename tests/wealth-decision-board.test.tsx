@@ -612,7 +612,8 @@ describe('BuyPlan 明日买点（10 列 → 6 列）', () => {
     expect(txt).toContain('0.0% ~ 1.2%')
     expect(txt).toContain('竞价额要够')
     expect(txt).toContain('0.22 亿')
-    expect(txt).toContain('明日结论')
+    // 2026-11-16：盘后只能给「预案倾向」，结论要等 09:25 竞价，列名随之调整
+    expect(txt).toContain('预案倾向（9:25 定）')
     expect(txt).toContain('放弃')
     expect(txt).toContain('身位差 3 板')
   })
