@@ -62,6 +62,8 @@ export interface DataTableProps<T> {
   renderExpanded?: (row: T) => ReactNode
   /** 点行切换展开（与 expandedKeys 配套使用） */
   onToggleRow?: (row: T, key: string) => void
+  /** 表头吸顶（长表滚动时列名不丢） */
+  stickyHeader?: boolean
 }
 
 export function DataTable<T>({
@@ -76,6 +78,7 @@ export function DataTable<T>({
   expandedKeys,
   renderExpanded,
   onToggleRow,
+  stickyHeader = false,
 }: DataTableProps<T>) {
   /**
    * 行高常量必须与真实渲染一致：实测 dense 行为 32px（py-1 + 12.5px 正文 + border）。
@@ -99,11 +102,16 @@ export function DataTable<T>({
     <div
       ref={virtual ? scrollRef : undefined}
       onScroll={virtual ? win.onScroll : undefined}
-      className={virtual ? cn('overflow-auto overscroll-contain', heightClass) : 'overflow-x-auto'}
+      className={
+        virtual
+          ? cn('overflow-auto overscroll-contain', heightClass)
+          : cn('overflow-x-auto', stickyHeader && 'overflow-y-auto', stickyHeader && heightClass)
+      }
     >
       <table className="w-full border-collapse text-13">
-        <thead className={virtual ? 'sticky top-0 z-10' : undefined}>
+        <thead className={virtual || stickyHeader ? 'sticky top-0 z-10' : undefined}>
           <tr className="border-b border-line bg-line-faint">
+            {renderExpanded && <th className="w-[18px] px-1" aria-label="展开" />}
             {columns.map((c) => (
               <th
                 key={c.label}
@@ -144,6 +152,11 @@ export function DataTable<T>({
                 rowClass?.(row, i),
               )}
             >
+              {renderExpanded && (
+                <td className="px-1 w-[18px] text-sub select-none" aria-hidden>
+                  <span className={cn('inline-block transition-transform', open && 'rotate-90')}>▸</span>
+                </td>
+              )}
               {columns.map((c) => (
                 <td
                   key={c.label}
@@ -160,7 +173,7 @@ export function DataTable<T>({
             </tr>
             {open && (
               <tr className="bg-line-faint/40">
-                <td colSpan={columns.length} className="px-2 py-2">
+                <td colSpan={columns.length + (renderExpanded ? 1 : 0)} className="px-2 py-2">
                   {renderExpanded?.(row)}
                 </td>
               </tr>

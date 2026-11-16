@@ -135,6 +135,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
           rows={rows}
           rowKey={(r) => r.code}
           dense
+          stickyHeader
           empty="本期无候选 —— 接力池留空是允许的结论，不是数据缺失"
           expandedKeys={open}
           onToggleRow={(row) => {
