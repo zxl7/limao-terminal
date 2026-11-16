@@ -55,6 +55,44 @@ function shortReason(s: DossierStock): string {
   return raw
 }
 
+
+/**
+ * 「什么情况下可以买」——每只票都要有一句可执行的判断（2026-11-16 用户要求）。
+ *
+ * 全部由**已有字段**拼，不新增推断：
+ *   · 预期区间 `expectation.expected_range`（%）
+ *   · 竞价额下限 `expectation.auction_amount_min_yi`（亿）
+ *   · 一字/买不到 → 明确写「看是否开板」
+ *   · 预案倾向 `forecast.verdict`（可等/放弃/观察）
+ */
+function buyCondition(s: DossierStock): string {
+  const r = s.expectation?.expected_range
+  const lo = Array.isArray(r) && r.length === 2 ? Number(r[0]) : null
+  const hi = Array.isArray(r) && r.length === 2 ? Number(r[1]) : null
+  const amt = s.expectation?.auction_amount_min_yi
+  const v = s.forecast?.verdict
+  const oneWord = (s as { is_one_word?: boolean }).is_one_word
+  const boards = s.boards ?? 0
+
+  const range = (lo != null && hi != null && Number.isFinite(lo) && Number.isFinite(hi))
+    ? `竞价 ${num(lo, 1)}% ~ ${num(hi, 1)}%`
+    : ''
+  const cash = (typeof amt === 'number' && amt > 0) ? `且竞价额 ≥ ${num(amt, 1)} 亿` : ''
+
+  if (oneWord) {
+    return `一字买不到：只有开板才做（开板后 ${range || '回到预案区间'} ${cash} 才接）`
+  }
+  if (v === '放弃') {
+    return `默认不买（预案判放弃）；除非 ${range || '竞价明显好于预期'} ${cash} 再复核`
+  }
+  if (range) {
+    return `${range} ${cash}${v === '可等' ? ' → 可买' : ' → 可买（需盯开盘承接）'}`
+  }
+  if (v === '可等') return '竞价符合预期即可买（区间未给出，按开盘承接判断）'
+  if (boards >= 3) return '高位票：只做竞价强势（红开/不大幅低开），弱开不接'
+  return '竞价不弱于预期即可参与（区间未给出）'
+}
+
 export function BuyPlan({
   relay,
   watch,
@@ -151,6 +189,13 @@ export function BuyPlan({
               </span>
             )
           },
+        },
+        {
+          label: '什么情况下买',
+          className: 'whitespace-normal min-w-[220px]',
+          cell: ({ s: row }) => (
+            <span className="text-11 leading-snug text-txt">{buyCondition(row)}</span>
+          ),
         },
         {
           label: '竞价额要够',
