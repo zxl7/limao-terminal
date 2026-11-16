@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
+import { DataTable } from '@/features/analytics'
+import { boardsText } from '@/features/wealth/lib/format'
+import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
-import { BuyPlan } from './BuyPlan'
+import { buyCondition } from './BuyPlan'
 import { EnvPanel } from './EnvPanel'
-import { PickCard } from './PickCard'
 import { PoolLedgerCard } from './PoolLedgerCard'
 import { TodayVerdict } from './TodayVerdict'
 
@@ -34,46 +37,6 @@ import { TodayVerdict } from './TodayVerdict'
  *
  * ⛔ 三个池区一律**单排铺满**，不分左右窄栏 —— 卡片横向排布本身就是对照。
  */
-function PoolSection({
-  title,
-  badge,
-  stocks,
-  bucket,
-  marketMaxBoards,
-  emptyText,
-}: {
-  title: string
-  badge: string
-  stocks: DecisionDossier['relay']
-  bucket: 'relay' | 'watch'
-  marketMaxBoards?: number | null
-  emptyText: string
-}) {
-  return (
-    <Card
-      title={title}
-      extra={
-        <CardBadge tone={stocks.length ? (bucket === 'relay' ? 'up' : 'neutral') : 'neutral'}>{badge}</CardBadge>
-      }
-    >
-      {stocks.length ? (
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
-          {stocks.map((s, i) => (
-            <PickCard
-              key={s.code}
-              stock={s}
-              bucket={bucket}
-              rank={bucket === 'relay' ? (s.relay_rank ?? i + 1) : (s.watch_rank ?? i + 1)}
-              marketMaxBoards={marketMaxBoards}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="py-3 text-center text-12 text-sub">{emptyText}</div>
-      )}
-    </Card>
-  )
-}
 
 export function DecisionBoard({
   dossier,
@@ -126,6 +89,7 @@ export function DecisionBoard({
  * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
  */
 export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
   if (!dossier) {
     return (
       <div className="flex flex-col gap-3">
@@ -135,49 +99,137 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   }
   const relay = dossier.relay ?? []
   const watch = dossier.watch ?? []
-  // 2026-11-16 用户：断板/只看不买的核心票不该出现在「明早竞价判」里，也不再单列一块。
-  // 后端已改成「只注入今天仍在涨停的核心票，且可正常判定」，这里直接展示即可。
-  const judgeableWatch = watch
+  const rows = [...relay, ...watch].filter(
+    (s, i, arr) => arr.findIndex((x) => x.code === s.code) === i,
+  )
+
+  const toggle = (row: DecisionDossier['relay'][number], key: string) => {
+    const next = new Set(open)
+    // 子级内容按「代码」存，避免行序变化后展开错行
+    if (next.has(row.code)) next.delete(row.code)
+    else next.add(row.code)
+    setOpen(next)
+    void key
+  }
+  void toggle
+
   return (
     <div className="flex flex-col gap-3">
       <Card
         title="明日标的"
         extra={
           <span className="flex items-baseline gap-2">
-            <CardBadge>{relay.length + watch.length} 只</CardBadge>
+            <CardBadge>{rows.length} 只</CardBadge>
             <CardBadge tone="rec">预案 {dossier.date} · 次一交易日执行</CardBadge>
           </span>
         }
       >
         <p className="text-11 text-sub m-0 mb-1.5">
-          这份是 <b className="text-txt">{dossier.date}</b> 收盘后写的，等下一次收盘再刷新。
-          盘后只给<b className="text-txt">预案</b>：竞价区间、要多少钱、大概什么档位。
-          <b className="text-txt">买卖结论要到明早 9:25 竞价后</b>，对整个池子统一裁一次。
+          <b className="text-txt">一级＝今天的涨停事实</b>（板数 / 身位 / 封板 / 晋级率 / 涨停原因）；
+          <b className="text-txt">点开二级＝明天的竞价预案</b>（竞价落在哪、什么情况下买、要多少钱）。
+          这份是 <b className="text-txt">{dossier.date}</b> 收盘后写的，等下一次收盘再刷新；
+          买卖结论要到明早 9:25 竞价后统一裁。
         </p>
-        <BuyPlan relay={relay} watch={watch} />
+        <DataTable
+          rows={rows}
+          rowKey={(r) => r.code}
+          dense
+          empty="本期无候选 —— 接力池留空是允许的结论，不是数据缺失"
+          expandedKeys={open}
+          onToggleRow={(row) => {
+            const next = new Set(open)
+            if (next.has(row.code)) next.delete(row.code)
+            else next.add(row.code)
+            setOpen(next)
+          }}
+          renderExpanded={(r) => <PlanDetail s={r} />}
+          columns={[
+            {
+              label: '标的',
+              cell: (r) => (
+                <span className="flex items-baseline gap-1.5">
+                  <span className="text-txt font-semibold">{r.name}</span>
+                  <span className="num text-11 text-sub">{r.code}</span>
+                  {r.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
+                </span>
+              ),
+            },
+            { label: '板数', num: true, cell: (r) => boardsText(r.boards) },
+            {
+              label: '身位',
+              num: true,
+              cell: (r) =>
+                r.dragon_rank == null ? <span className="text-sub">—</span> : `第 ${r.dragon_rank}`,
+            },
+            {
+              label: '封板',
+              num: true,
+              cell: (r) => (
+                <span className="text-sub">
+                  {r.cje_yi == null ? '—' : `${r.cje_yi.toFixed(2)} 亿`}
+                  {r.seal_ratio_pct != null ? ` · 占流通 ${r.seal_ratio_pct.toFixed(2)}%` : ''}
+                </span>
+              ),
+            },
+            {
+              label: '晋级率',
+              num: true,
+              cell: (r) => {
+                const cp = (r as { conditional_promotion?: { quality?: string; rate?: number } }).conditional_promotion
+                const rate = cp?.rate
+                const ok = cp?.quality === 'ok'
+                return (
+                  <span className={cn('num', !ok ? 'text-sub' : (rate ?? 0) >= 30 ? 'text-up' : 'text-warn')}>
+                    {ok && rate != null ? `${rate.toFixed(1)}%` : '—'}
+                  </span>
+                )
+              },
+            },
+            {
+              label: '涨停原因',
+              className: 'whitespace-normal min-w-[260px]',
+              cell: (r) => (
+                <span className="text-sub text-12">{r.limit_up_reason || '—'}</span>
+              ),
+            },
+          ]}
+        />
       </Card>
+    </div>
+  )
+}
 
-      <PoolSection
-        title="接力池"
-        badge={`${relay.length} 只`}
-        stocks={relay}
-        bucket="relay"
-        marketMaxBoards={dossier.market_max_boards}
-        emptyText="今日无可接力标的 —— 接力池留空是允许的结论"
-      />
-
-      {/* ⛔ 2026-11-16 修数据口径：`watch` 里混着「板块核心观察」（只看不买、可能已断板），
-          它们**不参与 09:25 竞价判定**，不能和「明早竞价判」的那批混在一张卡里。
-          实证：11-16 观察显示 2 只，其中日出东方早已断板（boards=0），根本不会去竞价。 */}
-      <PoolSection
-        title="观察（明早竞价判）"
-        badge={`${judgeableWatch.length} 只`}
-        stocks={judgeableWatch}
-        bucket="watch"
-        marketMaxBoards={dossier.market_max_boards}
-        emptyText="无观察标的"
-      />
-
+/** 二级：明天的竞价预案（区间 / 条件 / 金额 / 身位说明） */
+function PlanDetail({ s }: { s: DecisionDossier['relay'][number] }) {
+  const r = s.expectation?.expected_range
+  const lo = Array.isArray(r) && r.length === 2 ? Number(r[0]) : null
+  const hi = Array.isArray(r) && r.length === 2 ? Number(r[1]) : null
+  const amt = s.expectation?.auction_amount_min_yi
+  const stars = (s as { conditional_promotion?: { quality?: string; rate?: number; n?: number } }).conditional_promotion
+  return (
+    <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-12 md:grid-cols-2">
+      <span>
+        <span className="text-sub">竞价落在　</span>
+        <b className="num text-txt">
+          {lo != null && hi != null ? `${lo.toFixed(1)}% ~ ${hi.toFixed(1)}%` : '未给出'}
+        </b>
+      </span>
+      <span>
+        <span className="text-sub">什么情况下买　</span>
+        <span className="text-txt">{buyCondition(s)}</span>
+      </span>
+      <span>
+        <span className="text-sub">竞价额要够　</span>
+        <b className="num text-txt">{typeof amt === 'number' && amt > 0 ? `${amt.toFixed(2)} 亿` : '—'}</b>
+      </span>
+      <span>
+        <span className="text-sub">身位　</span>
+        <span className="text-txt">
+          {s.dragon_rank == null ? '—' : `方向内第 ${s.dragon_rank}`}
+          {s.theme_mates_cnt ? ` · 同题材 ${s.theme_mates_cnt} 家` : ' · 独苗'}
+          {stars?.quality === 'ok' && stars.rate != null ? ` · 晋级样本 ${stars.n} 次 ${stars.rate.toFixed(1)}%` : ''}
+        </span>
+      </span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { render } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import type {
   DecisionDossier,
   DossierStock,
@@ -647,8 +647,8 @@ describe('ScreenFunnel 全量过筛（诊断层）', () => {
 })
 
 describe('DecisionBoard 版面顺序对回四个问题', () => {
-  it('今日与明日是两个独立组件：今日 = 今天 → 账本 → 今晨竞价；明日 = 明日标的 → 接力池 → 观察', () => {
-    // 2026-11-16 用户：不要在今日链路里再开 tab；明日改成页面顶部独立 tab。
+  it('今日与明日是两个独立组件：今日三块；明日是「父子嵌套表」（一级今日事实 / 二级明日预案）', async () => {
+    // 2026-11-16 用户：明日标的改成嵌套表，父级放今天的涨停事实，点开看明天的竞价预案。
     const today = render(
       <DecisionBoard dossier={dossier()} callFile={poolCall()} ledger={ledger()} screen={screenFile()} />,
     )
@@ -657,22 +657,30 @@ describe('DecisionBoard 版面顺序对回四个问题', () => {
     const ti = tOrder.map((k) => tt.indexOf(k))
     for (const [i, v] of ti.entries()) expect(v, `缺块：${tOrder[i]}`).toBeGreaterThanOrEqual(0)
     expect(ti).toEqual([...ti].sort((a, b) => a - b))
-    // 今日组件里不该再出现明日内容
-    expect(tt).not.toContain('接力池')
     expect(tt).not.toContain('明日标的')
 
     const tomorrow = render(<TomorrowBoard dossier={dossier()} />)
     const mt = tomorrow.container.textContent ?? ''
-    const mOrder = ['明日标的', '接力池', '观察（明早竞价判）']
-    const mi = mOrder.map((k) => mt.indexOf(k))
-    for (const [i, v] of mi.entries()) expect(v, `缺块：${mOrder[i]}`).toBeGreaterThanOrEqual(0)
-    expect(mi).toEqual([...mi].sort((a, b) => a - b))
+    // 一级表头：今天的涨停事实
+    for (const k of ['标的', '板数', '身位', '封板', '晋级率', '涨停原因']) {
+      expect(mt, `缺一级列：${k}`).toContain(k)
+    }
+    // 二级内容未展开前不该出现（「竞价额要够」只在子级里）
+    expect(mt).not.toContain('竞价额要够')
+    // 点开第一行 → 子级出现
+    const firstRow = tomorrow.container.querySelector('tbody tr')
+    expect(firstRow).toBeTruthy()
+    fireEvent.click(firstRow as HTMLElement)
+    await waitFor(() => {
+      expect(tomorrow.container.textContent ?? '').toContain('竞价额要够')
+    })
   })
 
-  it('接力池为空时明说「留空是允许的结论」，不说没数据', () => {
-    const { container } = render(<TomorrowBoard dossier={dossier()} />)
+  it('无候选时明说「留空是允许的结论」，不说没数据', () => {
+    const empty: DecisionDossier = { ...dossier(), relay: [], watch: [] }
+    const { container } = render(<TomorrowBoard dossier={empty} />)
     const txt = container.textContent ?? ''
-    expect(txt).toContain('今日无可接力标的')
+    expect(txt).toContain('留空是允许的结论')
     expect(txt).not.toContain('暂无数据')
   })
 

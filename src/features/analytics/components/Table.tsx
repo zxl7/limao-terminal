@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { cn } from '@/shared/lib'
 import { useMeasuredHeight, useVirtualRows } from '@/shared/ui'
 
@@ -53,6 +53,15 @@ export interface DataTableProps<T> {
   virtual?: boolean
   /** 虚拟滚动容器的高度上限（默认「视口 − 顶栏」，保证不超屏） */
   heightClass?: string
+  /**
+   * 可展开的「父子表」（2026-11-16 用户：明日标的要一级=今日涨停事实、二级=明日竞价预案）。
+   * 点击行 → 展开一行 `colSpan` 的子内容。⛔ 只影响展示，不改数据。
+   */
+  expandedKeys?: ReadonlySet<string>
+  /** 子级内容（返回 null 表示该行没子级） */
+  renderExpanded?: (row: T) => ReactNode
+  /** 点行切换展开（与 expandedKeys 配套使用） */
+  onToggleRow?: (row: T, key: string) => void
 }
 
 export function DataTable<T>({
@@ -64,6 +73,9 @@ export function DataTable<T>({
   rowClass,
   virtual = false,
   heightClass = 'max-h-[var(--panel-max-h)]',
+  expandedKeys,
+  renderExpanded,
+  onToggleRow,
 }: DataTableProps<T>) {
   /**
    * 行高常量必须与真实渲染一致：实测 dense 行为 32px（py-1 + 12.5px 正文 + border）。
@@ -117,13 +129,18 @@ export function DataTable<T>({
           )}
           {bodyRows.map((row, idx) => {
             const i = virtual ? win.start + idx : idx
+            const key = String(rowKey?.(row, i) ?? i)
+            const expandable = Boolean(renderExpanded)
+            const open = expandable && Boolean(expandedKeys?.has(key))
             return (
+            <Fragment key={key}>
             <tr
-              key={rowKey?.(row, i) ?? i}
               style={virtual ? { height: ROW_H } : undefined}
+              onClick={expandable && onToggleRow ? () => onToggleRow(row, key) : undefined}
               className={cn(
                 // hover 高亮：多列宽表横向扫读时，行背景是最便宜的「防串行」手段
                 'border-b border-line-faint transition-colors hover:bg-line-faint',
+                expandable && 'cursor-pointer',
                 rowClass?.(row, i),
               )}
             >
@@ -141,6 +158,14 @@ export function DataTable<T>({
                 </td>
               ))}
             </tr>
+            {open && (
+              <tr className="bg-line-faint/40">
+                <td colSpan={columns.length} className="px-2 py-2">
+                  {renderExpanded?.(row)}
+                </td>
+              </tr>
+            )}
+            </Fragment>
             )
           })}
           {virtual && win.padBottom > 0 && (

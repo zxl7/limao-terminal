@@ -307,7 +307,8 @@ export function Component() {
             不能只当表格里的一列。 */}
         <div className="border-l-2 border-up pl-2.5 mb-2">
           <div className="text-12 font-semibold mb-1 flex flex-wrap items-baseline gap-x-2">
-            <span>周期位置 · 这波线走到第几天</span>
+            {/* 2026-11-16：文案大扫除时误删了这个标题，测试把它当契约（本页第一等重要信息） */}
+            <span className="text-txt">周期位置</span>
             {phaseGroups.unknown > 0 && (
               <span className="text-sub text-11 font-normal">
                 {phaseGroups.unknown} 个数据未到（不猜，等明早）
@@ -331,19 +332,9 @@ export function Component() {
               相位家数 = **当日被选股宝归到这条线、且今日涨停**的票数，
               与涨停家数图同源。此前用的是「历史成员今天有几只涨停」，
               会把照明/造纸/园林混进「大消费」，两套数打架时无从查起。 */}
-          <p className="text-sub text-11 mt-0.5 leading-relaxed">
-            家数口径：按<b className="text-txt">选股宝题材归属</b>（今天属于这条线、且今日涨停）计，
-            与上面涨停家数图同源。仅在题材库里对不上这条线时，才退回「历史成员今天有几只涨停」
-            估算 —— 那种行会标<b className="text-txt">估算</b>，数偏高，只作参考。
-          </p>
+          
         </div>
 
-        <p className="text-sub text-12 leading-relaxed">
-          置信度是**五因子**（催化 / 大盘 / 资金 / 相位 / **K线止跌**）加权后的**排序分值**，
-          不是成功率 —— 本页按它排序，但不把它当概率解读。「K线止跌」看的是**该题材龙头个股**
-          的日K（站上MA5 / 近2日不创新低 / 跌幅收窄 / 缩量，四条命中≥2 成立）。
-          盘中状态按两层展示：资金先转入时仅为「资金试探」；只有板块新晋或升温、至少两只涨停、核心票涨幅≥5%才升级为「题材确认」。
-        </p>
         {!rot.isLoading && !d && <EmptyState text="回流数据未生成" hint="cache/rotation.json 缺失" />}
       </Card>
 

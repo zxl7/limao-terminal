@@ -31,7 +31,7 @@ import { boardsText, num, yiText } from '../lib/format'
  *   · 一字/买不到 → 明确写「看是否开板」
  *   · 预案方向 `forecast.verdict`（只用来决定措辞，不再单独成列）
  */
-function buyCondition(s: DossierStock): string {
+export function buyCondition(s: DossierStock): string {
   const r = s.expectation?.expected_range
   const lo = Array.isArray(r) && r.length === 2 ? Number(r[0]) : null
   const hi = Array.isArray(r) && r.length === 2 ? Number(r[1]) : null
