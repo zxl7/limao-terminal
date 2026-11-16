@@ -474,7 +474,7 @@ export function Component() {
             <p className="text-sub text-12 mt-1.5 leading-relaxed">
               柱色 = 较前一交易日 <b className="text-up">增多（转强）</b> /{' '}
               <b className="text-down">减少（转弱）</b>。
-              数据取自 <span className="num">zt_history</span> 每日末个盘中快照的涨停总数 ——
+              统计口径：每个交易日取最后一个盘中时点的涨停总数 ——
               <span className="num"> trajectory.zt_seq</span> 实测全为空，从那里取会得到一张空图。
             </p>
           </>
@@ -582,7 +582,7 @@ export function Component() {
                 <SeqRow label="核按钮" seq={historicTrajectory.map((day) => (day.nuke == null ? '—' : String(day.nuke)))} tone="nu" />
                 <SeqRow label="涨停数" seq={historicTrajectory.map((day) => (day.zt == null ? '—' : String(day.zt)))} tone="plain" />
                 <p className="text-sub text-12 mt-1 leading-relaxed">
-                  序列按时间正序；`—` = 该日字段为空（盘前快照尚未落盘），非 0。
+                  序列按时间正序；`—` = 该日数据未落盘，不是 0。
                 </p>
               </>
             ) : (

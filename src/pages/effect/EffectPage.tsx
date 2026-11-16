@@ -94,7 +94,7 @@ export function SelectionLogicSection({ selectionEffect }: { selectionEffect: Se
           { label: '候选阶段 / 形态', cell: (row) => <span className="text-sub">{row.expectation?.phase ?? '—'} · {row.expectation?.seal_form ?? '—'}</span> },
         ]} />}
       </div>
-      <p className="text-11 text-sub">反馈快照 {selectionEffect?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股文件 ${plan.generated_at_bj}` : ''}。{feedbackMatchesPlan ? '当前候选已与反馈日期对齐。' : '当前候选尚未有对应次日反馈。'} 未发布或缺失的候选反馈显示“—”，不以其他行情快照补算。</p>
+      <p className="text-11 text-sub">反馈更新 {selectionEffect?.generated_ts?.replace('T', ' ').slice(0, 19) ?? '—'}{plan ? ` · 选股结果 ${plan.generated_at_bj}` : ''}。{feedbackMatchesPlan ? '当前候选已与反馈日期对齐。' : '当前候选尚未有对应次日反馈。'} 未发布或缺失的候选反馈显示“—”，不用其他时点的行情凑数。</p>
     </div>
   </Card>
 }

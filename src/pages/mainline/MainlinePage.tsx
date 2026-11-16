@@ -160,7 +160,7 @@ export function Component() {
         ) : (
           <>
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
-              <StatPair label="快照时间" value={snap.data?.ts?.slice(11, 19) ?? '—'} />
+              <StatPair label="数据时间" value={snap.data?.ts?.slice(11, 19) ?? '—'} />
               <StatPair label="全市场涨停" value={snap.data?.total_zt ?? '—'} tone="up" />
               <StatPair label="情绪" value={snap.data?.sentiment ?? '—'} />
               <StatPair label="封板率" value={snap.data?.sentiment_detail?.seal_rate != null ? `${n1(snap.data.sentiment_detail.seal_rate)}%` : '—'} />
