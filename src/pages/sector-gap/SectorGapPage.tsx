@@ -114,7 +114,7 @@ export function SectorGapView() {
       </Card>
 
       <Card
-        title="累计对照 · 两套收益口径分列"
+        title="累计对照 · 两种算法分开看"
         extra={<CardBadge tone="warn">⛔ 晋级率 ≠ 买入胜率 ≠ 可执行收益</CardBadge>}
       >
         <DataTable
@@ -134,7 +134,7 @@ export function SectorGapView() {
         />
         <p className="text-11 text-sub mt-3">
           当日收盘＝竞价买入至收盘的评估代理；T+1＝竞价买入至次一交易日收盘，
-          对齐<b className="text-txt">账本结算口径</b>。
+          对齐<b className="text-txt">账本结算方式</b>。
           「量能证伪·干净组」是三环齐全、只被量能证伪的票；
           「veto 标记全组」还含缺环不裁决的票，两组⛔不可混读。
         </p>
@@ -197,7 +197,7 @@ export function SectorGapView() {
         />
       </Card>
 
-      <Card title="口径与边界">
+      <Card title="算法与边界">
         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-12 text-sub">
           <span>当日收盘口径</span><span>{data?.caliber.same_close ?? '—'}</span>
           <span>T+1 结算口径</span><span>{data?.caliber.t1_close ?? '—'}</span>

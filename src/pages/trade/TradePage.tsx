@@ -12,7 +12,7 @@ export async function loader() {
 }
 
 const CALIBER_LABEL: Record<string, { text: string; tone: 'up' | 'rec' | 'warn' }> = {
-  ai: { text: 'AI口径', tone: 'up' },
+  ai: { text: 'AI 决策', tone: 'up' },
   mechanical_fallback: { text: '机械回退', tone: 'warn' },
 }
 
@@ -86,7 +86,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
           <Metric label="最新决策日" value={last?.recommendation_date ?? '—'} />
           <Metric label="最新成交" value={last ? `${last.stock_count}只` : '—'} cls={last && last.stock_count > 0 ? 'text-txt' : 'text-sub'} />
         </div>
-        {firstAiIdx > 0 && <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5 mb-2">口径分界：自 <span className="num font-semibold">{rows[firstAiIdx].trade_date}</span> 起采用AI口径，此前为机械口径。</p>}
+        {firstAiIdx > 0 && <p className="text-warn text-12 leading-relaxed border-l-2 border-warn pl-2.5 mb-2">算法切换：自 <span className="num font-semibold">{rows[firstAiIdx].trade_date}</span> 起由 AI 决定，之前是机械规则。</p>}
       </Card>
 
       <Card title="📈 全部交易走势" extra={<CardBadge tone={tradeChart.tone === 'up' ? 'up' : tradeChart.tone === 'down' ? 'down' : 'neutral'}>{tradeChart.navs.length}笔实际交易</CardBadge>}>
@@ -102,7 +102,7 @@ function RelayPerformance({ rows: sourceRows, loading }: { rows: AccountNavEntry
         <DataTable<AccountNavEntry> rows={[...rows].reverse()} rowKey={(row) => row.trade_date} empty="尚无结算记录" columns={[
           { label: '结算日', cell: (row) => <span className="num">{row.trade_date}</span> },
           { label: '决策日', cell: (row) => <span className="num text-sub">{row.recommendation_date}</span> },
-          { label: '口径', cell: (row) => { const caliber = row.caliber ? CALIBER_LABEL[row.caliber] : null; return caliber ? <Tag tone={caliber.tone} title={row.note}>{caliber.text}</Tag> : <span className="text-sub text-12">机械</span> } },
+          { label: '来源', cell: (row) => { const caliber = row.caliber ? CALIBER_LABEL[row.caliber] : null; return caliber ? <Tag tone={caliber.tone} title={row.note}>{caliber.text}</Tag> : <span className="text-sub text-12">机械</span> } },
           { label: '成交', num: true, cell: (row) => <span className={row.stock_count === 0 ? 'text-sub' : 'text-txt'}>{row.stock_count}</span> },
           { label: '账户收益', num: true, cell: (row) => <ReturnText value={rowReturn(row)} /> },
           { label: '等权参照', num: true, cell: (row) => <span className={cn('num', Number.isFinite(row.account_return_pct) && Math.abs((row.account_return_pct as number) - row.avg_return_pct) > 0.005 ? 'text-sub line-through' : 'text-sub')}>{pct(row.avg_return_pct)}</span> },

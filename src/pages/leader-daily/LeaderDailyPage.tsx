@@ -163,7 +163,7 @@ export function Component() {
             {latest?.theme_source === 'sector_fallback' ? '行业口径（题材快照缺失）' : '无有效题材映射'}
           </CardBadge>
         ) : (
-          <CardBadge>题材口径 · 与选股同源</CardBadge>
+          <CardBadge>题材归类 · 和选股同一套</CardBadge>
         )}
         <div className="ml-auto flex items-center gap-1">
           {[8, 12, 20].map((n) => (
@@ -191,7 +191,7 @@ export function Component() {
               <p className="mb-2 text-12 leading-relaxed text-sub">
                 窗口内 <b className="text-warn">{degradedDays}</b> 天的题材快照缺失、
                 已降级为<b className="text-txt">申万行业</b>分组（列头标 <code className="text-11">行</code>）。
-                行业口径与题材口径不是同一把尺子，<b className="text-txt">跨口径比板数没有意义</b>，
+                行业分类和题材分类不是一把尺子，<b className="text-txt">跨着比板数没有意义</b>，
                 只用于看「这条线有没有延续」。
               </p>
             )}

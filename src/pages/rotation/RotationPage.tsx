@@ -427,8 +427,9 @@ export function Component() {
                 emptyText="无 5 日资金数据"
               />
               <p className="text-sub text-11 mt-1.5 leading-relaxed">
-                零线居中：右侧红条为累计净流入、左侧绿条为净流出，附注是<b className="text-txt">流入天数</b>——
-                金额大但天数少 = 单日脉冲，<b className="text-txt">金额与天数同时占优才是持续吸金</b>。
+                零线居中：右边红条是累计净流入、左边绿条是净流出。
+                下面的<b className="text-txt">「连着流入」</b>更要紧——连着几天都在进，
+                比一天砸进来一大笔更可靠；<b className="text-txt">金额大、天数少，多半是一日行情</b>。
               </p>
             </div>
             <Flow5DTable title="5 日资金净流入 Top" rows={flows?.inflow_top ?? []} days={flows?.data_days} />
@@ -730,7 +731,7 @@ function Flow5DTable({
   days,
 }: {
   title: string
-  rows: Array<{ name: string; total_yi: number; days: number; inflow_days: number; last_yi: number; trend: string }>
+  rows: Array<{ name: string; total_yi: number; days: number; inflow_days: number; last_yi: number; trend: string; streak?: number }>
   days?: string[]
 }) {
   return (
@@ -758,6 +759,15 @@ function Flow5DTable({
           },
           { label: '最近一日', num: true, cell: (r) => (r.last_yi > 0 ? `+${n2(r.last_yi)}` : n2(r.last_yi)) },
           { label: '流入天数', num: true, cell: (r) => `${r.inflow_days}/${r.days}` },
+          {
+            label: '连着流入',
+            num: true,
+            cell: (r) => (
+              <span className={cn((r.streak ?? 0) >= 2 ? 'text-up font-semibold' : 'text-sub')}>
+                {(r.streak ?? 0) > 0 ? `${r.streak} 天` : '—'}
+              </span>
+            ),
+          },
           { label: '趋势', cell: (r) => <span className="text-sub text-12">{r.trend || '—'}</span> },
         ]}
       />
