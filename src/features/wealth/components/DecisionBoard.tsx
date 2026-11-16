@@ -87,7 +87,7 @@ export function DecisionBoard({
  * 明日策略 —— 页面顶部独立 tab（2026-11-16 用户：不要在今日链路里再开「今日/明日」，
  * 顺序改为 今日、明日、尾盘、竞价、执行）。
  *
- * 内容：明日标的（每只票都给「什么情况下买」）+ 接力池 + 观察（明早竞价判）。
+ * 内容：明日标的——**一个池子、一张表**（2026-11-16 用户：不要区分接力池和观察池）。
  * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
  */
 /**
@@ -168,7 +168,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             bordered
             tableLayout="auto"
             pagination={false}
-            locale={{ emptyText: '本期无候选 —— 接力池留空是允许的结论，不是数据缺失' }}
+            locale={{ emptyText: '本期无候选 —— 留空是允许的结论，不是数据缺失' }}
             dataSource={rows as unknown as Array<Record<string, unknown>>}
             sticky
             onRow={(r) => ({
@@ -186,7 +186,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
                       <span className="flex items-baseline gap-1.5">
                         <span className="text-txt font-semibold">{row.name}</span>
                         <span className="num text-11 text-sub">{row.code}</span>
-                        {row.watch_group === '板块核心观察' && <CardBadge>核心</CardBadge>}
+{/* 不显示"接力/观察"池别标签：用户 2026-11-16 明确要求不区分 */}
                       </span>
                       <span className="flex flex-wrap gap-1">
                         {tagsOf(row).map((t) => (
