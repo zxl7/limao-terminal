@@ -1233,6 +1233,10 @@ export interface DossierSealGate {
 }
 
 export interface DossierStock {
+  /** 涨停原因（同花顺 limit_up_reason，2026-11-16 起随候选下发） */
+  limit_up_reason?: string | null
+  /** 断板票的说明：上次涨停哪天、几板 */
+  boards_note?: string | null
   leader_role?: '龙头' | '准龙头' | '跟风' | null
   /**
    * 昨日已在池 ∧ 今日板数更高 → 观察池优先占位（2026-11-04 用户「b 占位」）。

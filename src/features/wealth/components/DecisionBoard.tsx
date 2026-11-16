@@ -135,6 +135,9 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   }
   const relay = dossier.relay ?? []
   const watch = dossier.watch ?? []
+  // 只看不买的核心观察 ≠ 明早竞价要判的票，必须分开展示
+  const observeOnly = watch.filter((w) => w.buyable === false || w.watch_group === '板块核心观察')
+  const judgeableWatch = watch.filter((w) => !observeOnly.includes(w))
   return (
     <div className="flex flex-col gap-3">
       <Card
@@ -163,14 +166,28 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
         emptyText="今日无可接力标的 —— 接力池留空是允许的结论"
       />
 
+      {/* ⛔ 2026-11-16 修数据口径：`watch` 里混着「板块核心观察」（只看不买、可能已断板），
+          它们**不参与 09:25 竞价判定**，不能和「明早竞价判」的那批混在一张卡里。
+          实证：11-16 观察显示 2 只，其中日出东方早已断板（boards=0），根本不会去竞价。 */}
       <PoolSection
         title="观察（明早竞价判）"
-        badge={`${watch.length} 只`}
-        stocks={watch}
+        badge={`${judgeableWatch.length} 只`}
+        stocks={judgeableWatch}
         bucket="watch"
         marketMaxBoards={dossier.market_max_boards}
         emptyText="无观察标的"
       />
+
+      {observeOnly.length > 0 && (
+        <PoolSection
+          title="板块核心观察（只看不买，不参与竞价判定）"
+          badge={`${observeOnly.length} 只`}
+          stocks={observeOnly}
+          bucket="watch"
+          marketMaxBoards={dossier.market_max_boards}
+          emptyText="无"
+        />
+      )}
     </div>
   )
 }

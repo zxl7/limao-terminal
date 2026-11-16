@@ -181,6 +181,16 @@ export function PickCard({
           title={s.line_tier_why}
         />
 
+        {/* 🏷 涨停原因（同花顺）：这只票昨天为什么涨停 —— 判断题材真假的第一手证据 */}
+        {s.limit_up_reason && (
+          <SpecRow
+            label="原因"
+            main={s.limit_up_reason}
+            details="同花顺"
+            title={`涨停原因：${s.limit_up_reason}`}
+          />
+        )}
+
         <SpecRow
           label="封板"
           main={s.cje_yi == null ? '—' : `${num(s.cje_yi, 2)} 亿`}
