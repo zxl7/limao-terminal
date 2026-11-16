@@ -135,9 +135,9 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   }
   const relay = dossier.relay ?? []
   const watch = dossier.watch ?? []
-  // 只看不买的核心观察 ≠ 明早竞价要判的票，必须分开展示
-  const observeOnly = watch.filter((w) => w.buyable === false || w.watch_group === '板块核心观察')
-  const judgeableWatch = watch.filter((w) => !observeOnly.includes(w))
+  // 2026-11-16 用户：断板/只看不买的核心票不该出现在「明早竞价判」里，也不再单列一块。
+  // 后端已改成「只注入今天仍在涨停的核心票，且可正常判定」，这里直接展示即可。
+  const judgeableWatch = watch
   return (
     <div className="flex flex-col gap-3">
       <Card
@@ -178,16 +178,6 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
         emptyText="无观察标的"
       />
 
-      {observeOnly.length > 0 && (
-        <PoolSection
-          title="板块核心观察（只看不买，不参与竞价判定）"
-          badge={`${observeOnly.length} 只`}
-          stocks={observeOnly}
-          bucket="watch"
-          marketMaxBoards={dossier.market_max_boards}
-          emptyText="无"
-        />
-      )}
     </div>
   )
 }
