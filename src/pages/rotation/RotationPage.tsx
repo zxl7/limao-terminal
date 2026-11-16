@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { queryClient } from '@/shared/api'
+import { api, queryClient } from '@/shared/api'
+import type { ThemeLibrary } from '@/shared/api/types'
 import type { PoolStock, RotationCandidate, SectorFlowFull } from '@/shared/api'
 import { DataTable, SegTabs, StatPair, Tag, n1, n2, pct } from '@/features/analytics'
 import { marketQueries } from '@/features/market'
@@ -489,9 +490,61 @@ export function Component() {
           <FlowSide title="净流出" rows={mc?.outflow_top ?? []} />
         </div>
       </Card>
+
+      {/* 📚 题材库沉淀（2026-11-16 用户「我在哪里可以看题材的沉淀」） */}
+      <ThemeLibraryCard />
         </Zone>
       </ZoneRow>
     </div>
+  )
+}
+
+/**
+ * 题材库沉淀：把每日选股宝快照累计成「代码 → 题材历史」。
+ * 数据 `cache/theme_library.json`（`scripts/theme_library.py` 15:35 追加）。
+ */
+function ThemeLibraryCard() {
+  const lib = useQuery({ queryKey: ['theme', 'library'] as const, queryFn: api.themeLibrary, staleTime: 10 * 60_000 })
+  const d = lib.data as ThemeLibrary | undefined
+  const rows = useMemo(() => {
+    const cnt = new Map<string, { n: number; days: number }>()
+    for (const e of Object.values(d?.entries ?? {})) {
+      const t = e.theme_base_latest || e.theme_latest
+      if (!t) continue
+      const cur = cnt.get(t) ?? { n: 0, days: 0 }
+      cur.n += 1
+      cur.days += e.day_count
+      cnt.set(t, cur)
+    }
+    return [...cnt.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 12)
+  }, [d])
+
+  if (!d) {
+    return (
+      <Card title="📚 题材库沉淀" extra={<CardBadge>—</CardBadge>}>
+        <EmptyState text={lib.isLoading ? '加载中…' : '暂无题材库'} hint="每日 15:35 由快照合并生成" />
+      </Card>
+    )
+  }
+  const max = rows[0]?.[1].n ?? 1
+  return (
+    <Card title="📚 题材库沉淀" extra={<CardBadge>{d.day_count} 天 · {d.code_count} 只</CardBadge>}>
+      <p className="text-11 text-sub m-0 mb-1.5">
+        选股宝快照每日累计（{d.days[0]} ~ {d.days.at(-1)}）；下面的「只」＝出现过该题材的股票数
+      </p>
+      <ul className="text-12 leading-relaxed m-0">
+        {rows.map(([name, v]) => (
+          <li key={name} className="flex items-center gap-2 mb-0.5">
+            <span className="w-[132px] flex-none truncate">{name}</span>
+            <span className="h-[4px] flex-1 max-w-[220px] rounded-sm overflow-hidden" style={{ background: 'var(--color-line-faint)' }}>
+              <span className="block h-full" style={{ width: `${Math.round((v.n / max) * 100)}%`, background: 'var(--color-lead)' }} />
+            </span>
+            <span className="num flex-none w-[52px] text-right">{v.n} 只</span>
+            <span className="text-sub flex-none w-[64px] text-right">累计 {v.days} 天</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 

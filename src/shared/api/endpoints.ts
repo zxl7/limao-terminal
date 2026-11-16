@@ -119,6 +119,7 @@ export interface RouteTypeMap {
   '/api/market/candidates': CandidatesFile
   '/api/theme/rotation': RotationData
   '/api/theme/series': ThemeSeries
+  '/api/theme/library': import('./types').ThemeLibrary
   '/api/theme/sequence': ThemeSequence
   '/api/flow/history': FlowHistoryDay[]
   '/api/flow/live': SectorFundPool
@@ -297,6 +298,8 @@ export const api = {
   rotation: () => fetchRoute('/api/theme/rotation'),
   /** 题材多日序列 */
   series: () => fetchRoute('/api/theme/series'),
+  /** 题材库沉淀（代码→题材历史） */
+  themeLibrary: () => fetchRoute('/api/theme/library'),
   sequence: () => fetchRoute('/api/theme/sequence'),
   /** 板块资金历史（多日合并） */
   flowHistory: () => fetchRoute('/api/flow/history'),

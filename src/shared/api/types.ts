@@ -3982,3 +3982,22 @@ export interface ReviewSeries {
   rows: ReviewSeriesRow[]
   sources?: Record<string, boolean>
 }
+
+
+/** 题材库沉淀（scripts/theme_library.py 产出） */
+export interface ThemeLibraryEntry {
+  themes_seen: string[]
+  theme_latest: string
+  theme_base_latest: string
+  first_day: string
+  last_day: string
+  day_count: number
+}
+export interface ThemeLibrary {
+  generated_ts: string
+  source?: string
+  days: string[]
+  day_count: number
+  code_count: number
+  entries: Record<string, ThemeLibraryEntry>
+}

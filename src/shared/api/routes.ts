@@ -95,6 +95,7 @@ export const ROUTES: Record<string, RouteDef> = {
   '/api/market/candidates': { file: 'cache/pulse_snapshots/candidates.json',   cadence: 'intraday', desc: '候选池' },
   '/api/theme/rotation':    { file: 'cache/theme_rotation.json',               cadence: 'intraday', desc: '题材轮动·回流预测·5日资金' },
   '/api/theme/series':      { file: 'cache/theme_series.json',                 cadence: 'daily',    desc: '题材多日序列（数据堆叠 Tab 数据源）' },
+  '/api/theme/library':     { file: 'cache/theme_library.json',                cadence: 'daily',    desc: '题材库沉淀（代码→题材历史）' },
   // ⚠️ 2026-09-16 状态：**停更**（最后写入 2026-09-03 · 0 B），已被 `/api/theme/series`
   //    （theme_series.json，当日仍在更新）取代 —— 后者含 dates/daily_totals/
   //    daily_details/themes/theme_leaders/table_rows 完整结构，
