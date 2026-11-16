@@ -52,7 +52,7 @@ export function Component() {
     <div className="flex flex-col gap-3">
       {(isPending || isError || !data) && (
         <p role="status" className="m-0 rounded-sm bg-warn-soft px-3 py-2 text-12 text-warn">
-          {isPending ? '正在加载主快照…' : isError ? data ? '主快照更新失败，相关卡片保留上次数据；空白项不能视为零值。' : '主快照加载失败，暂无法确认盘面与风险状态。' : '主快照尚未提供，暂无法确认盘面与风险状态。'}
+          {isPending ? '正在加载盘面数据…' : isError ? data ? '盘面数据更新失败，相关卡片保留上次数据；空白项不能视为零值。' : '盘面数据加载失败，暂无法确认盘面与风险状态。' : '主快照尚未提供，暂无法确认盘面与风险状态。'}
         </p>
       )}
       {data && missingParts && (

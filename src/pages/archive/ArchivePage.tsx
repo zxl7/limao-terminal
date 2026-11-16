@@ -359,7 +359,7 @@ export function Component() {
                   </select>
                   <StatPair label="报价条数" value={auctionQuotes.length} />
                   <StatPair
-                    label="快照时间"
+                    label="数据时间"
                     value={(activeAuction?.data as { ts?: string } | undefined)?.ts ?? '—'}
                   />
                   <StatPair

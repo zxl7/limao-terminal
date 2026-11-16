@@ -441,7 +441,7 @@ export function AiWealthView() {
           {/* 竞价现场（原独立 tab）——与 DecisionBoard 的「今晨竞价」同源，合到一处看 */}
           <Card
             title="竞价现场"
-            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未落盘'}</CardBadge>}
+            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{callFile?.trade_date ?? '未生成'}</CardBadge>}
           >
             <ExecutionPanel dossier={dossier} callFile={callFile} />
           </Card>
@@ -474,7 +474,7 @@ export function AiWealthView() {
           {/* 命中逻辑：只讲「买到的 4 只为什么被选中」 */}
           <Card
             title="命中逻辑"
-            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{hitCount} 只 · {callFile?.trade_date ?? '未落盘'}</CardBadge>}
+            extra={<CardBadge tone={callFile ? 'rec' : 'neutral'}>{hitCount} 只 · {callFile?.trade_date ?? '未生成'}</CardBadge>}
           >
             <AiHitLogic file={callFile} tradeDate={callFile?.trade_date ?? activeView?.date} />
           </Card>
@@ -501,7 +501,7 @@ export function AiWealthView() {
                       {callFile.meta?.call_at && <span className="num text-sub">· {callFile.meta.call_at}</span>}
                     </>
                   ) : (
-                    <span>未落盘（当日 09:25 后生成）</span>
+                    <span>未生成（当日 09:25 后生成）</span>
                   )}
                 </div>
               </div>
@@ -603,7 +603,7 @@ export function AiWealthView() {
           <DataTable
             rows={navTableRows}
             rowKey={(r) => r.trade_date}
-            empty="尚无结算记录（15:30 后落盘）"
+            empty="尚无结算记录（15:30 后生成）"
             columns={[
               {
                 label: '结算日',

@@ -160,7 +160,7 @@ export function Component() {
         </div>
         {latest?.theme_source !== 'snapshot' ? (
           <CardBadge tone="warn">
-            {latest?.theme_source === 'sector_fallback' ? '行业口径（题材快照缺失）' : '无有效题材映射'}
+            {latest?.theme_source === 'sector_fallback' ? '行业归类（题材数据缺失）' : '无有效题材映射'}
           </CardBadge>
         ) : (
           <CardBadge>题材归类 · 和选股同一套</CardBadge>
@@ -189,7 +189,7 @@ export function Component() {
           >
             {degradedDays > 0 && (
               <p className="mb-2 text-12 leading-relaxed text-sub">
-                窗口内 <b className="text-warn">{degradedDays}</b> 天的题材快照缺失、
+                窗口内 <b className="text-warn">{degradedDays}</b> 天的题材数据缺失、
                 已降级为<b className="text-txt">申万行业</b>分组（列头标 <code className="text-11">行</code>）。
                 行业分类和题材分类不是一把尺子，<b className="text-txt">跨着比板数没有意义</b>，
                 只用于看「这条线有没有延续」。
@@ -207,7 +207,7 @@ export function Component() {
                       <th key={f.date} className="px-1 py-1 text-center font-medium text-sub">
                         <div className="whitespace-nowrap">{shortDate(f.date)}</div>
                         {f.degraded && (
-                          <div className="text-10 text-warn" title="题材快照缺失·已降级为行业分组">
+                          <div className="text-10 text-warn" title="题材数据缺失·已退回行业分组">
                             行
                           </div>
                         )}

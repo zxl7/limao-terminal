@@ -304,7 +304,7 @@ export function Component() {
             }
           >
             {!wk || wkView.rows.length === 0 ? (
-              <EmptyState text="周涨停地图未落盘（cache/weekly_zt_map.json 缺失）" />
+              <EmptyState text="周涨停地图还没有数据" />
             ) : (
               <div className="flex flex-col gap-2.5">
                 <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">

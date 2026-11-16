@@ -336,7 +336,7 @@ export function Component() {
             extra={<CardBadge>{gs ? `${gs.date} · ${gs.count} 只` : '—'}</CardBadge>}
           >
             {!gs || gs.top.length === 0 ? (
-              <EmptyState text="股性榜未落盘（scripts/zt_genes.py 未运行）" />
+              <EmptyState text="股性榜还没有数据（生成任务尚未运行）" />
             ) : (
               <div className="max-h-[var(--panel-max-h)] overflow-y-auto">
                 <DataTable
@@ -405,7 +405,7 @@ export function Component() {
             extra={<CardBadge>{pool ? `${pool.date} · ${pool.pool.length} 只` : '—'}</CardBadge>}
           >
             {!pool || pool.pool.length === 0 ? (
-              <EmptyState text="涨停基因池未落盘（pool_<日期>.json 缺失）" />
+              <EmptyState text="涨停基因池还没有数据" />
             ) : (
               <div className="max-h-[var(--panel-max-h)] overflow-y-auto">
                 <DataTable

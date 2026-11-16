@@ -234,13 +234,13 @@ export function Component() {
       <ZoneRow>
         <Zone label="题材冻结" dot="bg-rec" className="xl:w-[50%]">
           <Card
-            title="题材映射快照"
+            title="题材映射"
             extra={<CardBadge>{latestSnapshot?.date ?? '—'}</CardBadge>}
           >
             {snapshots.isLoading ? (
-              <EmptyState text="加载题材快照…" />
+              <EmptyState text="加载题材映射…" />
             ) : snapshots.isError && !snapshots.data ? (
-              <EmptyState text="题材快照读取失败" />
+              <EmptyState text="题材映射读取失败" />
             ) : frozenThemeRows.length === 0 ? (
               <EmptyState text="暂无题材映射快照" />
             ) : (

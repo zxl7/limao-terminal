@@ -231,7 +231,7 @@ export function Component() {
           <CardBadge
             tone={sentiment == null ? 'neutral' : sentiment >= 6 ? 'up' : sentiment <= 2 ? 'down' : 'neutral'}
           >
-            轮动快照 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}{ctxRef ? ` · 大盘参考态 ${ctxAge} 分钟前` : ''}
+            数据时间 {d?.generated_ts?.slice(11, 19) ?? '—'} · 情绪 {n1(sentiment)} · 快照涨停 {mc?.zt_count_today ?? '—'}{ctxRef ? ` · 大盘参考态 ${ctxAge} 分钟前` : ''}
           </CardBadge>
         }
       >
@@ -270,8 +270,8 @@ export function Component() {
           <SegTabs
             items={[
               { key: 'reflow', label: `回流候选 (${sorted.length})` },
-              { key: 'trend', label: `涨停家数 (${d?.sector_zt_trends?.length ?? 0})` },
-              { key: 'flow', label: '5 日资金' },
+              { key: 'trend', label: `涨停趋势 (${d?.sector_zt_trends?.length ?? 0})` },
+              { key: 'flow', label: '5日资金' },
               { key: 'avoid', label: `规避名单 (${d?.avoidance_sweep?.length ?? 0})` },
             ]}
             value={tab}
@@ -474,7 +474,7 @@ export function Component() {
         </Zone>
 
         <Zone label="当日资金" dot="bg-up" className="xl:w-[38%]">
-          <Card title="快照板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
+          <Card title="板块资金进出榜" extra={<CardBadge>{d?.generated_ts || '—'}</CardBadge>}>
         {todayDuel.length > 0 && (
           <div className="mb-3">
             <div className="text-12 font-semibold mb-1 flex items-center gap-1">
@@ -526,7 +526,7 @@ function ThemeLibraryCard() {
   if (!d) {
     return (
       <Card title="📚 题材库沉淀" extra={<CardBadge>—</CardBadge>}>
-        <EmptyState text={lib.isLoading ? '加载中…' : '暂无题材库'} hint="每日 15:35 由快照合并生成" />
+        <EmptyState text={lib.isLoading ? '加载中…' : '暂无题材库'} hint="每日 15:35 自动合并生成" />
       </Card>
     )
   }

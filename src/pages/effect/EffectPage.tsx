@@ -240,7 +240,7 @@ export function Component() {
       {/* 历史只回答“在改善还是恶化”；情景只列观察条件，避免与当日事实混读。 */}
       <div className="flex gap-3 items-start max-xl:flex-col">
         <div className="xl:w-[60%] xl:flex-none min-w-0">
-          <Card title="③ 过去几日：赚钱环境在改善还是恶化" extra={<CardBadge>{history.length} 个已落盘交易日</CardBadge>}>
+          <Card title="③ 过去几日：赚钱环境在改善还是恶化" extra={<CardBadge>{history.length} 个已有数据的交易日</CardBadge>}>
             <EffectTrendCard points={history} />
           </Card>
         </div>

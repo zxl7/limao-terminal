@@ -179,7 +179,7 @@ export function Component() {
                 </div>
               </div>
               <div>
-                <div className="text-11 text-sub mb-1">真实盘面（盘中快照）</div>
+                <div className="text-11 text-sub mb-1">真实盘面（盘中）</div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <StatPair label="情绪分" value={num(renv?.sentiment_score)} />
                   <StatPair label="情绪" value={renv?.sentiment ?? '—'} />
@@ -471,7 +471,7 @@ export function Component() {
           >
             {!shadow ? (
               <EmptyState
-                text="影子模式未落盘"
+                text="影子模式暂无数据"
                 hint="cache/shadow/relay_shadow_<日期>.json 缺失（该实验非每日运行）"
               />
             ) : (

@@ -72,7 +72,7 @@ export function Component() {
           feedback.data?.error ? (
             <CardBadge tone="neutral">非交易时段 · 未计算</CardBadge>
           ) : (
-            <CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>
+            <CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中数据'}</CardBadge>
           )
         }
       >
