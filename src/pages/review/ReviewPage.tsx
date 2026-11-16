@@ -145,6 +145,27 @@ export function Component() {
             </ul>
           </Card>
 
+          {/* 🏗 板块梯队：家数 + 高度 + 梯队分布（2026-11-16 用户「梯队+强度是最重要的指标」） */}
+          {!!d.ladder?.length && (
+            <Card title="🏗 板块梯队" extra={<CardBadge>{d.ladder.length} 条线</CardBadge>}>
+              <ul className="text-12 leading-relaxed m-0">
+                {d.ladder.slice(0, 8).map((r) => (
+                  <li key={r.theme} className="flex items-center gap-1.5 mb-0.5">
+                    <span className="w-[86px] flex-none truncate">{r.theme}</span>
+                    <span className="num flex-none w-[30px] text-right">{r.mates}家</span>
+                    <span className={cn('flex-none w-[38px] text-right', r.max_boards >= 3 ? 'text-up' : 'text-sub')}>高{r.max_boards}</span>
+                    <span className="flex-none text-11 text-sub w-[92px] text-right">
+                      首{r.l1}·2板{r.l2}·3板{r.l3}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-11 text-sub m-0 mt-1">
+                一堆首板＝方向有了但没高度；首板多、高度也有的线才走得远
+              </p>
+            </Card>
+          )}
+
           {/* 2026-11-15 用户：情绪演变做成小卡，放左栏主线之下 */}
           {evolution && (
             <Card title="📉 情绪演变" extra={<CardBadge>评分轨迹</CardBadge>}>

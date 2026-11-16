@@ -3950,6 +3950,15 @@ export interface ReviewHighBoardRow {
   name: string; code: string; boards: number; pct: number | null; zbc: number; fbt: string
   second_wave: boolean; prior_zt: number | null; next_odds: number | null; key: string
 }
+export interface ReviewLadderRow {
+  theme: string
+  mates: number
+  max_boards: number
+  l1: number
+  l2: number
+  l3: number
+  strength: number
+}
 export interface ReviewPanel {
   date: string
   prev: string | null
@@ -3958,6 +3967,7 @@ export interface ReviewPanel {
   high_board?: { max_boards: number; count: number; rows: ReviewHighBoardRow[]; note: string }
   money: ReviewMoney
   themes: ReviewTheme[]
+  ladder?: ReviewLadderRow[]
   commentary?: Array<{ heading: string; lines: string[] }>
   pool?: {
     relay: number; watch: number; stance: string | null; quota: number | null
