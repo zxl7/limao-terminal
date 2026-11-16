@@ -23,47 +23,13 @@ import { boardsText, num, yiText } from '../lib/format'
  * ⛔ 区间用二元数组 `expected_range`（`[下沿, 上沿]`），⛔ 不可直接插值。
  */
 /**
- * 明日结论的**一句话**（2026-11-11 用户第二次反馈「还是全是重复文案」）。
- *
- * 旧冻结件（11-10 及以前）的 `forecast.reasons[0]` 是**整段档位统计**——同档所有票一字不差。
- * 冻结件不改写，所以在展示层做规范化：能拿到 `stat_note`（新件）就直接用后端短句；
- * 拿不到就从**这只票自己的项**拼一句，统计交给上方的「本档统计」行（只显示一次）。
- */
-function shortReason(s: DossierStock): string {
-  const fc = s.forecast
-  const raw = String(fc?.reasons?.[0] ?? '').trim()
-  if (fc?.stat_note) return raw                       // 新冻结件：后端已给短句
-  if (!raw) return ''
-  const b = s.boards
-  const dr = s.dragon_rank
-  const role = s.leader_role ?? ''
-  const rank = typeof dr === 'number' && dr > 0 ? `本方向第${dr}` : ''
-  const tag = [b ? `${b}板` : '', rank, role].filter(Boolean).join('·')
-  // ⛔ 必须用 startsWith：「比本题材最高板低 ≥2 板…」也含这个子串，
-  //    用 includes 会把**后排**的票误写成「它就是最高板」（11-11 日出东方踩到）。
-  // 旧数据写作「它自己就是本题材最高板」，新数据写作「它就是本题材最高板」
-  if (/^它(自己)?就是本题材最高板/.test(raw)) {
-    return `它就是本题材最高板${tag ? `（${tag}）` : ''}`
-  }
-  if (raw.includes('比本题材最高板低')) {
-    return `比本题材最高板低 ≥2 板＝后排${tag ? `（${tag}）` : ''}`
-  }
-  if (raw.includes('只差 1 板')) {
-    return `只差 1 板＝最快的一档${tag ? `（${tag}）` : ''}`
-  }
-  if (raw.includes('历史崖位')) return `${b} 板是历史崖位`
-  return raw
-}
-
-
-/**
  * 「什么情况下可以买」——每只票都要有一句可执行的判断（2026-11-16 用户要求）。
  *
  * 全部由**已有字段**拼，不新增推断：
  *   · 预期区间 `expectation.expected_range`（%）
  *   · 竞价额下限 `expectation.auction_amount_min_yi`（亿）
  *   · 一字/买不到 → 明确写「看是否开板」
- *   · 预案倾向 `forecast.verdict`（可等/放弃/观察）
+ *   · 预案方向 `forecast.verdict`（只用来决定措辞，不再单独成列）
  */
 function buyCondition(s: DossierStock): string {
   const r = s.expectation?.expected_range
@@ -201,34 +167,6 @@ export function BuyPlan({
           label: '竞价额要够',
           num: true,
           cell: ({ s }) => <span className="num text-txt">{yiText(s.expectation?.auction_amount_min_yi)}</span>,
-        },
-        {
-          // ⛔ 2026-11-16 用户：全池判定要等 09:25 竞价，盘后给「结论」不合逻辑。
-          //    这里只是**预案倾向**（历史档位统计 + 位置判断），9:25 才定生死。
-          label: '预案倾向（9:25 定）',
-          className: 'whitespace-normal min-w-[260px]',
-          cell: ({ s }) => {
-            const v = s.forecast?.verdict
-            const why = shortReason(s)
-            if (!v) return <span className="text-sub">—</span>
-            return (
-              <span className="flex flex-col gap-0.5">
-                <span
-                  className={cn(
-                    'w-fit rounded-sm border px-1 text-11',
-                    v === '可等'
-                      ? 'border-up text-up'
-                      : v === '放弃'
-                        ? 'border-down text-down'
-                        : 'border-line text-sub',
-                  )}
-                >
-                  {v}
-                </span>
-                {why && <span className="text-11 leading-snug text-sub">{why}</span>}
-              </span>
-            )
-          },
         },
       ]}
       />

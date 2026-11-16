@@ -605,17 +605,18 @@ describe('PickCard 四维（2026-11-06 砍掉推导量）', () => {
 })
 
 describe('BuyPlan 明日买点（10 列 → 6 列）', () => {
-  it('留下的是下单要用的：区间 / 竞价额 / 结论 + 理由', () => {
+  it('留下的是下单要用的：区间 / 竞价额 / 什么情况下买', () => {
     const { container } = render(<BuyPlan relay={[]} watch={[stock()]} />)
     const txt = container.textContent ?? ''
     expect(txt).toContain('竞价落在')
     expect(txt).toContain('0.0% ~ 1.2%')
     expect(txt).toContain('竞价额要够')
     expect(txt).toContain('0.22 亿')
-    // 2026-11-16：盘后只能给「预案倾向」，结论要等 09:25 竞价，列名随之调整
-    expect(txt).toContain('预案倾向（9:25 定）')
-    expect(txt).toContain('放弃')
-    expect(txt).toContain('身位差 3 板')
+    // 2026-11-16 用户选 A：删掉「预案倾向」整列，只留「什么情况下买」（结论等 09:25 才定）
+    expect(txt).toContain('什么情况下买')
+    expect(txt).not.toContain('预案倾向')
+    // 删列后「身位差 3 板」这类理由不再渲染（它原属被删的那一列）
+    expect(txt).not.toContain('身位差 3 板')
   })
 
   it('⛔ 统计推导列不再出现（买不到 / 该档真买到 / 明早中位 / 超预期线）', () => {
