@@ -1,5 +1,5 @@
 // 财富密码决策档案（2026-11-06 按用户四问重排：买什么 / 赚没赚 / 为什么买 / 为什么没买）
-export { DecisionBoard } from './components/DecisionBoard'
+export { DecisionBoard, TomorrowBoard } from './components/DecisionBoard'
 export { TodayVerdict } from './components/TodayVerdict'
 export { PoolLedgerCard } from './components/PoolLedgerCard'
 export { EnvPanel } from './components/EnvPanel'

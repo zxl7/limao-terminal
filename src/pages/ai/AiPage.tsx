@@ -28,7 +28,7 @@ import {
   n2,
   pct,
 } from '@/features/analytics'
-import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel, navRowsDesc } from '@/features/wealth'
+import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel, TomorrowBoard, navRowsDesc } from '@/features/wealth'
 import { Card, CardBadge, EmptyState, LineChart, StockLink } from '@/shared/ui'
 import { cn, stanceText } from '@/shared/lib'
 
@@ -686,17 +686,19 @@ const CALIBER_LABEL: Record<string, string> = {
   ai_judgement_t1_close: 'T+1 口径（竞价→次日收盘）',
 }
 
+// 2026-11-16 用户定的顺序：今日 → 明日 → 尾盘 → 竞价 → 执行（文案不变）
 const WEALTH_SECTIONS = [
-  { key: 'link', label: '今日链路' },
-  { key: 'gap', label: '竞价留痕' },
-  { key: 'audit', label: '执行审计' },
-  { key: 'ambush', label: '尾盘潜伏' },
+  { key: 'today', label: '今日' },
+  { key: 'tomorrow', label: '明日' },
+  { key: 'ambush', label: '尾盘' },
+  { key: 'gap', label: '竞价' },
+  { key: 'audit', label: '执行' },
 ] as const
 
 type WealthSection = (typeof WEALTH_SECTIONS)[number]['key']
 
 export function Component() {
-  const [section, setSection] = useState<WealthSection>('link')
+  const [section, setSection] = useState<WealthSection>('today')
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 border-b border-line pb-2">
@@ -707,12 +709,27 @@ export function Component() {
           onChange={(k) => setSection(k as WealthSection)}
         />
       </div>
-      {section === 'link' && <AiWealthView />}
+      {section === 'today' && <AiWealthView />}
+      {section === 'tomorrow' && <TomorrowView />}
+      {section === 'ambush' && <AmbushView />}
       {section === 'gap' && <SectorGapView />}
       {section === 'audit' && <ExecutionAuditView />}
-      {section === 'ambush' && <AmbushView />}
     </div>
   )
+}
+
+/**
+ * 明日策略（2026-11-16 用户：顶部独立 tab「明日」，不再塞在今日链路里）。
+ * 只读最新一期决策档案；⛔ 不在这里做任何判定。
+ */
+export function TomorrowView() {
+  const dossiers = useQuery(analyticsQueries.decisionCandidates())
+  const latest = useMemo(() => {
+    const list = (dossiers.data ?? []).map((f) => f.data).filter((x): x is DecisionDossier => !!x)
+    list.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    return list[0]
+  }, [dossiers.data])
+  return <TomorrowBoard dossier={latest} />
 }
 
 /**

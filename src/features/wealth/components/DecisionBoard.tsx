@@ -1,6 +1,4 @@
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
-import { useState } from 'react'
-import { SegTabs } from '@/features/analytics'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { BuyPlan } from './BuyPlan'
 import { EnvPanel } from './EnvPanel'
@@ -92,17 +90,7 @@ export function DecisionBoard({
   // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
   screen?: ScreenFile
 }) {
-  // 今日 / 明日 两个 tab（2026-11-16 用户要求分开）。
-  // 自动切换口径（用户第二次更正）：**过了午夜 00:00** 才默认「明日」——
-  //   白天到当晚 24:00 之前都看「今日」；跨过零点，预案就成了"今天要做的事"，
-  //   默认切到「明日标的」（内容仍是昨晚收盘写的那份，等下一个收盘再刷新）。
-  // ⛔ Hook 必须在早退之前调用（rules of hooks）。
-  const [tab, setTab] = useState<'today' | 'tomorrow'>(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    const dossierDate = String(dossier?.date ?? '')
-    return dossierDate && today > dossierDate ? 'tomorrow' : 'today'
-  })
-
+  void _screen
   if (!dossier) {
     return (
       <div className="flex flex-col gap-3">
@@ -113,33 +101,9 @@ export function DecisionBoard({
     )
   }
 
-  void _screen
-  const relay = dossier.relay ?? []
-  const watch = dossier.watch ?? []
-
-  /**
-   * 今日 / 明日 分两个 tab（2026-11-16 用户：「今日策略和明日分隔开，新开一个明日 tab，
-   * 过了 12 点再自动切换」）。
-   *
-   * 默认值的规则：**中午 12 点后默认看「明日」**（上午盘面已走完，重点转成明天怎么做）；
-   * 12 点前默认「今日」。⛔ 默认值只算一次（模块级日期），手动切换后不再被时间抢回。
-   */
   return (
     <div className="flex flex-col gap-3">
-      <SegTabs
-        items={[
-          { key: 'today', label: '今日策略' },
-          { key: 'tomorrow', label: `明日标的（${relay.length + watch.length}）` },
-        ]}
-        value={tab}
-        onChange={(k) => setTab(k as 'today' | 'tomorrow')}
-      />
-      {tab === 'today' && (
-      <>
-      {/* ① 今天：买了没有 + 为什么是这个结果（全页第一眼） */}
       <TodayVerdict dossier={dossier} callFile={callFile} ledger={ledger} />
-
-      {/* ② 今日账本：09:25 竞价价买 → 当日收盘卖（赚没赚） */}
       <PoolLedgerCard
         callFile={callFile}
         quotes={quotes}
@@ -147,21 +111,32 @@ export function DecisionBoard({
         participateCount={callFile?.meta?.participate?.length ?? 0}
         effectiveQuota={callFile?.meta?.effective_quota ?? callFile?.quota}
       />
-
-      {/* ③ 今晨竞价：读数层（只留两个能读出结论的计数） */}
       <Card title="今晨竞价" extra={<CardBadge>{callFile?.trade_date ?? '未生成'}</CardBadge>}>
         <EnvPanel callFile={callFile} />
       </Card>
+    </div>
+  )
+}
 
-      </>
-      )}
-
-      {tab === 'tomorrow' && (
-      <>
-      {/* ④ 明日标的：买什么、竞价落在哪、要多少钱。
-          ⚠️ 日期口径：`dossier` 是**今天盘后写的预案**，执行日是**次一交易日** ——
-              与上方 ①②③（今日执行日）不是同一天，⛔ 必须在卡头标明，否则会把
-              「明天该买的」当成「今天买了什么」读。 */}
+/**
+ * 明日策略 —— 页面顶部独立 tab（2026-11-16 用户：不要在今日链路里再开「今日/明日」，
+ * 顺序改为 今日、明日、尾盘、竞价、执行）。
+ *
+ * 内容：明日标的（每只票都给「什么情况下买」）+ 接力池 + 观察（明早竞价判）。
+ * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
+ */
+export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
+  if (!dossier) {
+    return (
+      <div className="flex flex-col gap-3">
+        <EmptyState text="本期决策档案未生成" hint="wealth_code/cache/candidates-<日期>.json 未生成" />
+      </div>
+    )
+  }
+  const relay = dossier.relay ?? []
+  const watch = dossier.watch ?? []
+  return (
+    <div className="flex flex-col gap-3">
       <Card
         title="明日标的"
         extra={
@@ -179,7 +154,6 @@ export function DecisionBoard({
         <BuyPlan relay={relay} watch={watch} />
       </Card>
 
-      {/* ⑤ 接力池 */}
       <PoolSection
         title="接力池"
         badge={`${relay.length} 只`}
@@ -189,11 +163,6 @@ export function DecisionBoard({
         emptyText="今日无可接力标的 —— 接力池留空是允许的结论"
       />
 
-      {/*
-        ⑥ 观察（2026-11-11 文案）：11-10 起已合并为**单接力池**，watch 里通常只剩
-        「全市场唯一且 ≥7 板」那只高度观察票。⛔ 不能再叫「观察池·不可买」——
-        原观察票明早照样走 09:25 裁决（POOL_CALL_ALL_TRADEABLE=1）。
-      */}
       <PoolSection
         title="观察（明早竞价判）"
         badge={`${watch.length} 只`}
@@ -202,8 +171,6 @@ export function DecisionBoard({
         marketMaxBoards={dossier.market_max_boards}
         emptyText="无观察标的"
       />
-      </>
-      )}
     </div>
   )
 }

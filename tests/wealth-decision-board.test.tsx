@@ -15,6 +15,7 @@ import {
   PoolLedgerCard,
   ScreenFunnel,
   TodayVerdict,
+  TomorrowBoard,
 } from '@/features/wealth'
 
 /**
@@ -646,40 +647,30 @@ describe('ScreenFunnel 全量过筛（诊断层）', () => {
 })
 
 describe('DecisionBoard 版面顺序对回四个问题', () => {
-  it('今日 / 明日 分两个 tab：今日 = 今天 → 账本 → 今晨竞价；明日 = 明日标的 → 接力池 → 观察', async () => {
-    // 2026-11-16 用户：「今日策略和明日分隔开，新开一个明日 tab」。
-    // 默认 tab 取决于当前小时（≥12 点默认「明日」），所以这里把两个 tab 都点一遍。
-    const { container } = render(
+  it('今日与明日是两个独立组件：今日 = 今天 → 账本 → 今晨竞价；明日 = 明日标的 → 接力池 → 观察', () => {
+    // 2026-11-16 用户：不要在今日链路里再开 tab；明日改成页面顶部独立 tab。
+    const today = render(
       <DecisionBoard dossier={dossier()} callFile={poolCall()} ledger={ledger()} screen={screenFile()} />,
     )
-    const clickTab = async (label: string) => {
-      const btn = [...container.querySelectorAll('button')].find((b) => (b.textContent ?? '').includes(label))
-      expect(btn, `找不到 tab：${label}`).toBeTruthy()
-      btn!.click()
-      await new Promise((r) => setTimeout(r, 0))
-    }
-
-    await clickTab('今日策略')
-    let txt = container.textContent ?? ''
-    const today = ['今天', '今日账本', '今晨竞价']
-    const ti = today.map((k) => txt.indexOf(k))
-    for (const [i, v] of ti.entries()) expect(v, `缺块：${today[i]}`).toBeGreaterThanOrEqual(0)
+    const tt = today.container.textContent ?? ''
+    const tOrder = ['今天', '今日账本', '今晨竞价']
+    const ti = tOrder.map((k) => tt.indexOf(k))
+    for (const [i, v] of ti.entries()) expect(v, `缺块：${tOrder[i]}`).toBeGreaterThanOrEqual(0)
     expect(ti).toEqual([...ti].sort((a, b) => a - b))
-    // 明日内容不能在「今日」tab 里出现
-    expect(txt).not.toContain('接力池')
+    // 今日组件里不该再出现明日内容
+    expect(tt).not.toContain('接力池')
+    expect(tt).not.toContain('明日标的')
 
-    await clickTab('明日标的')
-    txt = container.textContent ?? ''
-    const tomorrow = ['明日标的', '接力池', '观察（明早竞价判）']
-    const mi = tomorrow.map((k) => txt.indexOf(k))
-    for (const [i, v] of mi.entries()) expect(v, `缺块：${tomorrow[i]}`).toBeGreaterThanOrEqual(0)
+    const tomorrow = render(<TomorrowBoard dossier={dossier()} />)
+    const mt = tomorrow.container.textContent ?? ''
+    const mOrder = ['明日标的', '接力池', '观察（明早竞价判）']
+    const mi = mOrder.map((k) => mt.indexOf(k))
+    for (const [i, v] of mi.entries()) expect(v, `缺块：${mOrder[i]}`).toBeGreaterThanOrEqual(0)
     expect(mi).toEqual([...mi].sort((a, b) => a - b))
   })
 
   it('接力池为空时明说「留空是允许的结论」，不说没数据', () => {
-    const { container } = render(
-      <DecisionBoard dossier={dossier()} callFile={poolCall()} ledger={ledger()} screen={screenFile()} />,
-    )
+    const { container } = render(<TomorrowBoard dossier={dossier()} />)
     const txt = container.textContent ?? ''
     expect(txt).toContain('今日无可接力标的')
     expect(txt).not.toContain('暂无数据')
