@@ -92,9 +92,16 @@ export function DecisionBoard({
   // ⛔ `screen` 已不在此页渲染（移到 AI 页「诊断」tab），保留参数只为不破坏既有调用方。
   screen?: ScreenFile
 }) {
-  // 今日 / 明日 两个 tab（2026-11-16 用户要求分开）：12 点后默认看「明日」。
-  // ⛔ Hook 必须在早退之前调用（规则 of hooks）。
-  const [tab, setTab] = useState<'today' | 'tomorrow'>(() => (new Date().getHours() >= 12 ? 'tomorrow' : 'today'))
+  // 今日 / 明日 两个 tab（2026-11-16 用户要求分开）。
+  // 自动切换口径（用户第二次更正）：**过了午夜 00:00** 才默认「明日」——
+  //   白天到当晚 24:00 之前都看「今日」；跨过零点，预案就成了"今天要做的事"，
+  //   默认切到「明日标的」（内容仍是昨晚收盘写的那份，等下一个收盘再刷新）。
+  // ⛔ Hook 必须在早退之前调用（rules of hooks）。
+  const [tab, setTab] = useState<'today' | 'tomorrow'>(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const dossierDate = String(dossier?.date ?? '')
+    return dossierDate && today > dossierDate ? 'tomorrow' : 'today'
+  })
 
   if (!dossier) {
     return (
@@ -165,6 +172,7 @@ export function DecisionBoard({
         }
       >
         <p className="text-11 text-sub m-0 mb-1.5">
+          这份是 <b className="text-txt">{dossier.date}</b> 收盘后写的，等下一次收盘再刷新。
           盘后只给<b className="text-txt">预案</b>：竞价区间、要多少钱、大概什么档位。
           <b className="text-txt">买卖结论要到明早 9:25 竞价后</b>，对整个池子统一裁一次。
         </p>
