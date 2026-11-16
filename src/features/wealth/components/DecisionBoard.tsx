@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
 import { Tag } from '@/features/analytics'
-import { AntDescriptions, AntdProvider, AntDrawer, AntTable } from '@/shared/ui/antd'
+import { AntDescriptions, AntdProvider, AntTable } from '@/shared/ui/antd'
 import { boardsText } from '@/features/wealth/lib/format'
 import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
@@ -91,7 +91,7 @@ export function DecisionBoard({
  * ⛔ 只呈现预案；买卖结论等当天 09:25 竞价后统一裁定。
  */
 export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
-  const [picked, setPicked] = useState<DecisionDossier['relay'][number] | null>(null)
+  const [pickedCode, setPickedCode] = useState<string>('')
   if (!dossier) {
     return (
       <div className="flex flex-col gap-3">
@@ -104,6 +104,8 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
   const rows = [...relay, ...watch].filter(
     (s, i, arr) => arr.findIndex((x) => x.code === s.code) === i,
   )
+  // 左右结构：右侧默认展示第一只，点击左侧行切换
+  const picked = rows.find((r) => r.code === pickedCode) ?? rows[0]
 
   return (
     <div className="flex flex-col gap-3">
@@ -123,6 +125,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
           买卖结论要到明早 9:25 竞价后统一裁。
         </p>
         <AntdProvider>
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_460px]">
           <AntTable
             rowKey="code"
             size="small"
@@ -132,7 +135,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             dataSource={rows as unknown as Array<Record<string, unknown>>}
             sticky
             onRow={(r) => ({
-              onClick: () => setPicked(r as unknown as DecisionDossier['relay'][number]),
+              onClick: () => setPickedCode(String((r as { code?: string }).code ?? '')),
               style: { cursor: 'pointer' },
             })}
             columns={[
@@ -195,18 +198,24 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
               },
             ]}
           />
-        </AntdProvider>
 
-        {/* 右侧抽屉：点行弹出这只票的完整明细（今日涨停事实 + 明日竞价预案） */}
-        <AntDrawer
-          open={!!picked}
-          onClose={() => setPicked(null)}
-          width={560}
-          title={picked ? `${picked.name}（${picked.code}） · 明日预案` : ''}
-          destroyOnClose
-        >
-          {picked && <PlanDetail s={picked} />}
-        </AntDrawer>
+          {/* 右侧常驻详情（2026-11-16 用户：左右结构，点击切换；明日预案一样重要） */}
+          <div className="min-w-0">
+            {picked ? (
+              <>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                  <span className="text-13 font-semibold text-txt">{picked.name}</span>
+                  <span className="num text-11 text-sub">{picked.code}</span>
+                  <span className="ml-auto text-11 text-sub">点左侧任意一行切换</span>
+                </div>
+                <PlanDetail s={picked} />
+              </>
+            ) : (
+              <EmptyState text="左侧选一只票查看明细" />
+            )}
+          </div>
+          </div>
+        </AntdProvider>
       </Card>
     </div>
   )
