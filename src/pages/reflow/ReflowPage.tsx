@@ -147,7 +147,7 @@ export function PhaseCell({ c }: { c: RotationCandidate }) {
       {d.src === 'pool_codes' && (
         <span
           className="text-sub text-10"
-          title="选股宝题材快照里没对上这条线，退回按「历史成员今天有几只涨停」估算 —— 会偏高，只作参考"
+          title="题材库里没对上这条线，改用「历史成员今天有几只涨停」估算 —— 会偏高，只作参考"
         >
           估算
         </span>

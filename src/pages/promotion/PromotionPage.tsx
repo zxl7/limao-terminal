@@ -113,7 +113,7 @@ export function Component() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card title="⚡ 实时晋级反馈" extra={<CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中快照'}</CardBadge>}>
+      <Card title="⚡ 实时晋级反馈" extra={<CardBadge tone="up">{feedback.data?.generated_ts?.slice(11, 19) ?? '等待盘中数据'}</CardBadge>}>
         <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
           <span>昨日涨停 <b className="num text-txt">{feedback.data?.prev_zt_count ?? '—'}</b></span>
           <span>今日晋级 <b className="num text-up">{feedback.data?.promote_count ?? '—'}</b></span>
@@ -162,7 +162,7 @@ export function Component() {
               <br />
               ⚠️ <b className="text-txt">单日样本少时波动剧烈</b>（2 只票里成 1 只就是 50%），属统计噪声。
               故并列 <b className="text-txt">10 日简单均值虚线</b>作为趋势读数 —— 它是本页自算的参考，
-              与系统内 <b className="text-txt">动态阀门</b>（对比前 10 交易日截尾均值）<b>不是同一口径</b>，
+              与系统内 <b className="text-txt">动态阀门</b>（对比前 10 交易日截尾均值）<b>不是同一套算法</b>，
               当日阀门值以系统计算为准。
             </p>
           </>

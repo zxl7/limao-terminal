@@ -325,7 +325,7 @@ export function Component() {
                   </select>
                   <span className="text-sub text-12">
                     共 {activeDay?.rows.length ?? 0} 个板块 · 生成于 {activeDay?.generated_ts?.slice(11, 19) || '—'}
-                    {activeDay?.source === 'live' && ' · 今日盘中全量快照'}
+                    {activeDay?.source === 'live' && ' · 今日盘中全量'}
                   </span>
                 </div>
 
@@ -411,7 +411,7 @@ export function Component() {
                     ]}
                   />
                 <p className="text-sub text-11 mt-1.5">
-                  「同花顺」「滚动 5/10 日」为可选字段 —— 早于该口径上线日期的归档没有，渲染为「—」而非 0。
+                  「同花顺」「滚动 5/10 日」是后来才加的统计项 —— 更早的归档没有这两列，显示「—」，不是 0。
                 </p>
               </>
             )}
