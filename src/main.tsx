@@ -8,6 +8,7 @@ import { router } from './app/router'
 //   1. theme.css  —— @import "tailwindcss" + @theme 令牌（必须最先，它会建立 @layer 体系）
 //   2. base.css   —— reset 与全局排版（覆盖 Tailwind preflight 中需要调整的部分）
 //   3. skyroc UI  —— 组件库样式（放最后，避免其组件样式被通用工具类意外压制）
+import '@ant-design/v5-patch-for-react-19'
 import './styles/theme.css'
 import './styles/base.css'
 import '@skyroc/web-ui/style.css'

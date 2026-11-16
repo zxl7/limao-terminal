@@ -1,11 +1,12 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ParticipationQuotes, DecisionDossier, PoolCallFile, PoolLedger, ScreenFile } from '@/shared/api'
+import { Tag } from '@/features/analytics'
 import { AntdProvider, AntTable } from '@/shared/ui/antd'
 import { boardsText } from '@/features/wealth/lib/format'
 import { cn } from '@/shared/lib'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { buyCondition } from './BuyPlan'
-import { PickCard } from './PickCard'
 import { EnvPanel } from './EnvPanel'
 import { PoolLedgerCard } from './PoolLedgerCard'
 import { TodayVerdict } from './TodayVerdict'
@@ -143,18 +144,7 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
             expandable={{
               expandedRowRender: (r) => {
                 const row = r as unknown as DecisionDossier['relay'][number]
-                return (
-                  <div className="flex flex-col gap-2">
-                    {/* 原卡片全量（方向/身位/封板/原因…），按用户要求先全部保留 */}
-                    <PickCard
-                      stock={row}
-                      bucket={row.watch_group ? 'watch' : 'relay'}
-                      rank={row.relay_rank ?? row.watch_rank ?? undefined}
-                      marketMaxBoards={dossier.market_max_boards}
-                    />
-                    <PlanDetail s={row} />
-                  </div>
-                )
+                return <PlanDetail s={row} />
               },
               expandRowByClick: true,
               rowExpandable: () => true,
@@ -226,36 +216,92 @@ export function TomorrowBoard({ dossier }: { dossier?: DecisionDossier }) {
 }
 
 /** 二级：明天的竞价预案（区间 / 条件 / 金额 / 身位说明） */
+/**
+ * 二级明细（2026-11-16）：
+ * 1. **横排**（项目当列，一行值），不要竖排；
+ * 2. **不重复**：板数/身位/封板/晋级率/涨停原因一级已有 → 这里不再列；
+ * 3. 主题色 + Tag 全部用上。
+ */
 function PlanDetail({ s }: { s: DecisionDossier['relay'][number] }) {
   const r = s.expectation?.expected_range
   const lo = Array.isArray(r) && r.length === 2 ? Number(r[0]) : null
   const hi = Array.isArray(r) && r.length === 2 ? Number(r[1]) : null
   const amt = s.expectation?.auction_amount_min_yi
-  const stars = (s as { conditional_promotion?: { quality?: string; rate?: number; n?: number } }).conditional_promotion
+  const exp = s.expectation as
+    | { expected_text?: string; super_text?: string; low_text?: string; phase?: string; confidence?: number }
+    | undefined
+  const conf = exp?.confidence
+
+  const cell = (v: ReactNode) => <span className="text-12 whitespace-normal">{v}</span>
+  const cols = [
+    {
+      title: '方向',
+      width: 150,
+      render: () =>
+        cell(
+          <span>
+            <Tag tone="up">{s.core_theme || s.theme || '—'}</Tag>
+            <span className="text-sub ml-1">
+              {s.theme_mates_cnt ? `同题材 ${s.theme_mates_cnt} 家` : '独苗'}
+            </span>
+          </span>,
+        ),
+    },
+    {
+      title: '带动',
+      width: 80,
+      align: 'right' as const,
+      render: () => cell(<span className="num">{s.carry_cnt ? `${s.carry_cnt} 家` : '—'}</span>),
+    },
+    {
+      title: '竞价落在',
+      width: 110,
+      align: 'right' as const,
+      render: () =>
+        cell(
+          <b className="num text-warn">
+            {lo != null && hi != null ? `${lo.toFixed(1)}% ~ ${hi.toFixed(1)}%` : '未给出'}
+          </b>,
+        ),
+    },
+    { title: '什么情况下买', width: 260, render: () => cell(<span className="text-txt">{buyCondition(s)}</span>) },
+    {
+      title: '竞价额要够',
+      width: 100,
+      align: 'right' as const,
+      render: () => cell(<b className="num text-rec">{typeof amt === 'number' && amt > 0 ? `${amt.toFixed(2)} 亿` : '—'}</b>),
+    },
+    {
+      title: '情绪阶段',
+      width: 90,
+      render: () => cell(exp?.phase ? <Tag tone="warn">{exp.phase}</Tag> : <span className="text-sub">—</span>),
+    },
+    {
+      title: '置信度',
+      width: 80,
+      align: 'right' as const,
+      render: () =>
+        cell(
+          <span className={cn('num', (conf ?? 0) >= 0.7 ? 'text-up' : 'text-sub')}>
+            {conf == null ? '—' : conf.toFixed(2)}
+          </span>,
+        ),
+    },
+    { title: '正常预期', width: 220, render: () => cell(<span className="text-sub">{exp?.expected_text || '—'}</span>) },
+    { title: '超预期', width: 200, render: () => cell(<span className="text-up">{exp?.super_text || '—'}</span>) },
+    { title: '低于预期', width: 200, render: () => cell(<span className="text-down">{exp?.low_text || '—'}</span>) },
+  ]
+
   return (
-    <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-12 md:grid-cols-2">
-      <span>
-        <span className="text-sub">竞价落在　</span>
-        <b className="num text-txt">
-          {lo != null && hi != null ? `${lo.toFixed(1)}% ~ ${hi.toFixed(1)}%` : '未给出'}
-        </b>
-      </span>
-      <span>
-        <span className="text-sub">什么情况下买　</span>
-        <span className="text-txt">{buyCondition(s)}</span>
-      </span>
-      <span>
-        <span className="text-sub">竞价额要够　</span>
-        <b className="num text-txt">{typeof amt === 'number' && amt > 0 ? `${amt.toFixed(2)} 亿` : '—'}</b>
-      </span>
-      <span>
-        <span className="text-sub">身位　</span>
-        <span className="text-txt">
-          {s.dragon_rank == null ? '—' : `方向内第 ${s.dragon_rank}`}
-          {s.theme_mates_cnt ? ` · 同题材 ${s.theme_mates_cnt} 家` : ' · 独苗'}
-          {stars?.quality === 'ok' && stars.rate != null ? ` · 晋级样本 ${stars.n} 次 ${stars.rate.toFixed(1)}%` : ''}
-        </span>
-      </span>
-    </div>
+    <AntTable
+      rowKey={() => 'detail'}
+      size="small"
+      bordered
+      pagination={false}
+      showHeader
+      dataSource={[s]}
+      scroll={{ x: 'max-content' }}
+      columns={cols}
+    />
   )
 }
