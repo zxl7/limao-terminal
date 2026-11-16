@@ -1237,6 +1237,14 @@ export interface DossierStock {
   limit_up_reason?: string | null
   /** 断板票的说明：上次涨停哪天、几板 */
   boards_note?: string | null
+  /** 收盘共振分（0~3：成线 / 高度 / 早封），盘后可得，与 09:25 竞价共振不是一回事 */
+  close_resonance?: {
+    score: number
+    line: string
+    mates: number
+    max_boards: number
+    earliest: string
+  } | null
   leader_role?: '龙头' | '准龙头' | '跟风' | null
   /**
    * 昨日已在池 ∧ 今日板数更高 → 观察池优先占位（2026-11-04 用户「b 占位」）。

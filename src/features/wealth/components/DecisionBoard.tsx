@@ -122,9 +122,14 @@ function tagsOf(s: DecisionDossier['relay'][number]): Array<{ label: string; ton
   if (e.boom_label) out.push({ label: e.boom_label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ''), tone: 'up' })
   if (e.seal_form) out.push({ label: e.seal_form, tone: e.seal_form.includes('一字') ? 'up' : 'warn' })
   if (e.sector_tier === 'dragon') out.push({ label: '板块龙', tone: 'rec' })
-  if (e.gap_strength_hint) {
-    const t = e.gap_strength_hint.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '')
-    if (t) out.push({ label: t, tone: 'neutral' })
+  // ⛔ 2026-11-16 用户：删掉「高开谨慎/低开风险」这种含糊提示，不再上卡。
+  // 🧲 收盘共振分（成线 / 高度 / 早封）——盘后就能算，直接告诉这条线强不强
+  const cr = (s as { close_resonance?: { score: number } }).close_resonance
+  if (cr && typeof cr.score === 'number') {
+    out.push({
+      label: `共振 ${cr.score}/3`,
+      tone: cr.score >= 3 ? 'up' : cr.score === 2 ? 'warn' : 'neutral',
+    })
   }
   if (e.phase) out.push({ label: e.phase, tone: 'warn' })
   return out.slice(0, 4)
