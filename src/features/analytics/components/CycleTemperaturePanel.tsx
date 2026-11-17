@@ -140,7 +140,14 @@ function ChartMeta({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap items-center justify-end gap-1.5">{children}</div>
 }
 
-export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResult }) {
+export function CycleTemperaturePanel({
+  result,
+  compact = false,
+}: {
+  result: CycleTemperatureResult
+  /** 只渲染「当前周期状态 + 数据维度冷热」两块（2026-11-17：复盘页只要这两个，别把总览整块搬过去） */
+  compact?: boolean
+}) {
   const phase = phaseOf(result)
   const cycle = result.cycle
   const feedback = result.feedback
@@ -205,7 +212,7 @@ export function CycleTemperaturePanel({ result }: { result: CycleTemperatureResu
         </section>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div className={compact ? 'hidden' : 'mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2'}>
         <Card
           title="投机情绪 · 周期相位"
           extra={<ChartMeta><HeatBadge signal={result.heat.sentiment} /><CardBadge>{cycle.length}日</CardBadge></ChartMeta>}

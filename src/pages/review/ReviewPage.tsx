@@ -112,20 +112,16 @@ export function Component() {
         </div>
       </Card>
 
-      {/* 🌊 情绪周期（2026-11-17 用户：把情绪周期的关键图搬到复盘顶部）
-          ⛔ 不重复顶栏已有的 涨停/跌停/炸板/封板率/最高板/涨跌家数 —— 这里只放「周期」视角：
-          情绪分轨迹 + 晋级率 + 核按钮。 */}
-      {/* 🌊 情绪周期（2026-11-17 用户：把「投机情绪·周期相位 / 昨日涨停反馈·涨停家数·炸板率 /
-          资金温度·主力净额 / 接力质量」接进复盘页）
-          ⛔ 不重复顶栏已有的 涨停/跌停/炸板/封板率/最高板/涨跌家数。 */}
-      <Card title="🌊 情绪周期" extra={<CardBadge>相位 · 反馈 · 资金</CardBadge>}>
-        <CycleTemperaturePanel result={temperature} />
-        {/* 🔁 接力质量：晋级率 / 核按钮 / 连板晋级（与上方面板来源不同，单独一行） */}
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-line-faint pt-2">
-          <span className="text-12 font-semibold text-txt">🔁 接力质量</span>
+      {/* 🌊 情绪周期（2026-11-17 用户最终口径）：
+          用「周期温度总览」但**只保留**「当前周期状态 + 数据维度冷热」两块（compact），
+          下面的图表区不搬；另补一行「接力质量」。 */}
+      <CycleTemperaturePanel result={temperature} compact />
+      <Card title="🔁 接力质量" extra={<CardBadge>晋级 · 核按钮 · 情绪分</CardBadge>}>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />
           <Kpi label="核按钮" value={last?.nuke == null ? '—' : `${last.nuke} 只`} tone={(last?.nuke ?? 0) >= 5 ? 'down' : undefined} />
           <Kpi label="情绪分" value={last?.sentiment == null ? '—' : `${n1(last.sentiment)}/10`} tone={tone((last?.sentiment ?? 5) - 5)} />
+          <Kpi label="最高板" value={last?.max_boards == null ? '—' : `${last.max_boards} 板`} tone="warn" />
         </div>
       </Card>
 
