@@ -112,10 +112,11 @@ export function Component() {
         </div>
       </Card>
 
-      {/* 🌊 情绪周期（2026-11-17 用户最终口径）：
-          用「周期温度总览」但**只保留**「当前周期状态 + 数据维度冷热」两块（compact），
-          下面的图表区不搬；另补一行「接力质量」。 */}
-      <CycleTemperaturePanel result={temperature} compact />
+      {/* 🌊 情绪周期（2026-11-17 用户最终口径 · 第二次更正）：
+          把「周期温度总览」的**三张图**迁过来（周期相位 / 昨日涨停反馈 / 资金温度·主力净额）；
+          上面的「当前周期状态」「数据维度冷热」两块**删掉**。
+          另补一行「接力质量」（原面板里没有这一块）。 */}
+      <CycleTemperaturePanel result={temperature} chartsOnly />
       <Card title="🔁 接力质量" extra={<CardBadge>晋级 · 核按钮 · 情绪分</CardBadge>}>
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />

@@ -142,11 +142,15 @@ function ChartMeta({ children }: { children: ReactNode }) {
 
 export function CycleTemperaturePanel({
   result,
-  compact = false,
+  chartsOnly = false,
 }: {
   result: CycleTemperatureResult
-  /** 只渲染「当前周期状态 + 数据维度冷热」两块（2026-11-17：复盘页只要这两个，别把总览整块搬过去） */
-  compact?: boolean
+  /**
+   * `chartsOnly`（2026-11-17 用户最终口径）：
+   * **保留三张图**（周期相位 / 昨日涨停反馈 / 资金温度·主力净额），
+   * **删掉上面的「当前周期状态」和「数据维度冷热」两块**。
+   */
+  chartsOnly?: boolean
 }) {
   const phase = phaseOf(result)
   const cycle = result.cycle
@@ -170,7 +174,7 @@ export function CycleTemperaturePanel({
         </div>
       }
     >
-      <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(270px,0.82fr)_minmax(0,2fr)]">
+      <div className={chartsOnly ? 'hidden' : 'grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(270px,0.82fr)_minmax(0,2fr)]'}>
         <section className={`rounded border p-3 ${PHASE_SURFACE[phase.tone]}`} aria-label="当前周期状态">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -212,7 +216,7 @@ export function CycleTemperaturePanel({
         </section>
       </div>
 
-      <div className={compact ? 'hidden' : 'mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2'}>
+      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
         <Card
           title="投机情绪 · 周期相位"
           extra={<ChartMeta><HeatBadge signal={result.heat.sentiment} /><CardBadge>{cycle.length}日</CardBadge></ChartMeta>}
