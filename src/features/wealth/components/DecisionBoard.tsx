@@ -364,7 +364,7 @@ function DetailGroup({ title, rows }: { title: string; rows: DetailRow[] }) {
       column={1}
       size="small"
       bordered
-      labelStyle={{ width: 96, background: '#fafbfd', color: '#6b7280' }}
+      styles={{ label: { width: 96, background: '#fafbfd', color: '#6b7280' } }}
       items={rows.map((row, i) => ({ key: String(i), label: row.k, children: row.v() }))}
     />
   )

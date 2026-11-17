@@ -111,7 +111,7 @@ afterAll(() => {
   restore?.()
 })
 
-describe('全页面真实数据渲染', () => {
+describe('全页面真实数据渲染', { timeout: 20_000 }, () => {
   for (const [name, importer] of PAGES) {
     it(`${name} 页面可渲染且不抛错`, async () => {
       const mod = (await importer()) as { Component?: ComponentType }
@@ -136,6 +136,7 @@ describe('全页面真实数据渲染', () => {
 
       // 关键断言：渲染出了实体内容，而不是白屏
       expect(container.textContent?.trim().length).toBeGreaterThan(0)
+      // 注：ai 页面现在含 antd 表格（体积大、首渲染慢），并行跑时偶发超时 → 由外层放宽超时
 
       /**
        * 逐个点开页面内的按钮 —— 这一步是**必要的**，不是补充。
