@@ -153,6 +153,9 @@ export function CycleTemperaturePanel({
   chartsOnly?: boolean
 }) {
   const phase = phaseOf(result)
+  // 2026-11-17：复盘页把三张图搬过去后，高度要收（用户：「图表缩小高度」）
+  const chartH = chartsOnly ? 120 : 190
+  const fundH = chartsOnly ? 110 : 180
   const cycle = result.cycle
   const feedback = result.feedback
   const funds = result.funds
@@ -230,7 +233,7 @@ export function CycleTemperaturePanel({
                   { name: '情绪分', values: cycle.map((row) => row.sentiment), tone: 'up', area: true },
                   { name: 'MA3', values: cycle.map((row) => row.sentimentMa3), tone: 'sub', dashed: true },
                 ]}
-                height={190}
+                height={chartH}
                 yMin={0}
                 yMax={10}
                 refLines={[
@@ -293,7 +296,7 @@ export function CycleTemperaturePanel({
                 <LineChart
                   labels={funds.map((row) => row.date.slice(5))}
                   series={[{ name: '资金温度', values: funds.map((row) => row.temperature), tone: 'mid', area: true }]}
-                  height={180}
+                  height={fundH}
                   yMin={0}
                   yMax={100}
                   refLines={[{ value: 50, label: '50', tone: 'sub' }]}
