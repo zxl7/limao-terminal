@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, queryClient } from '@/shared/api'
 import type { ReviewPanel, ReviewSeries } from '@/shared/api/types'
-import { Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
-import { Tag, n1, n2 } from '@/features/analytics'
+import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { CycleTemperaturePanel, Tag, n1, n2, useCycleTemperature } from '@/features/analytics'
 import { cn } from '@/shared/lib'
 import { parseMainline } from '@/features/review/mainline'
 import { parseAi } from '@/features/review/ai'
@@ -32,6 +32,8 @@ export function Component() {
   const series = useQuery({ queryKey: ['review', 'series'] as const, queryFn: api.reviewSeries, staleTime: 5 * 60_000 })
   const d = panel.data as ReviewPanel | undefined
   const s = series.data as ReviewSeries | undefined
+  // 周期温度（投机情绪/涨停反馈/资金温度）：Hook 必须在早退之前调用
+  const temperature = useCycleTemperature()
 
   const rows = s?.rows ?? []
   const tone = (v: number | null | undefined) => (v == null ? 'sub' : v >= 0 ? 'up' : 'down')
@@ -70,7 +72,6 @@ export function Component() {
   const mainlineBlocks = (mainline ? parseMainline(mainline.lines) : []).filter((b) => b.rank !== '支线')
   const aiData = ai ? parseAi(ai.lines) : null
   /** 评分轨迹：只取有情绪分的那几天（当前 5 日窗口），不足 2 点不画图 */
-  const trendRows = rows.filter((r) => r.sentiment != null).slice(-6)
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,31 +115,18 @@ export function Component() {
       {/* 🌊 情绪周期（2026-11-17 用户：把情绪周期的关键图搬到复盘顶部）
           ⛔ 不重复顶栏已有的 涨停/跌停/炸板/封板率/最高板/涨跌家数 —— 这里只放「周期」视角：
           情绪分轨迹 + 晋级率 + 核按钮。 */}
-      <Card title="🌊 情绪周期" extra={<CardBadge>{rows.length} 日窗口</CardBadge>}>
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-1.5">
-          <div className="flex items-baseline gap-2">
-            <span className="text-12 text-sub">情绪分</span>
-            <span className={cn('text-22 font-semibold num', (last?.sentiment ?? 5) >= 6 ? 'text-up' : (last?.sentiment ?? 5) <= 2 ? 'text-down' : 'text-mid')}>
-              {last?.sentiment == null ? '—' : n1(last.sentiment)}
-            </span>
-            <span className="text-11 text-sub">/10</span>
-          </div>
+      {/* 🌊 情绪周期（2026-11-17 用户：把「投机情绪·周期相位 / 昨日涨停反馈·涨停家数·炸板率 /
+          资金温度·主力净额 / 接力质量」接进复盘页）
+          ⛔ 不重复顶栏已有的 涨停/跌停/炸板/封板率/最高板/涨跌家数。 */}
+      <Card title="🌊 情绪周期" extra={<CardBadge>相位 · 反馈 · 资金</CardBadge>}>
+        <CycleTemperaturePanel result={temperature} />
+        {/* 🔁 接力质量：晋级率 / 核按钮 / 连板晋级（与上方面板来源不同，单独一行） */}
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-line-faint pt-2">
+          <span className="text-12 font-semibold text-txt">🔁 接力质量</span>
           <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />
           <Kpi label="核按钮" value={last?.nuke == null ? '—' : `${last.nuke} 只`} tone={(last?.nuke ?? 0) >= 5 ? 'down' : undefined} />
-          <span className="ml-auto text-11 text-sub">对照：情绪周期页看完整周期判定</span>
+          <Kpi label="情绪分" value={last?.sentiment == null ? '—' : `${n1(last.sentiment)}/10`} tone={tone((last?.sentiment ?? 5) - 5)} />
         </div>
-        {trendRows.length > 1 && (
-          <LineChart
-            labels={trendRows.map((r) => r.date.slice(5))}
-            series={[
-              { name: '情绪分', values: trendRows.map((r) => r.sentiment), tone: 'up', area: true },
-              { name: '晋级率%', values: trendRows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
-            ]}
-            height={140}
-            format={(v) => n1(v)}
-            refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
-          />
-        )}
       </Card>
 
       {/* ② 两栏：左=高标 + 主线 + 梯队；右=AI 综合判断 + 主线复盘 + 其余点评 */}

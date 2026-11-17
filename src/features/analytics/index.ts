@@ -132,6 +132,7 @@ export {
   type HeatSignal,
   type LiveCycleSnapshot,
 } from './lib/cycle-temperature'
+export { useCycleTemperature } from './lib/useCycleTemperature'
 
 // 数值格式化（null 一律渲染为「—」；二元区间必须走 range，禁止直接渲染数组）
 export {
