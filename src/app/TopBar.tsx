@@ -142,10 +142,18 @@ export function TopBar() {
           className="max-2xl:hidden 2xl:flex"
         />
         <HeadKpi
-          label="上涨家数"
+          label="上涨"
           value={breadth.up ?? DASH}
           unit="家"
           tone={headFromTone('up')}
+          className="max-2xl:hidden 2xl:flex"
+        />
+        {/* 2026-11-17 用户：顶部缺下跌家数 —— 涨跌要成对出现，只给一半没法判断广度 */}
+        <HeadKpi
+          label="下跌"
+          value={breadth.down ?? DASH}
+          unit="家"
+          tone={headFromTone('down')}
           className="max-2xl:hidden 2xl:flex"
         />
         <HeadKpi
