@@ -146,7 +146,7 @@ export function TopBar() {
           value={breadth.up ?? DASH}
           unit="家"
           tone={headFromTone('up')}
-          className="max-2xl:hidden 2xl:flex"
+          /* 2026-11-17：常显（原来只在 2xl 宽屏出现，窄屏看不到「下跌家数」） */
         />
         {/* 2026-11-17 用户：顶部缺下跌家数 —— 涨跌要成对出现，只给一半没法判断广度 */}
         <HeadKpi
@@ -154,7 +154,6 @@ export function TopBar() {
           value={breadth.down ?? DASH}
           unit="家"
           tone={headFromTone('down')}
-          className="max-2xl:hidden 2xl:flex"
         />
         <HeadKpi
           label="成交额"

@@ -34,8 +34,6 @@ export function Component() {
   const s = series.data as ReviewSeries | undefined
 
   const rows = s?.rows ?? []
-  // 直接派生（`rows` 每次渲染都是新数组，放进 useMemo 依赖只会每次重算）
-  const labels = rows.map((r) => r.date.slice(5))
   const tone = (v: number | null | undefined) => (v == null ? 'sub' : v >= 0 ? 'up' : 'down')
 
   if (!d) {
@@ -95,10 +93,8 @@ export function Component() {
             <span className="text-12 text-sub">跌停风险</span>
             <span className={cn('text-20 font-semibold num', risk.level === '高' ? 'text-down' : risk.level === '中' ? 'text-warn' : 'text-up')}>{risk.level}</span>
           </div>
-          <Kpi label="涨停/跌停" value={`${last?.zt ?? '—'} / ${last?.dt ?? '—'}`} />
           <Kpi label="情绪分" value={last?.sentiment == null ? '—' : `${n1(last.sentiment)}`} tone={tone((last?.sentiment ?? 5) - 5)} />
           <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />
-          <Kpi label="最高板" value={last?.max_boards == null ? '—' : `${last.max_boards}`} tone="warn" />
           <Kpi label="池均幅" value={m.zt_pool_avg == null ? '—' : `${n2(m.zt_pool_avg)}%`} tone={tone(m.zt_pool_avg)} />
           <Kpi label="红盘率" value={m.red_ratio == null ? '—' : `${n1(m.red_ratio)}%`} />
         </div>
@@ -115,24 +111,39 @@ export function Component() {
         </div>
       </Card>
 
-      {/* ② 两栏：左=情绪分图 + 高标 + 主线 + 情绪演变；右=AI 综合判断 + 主线复盘 + 其余点评 */}
+      {/* 🌊 情绪周期（2026-11-17 用户：把情绪周期的关键图搬到复盘顶部）
+          ⛔ 不重复顶栏已有的 涨停/跌停/炸板/封板率/最高板/涨跌家数 —— 这里只放「周期」视角：
+          情绪分轨迹 + 晋级率 + 核按钮。 */}
+      <Card title="🌊 情绪周期" extra={<CardBadge>{rows.length} 日窗口</CardBadge>}>
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 mb-1.5">
+          <div className="flex items-baseline gap-2">
+            <span className="text-12 text-sub">情绪分</span>
+            <span className={cn('text-22 font-semibold num', (last?.sentiment ?? 5) >= 6 ? 'text-up' : (last?.sentiment ?? 5) <= 2 ? 'text-down' : 'text-mid')}>
+              {last?.sentiment == null ? '—' : n1(last.sentiment)}
+            </span>
+            <span className="text-11 text-sub">/10</span>
+          </div>
+          <Kpi label="晋级率" value={last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} />
+          <Kpi label="核按钮" value={last?.nuke == null ? '—' : `${last.nuke} 只`} tone={(last?.nuke ?? 0) >= 5 ? 'down' : undefined} />
+          <span className="ml-auto text-11 text-sub">对照：情绪周期页看完整周期判定</span>
+        </div>
+        {trendRows.length > 1 && (
+          <LineChart
+            labels={trendRows.map((r) => r.date.slice(5))}
+            series={[
+              { name: '情绪分', values: trendRows.map((r) => r.sentiment), tone: 'up', area: true },
+              { name: '晋级率%', values: trendRows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
+            ]}
+            height={140}
+            format={(v) => n1(v)}
+            refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
+          />
+        )}
+      </Card>
+
+      {/* ② 两栏：左=高标 + 主线 + 梯队；右=AI 综合判断 + 主线复盘 + 其余点评 */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-3 items-start">
         <div className="flex flex-col gap-3">
-          {/* 情绪分 + 晋级率（双轴，20 日） */}
-          <Card title="📈 情绪分 / 晋级率" extra={<CardBadge>近 {rows.length} 日</CardBadge>}>
-            {rows.length ? (
-              <LineChart
-                labels={labels}
-                series={[
-                  { name: '情绪分', values: rows.map((r) => r.sentiment), tone: 'up', area: true },
-                  { name: '晋级率%', values: rows.map((r) => r.promote_rate), tone: 'lead', axis: 'right', format: (v) => `${Math.round(v)}%` },
-                ]}
-                height={165}
-                format={(v) => n1(v)}
-                refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
-              />
-            ) : <EmptyState text="无序列数据" />}
-          </Card>
 
           <Card title="👑 高标" extra={hb ? <CardBadge>{hb.max_boards} 板</CardBadge> : undefined}>
             {hb?.rows?.length ? hb.rows.map((r) => (
@@ -180,27 +191,6 @@ export function Component() {
             </Card>
           )}
 
-          {/* 2026-11-15 用户：情绪演变做成小卡，放左栏主线之下 */}
-          {evolution && (
-            <Card title="📉 情绪演变" extra={<CardBadge>评分轨迹</CardBadge>}>
-              {trendRows.length > 1 && (
-                <LineChart
-                  labels={trendRows.map((r) => r.date.slice(5))}
-                  series={[{ name: '情绪分', values: trendRows.map((r) => r.sentiment), tone: 'up', area: true }]}
-                  height={105}
-                  format={(v) => n1(v)}
-                  showLegend={false}
-                  refLines={[{ value: 7, label: '7', tone: 'sub', dashed: true }, { value: 2, label: '2', tone: 'sub', dashed: true }]}
-                />
-              )}
-              <div className="flex flex-col gap-1 text-11 leading-[1.65] text-txt mt-1.5 break-words">
-                {evolution.lines.map((ln, i) => (
-                  // oxlint-disable-next-line react/no-array-index-key -- 原文顺序不变
-                  <CommentLine key={i} text={ln} compact />
-                ))}
-              </div>
-            </Card>
-          )}
         </div>
 
         {/* 右栏：AI 综合判断 → 主线复盘 → 其余段落 */}
@@ -446,6 +436,42 @@ export function Component() {
           )}
         </div>
       </div>
+
+      {/* 📌 今日总结（2026-11-17 用户：底部放今天的归纳，重点是主线 / 次主线）
+          ⛔ 只做归纳，不重复上面已有的明细（风险信号、AI 事实卡、点评正文都不再搬）。 */}
+      {!!d.ladder?.length && (
+        <Card title="📌 今日总结" extra={<CardBadge>主线 / 次主线</CardBadge>}>
+          <div className="flex flex-col gap-1.5 text-12">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-sub w-[52px] flex-none">主线</span>
+              <Tag tone="up">{d.ladder[0].theme}</Tag>
+              <span className="text-sub">
+                {d.ladder[0].mates} 家 · 最高 {d.ladder[0].max_boards} 板 · 首板 {d.ladder[0].l1} 家
+              </span>
+            </div>
+            {d.ladder.length > 1 && (
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-sub w-[52px] flex-none">次主线</span>
+                {d.ladder.slice(1, 4).map((r) => (
+                  <span key={r.theme} className="flex items-baseline gap-1">
+                    <Tag tone="warn">{r.theme}</Tag>
+                    <span className="text-sub">{r.mates} 家 · {r.max_boards} 板</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-sub w-[52px] flex-none">一句话</span>
+              <span className="text-txt">
+                情绪 {last?.sentiment == null ? '—' : n1(last.sentiment)}/10 ·
+                晋级率 {last?.promote_rate == null ? '—' : `${n1(last.promote_rate)}%`} ·
+                跌停风险 {risk.level}
+                {d.ladder[0].l3 === 0 ? ' · 主线没有高度，只有首板' : ` · 主线有 ${d.ladder[0].l3} 只 3 板以上`}
+              </span>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }
