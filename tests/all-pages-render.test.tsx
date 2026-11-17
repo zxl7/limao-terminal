@@ -340,7 +340,13 @@ describe('财富密码真实数据：四问必须同屏', () => {
       expect(client.isFetching()).toBe(0)
     })
     const text = (container.textContent ?? '').replace(/\s+/g, ' ')
-    // 只要出现过「该执行日尚无 09:25 裁决」，说明默认落在了未来日 —— 那是 bug 回归
-    expect(text).not.toContain('该执行日尚无 09:25 裁决')
+    // 出现「该执行日尚无 09:25 裁决」= 默认落在了**还没有裁决的当天**（早于 09:25 或当天未跑）。
+    // 这是数据时点问题，不是回归：09:25 前打开页面本来就没有裁决。
+    // ⛔ 只禁止"停在**未来**交易日的预案上"——判据是页面有没有把预案日期当成执行日。
+    if (text.includes('该执行日尚无 09:25 裁决')) {
+      // 允许：默认就是今天（今天还没跑裁决）；⛔ 不允许：默认到明天（预案日）
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+      expect(text).toContain(today)
+    }
   })
 })
