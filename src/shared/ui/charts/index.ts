@@ -22,7 +22,7 @@
 
 export { useChartWidth } from './useChartWidth'
 export { Sparkline } from './Sparkline'
-export { LineChart, maLine, type LineSeries, type RefLine } from './LineChart'
+export { LineChart, maLine, type LineSeries, type RefLine, type ChartMarker } from './LineChart'
 export { BarChart, type Bar } from './BarChart'
 export { BarList, type BarListItem } from './BarList'
 export { HeatMatrix, type HeatRow } from './HeatMatrix'

@@ -36,6 +36,21 @@ export interface LineSeries {
   format?: (v: number) => string
 }
 
+/**
+ * 图上的点标注（如情绪周期里的「高潮 / 冰点」极点）。
+ *
+ * ⛔ 只做标注，不参与坐标计算 —— 取值仍由序列与刻度决定，标注画在数据点旁。
+ */
+export interface ChartMarker {
+  /** 数据点下标（与 labels 对齐） */
+  index: number
+  /** 标注文字（建议短：极点名 + 日期，如「高潮 11-10」） */
+  label: string
+  tone?: Tone
+  /** 画在点上方还是下方（默认 above） */
+  place?: 'above' | 'below'
+}
+
 /** 横向参考线（如情绪分 7 分「偏强」阈值、2 分「退潮」阈值） */
 export interface RefLine {
   value: number
@@ -52,6 +67,8 @@ export interface RefLine {
  * 以数组/对象为默认值的 props。
  */
 const NO_REF_LINES: RefLine[] = []
+/** 同上：空标注的稳定引用，避免每次渲染触发 memo 重算 */
+const NO_MARKERS: ChartMarker[] = []
 
 /**
  * 折线图 —— 时序类数据的主力图。
@@ -77,6 +94,7 @@ export function LineChart({
   format = axisLabel,
   yTickCount = 4,
   refLines = NO_REF_LINES,
+  markers = NO_MARKERS,
   yMin,
   yMax,
   /** Y 轴最小值强制取 0（如涨停家数这类计数，0 有实际意义） */
@@ -93,6 +111,8 @@ export function LineChart({
   format?: (v: number) => string
   yTickCount?: number
   refLines?: RefLine[]
+  /** 极点标注（高潮/冰点这类）：只画点与文字，不改坐标 */
+  markers?: ChartMarker[]
   yMin?: number
   yMax?: number
   zeroBased?: boolean
@@ -372,6 +392,33 @@ export function LineChart({
                     />
                   ) : null,
                 )}
+            </g>
+          )
+        })}
+
+        {/* ── 极点标注（高潮/冰点）：点 + 文字，贴数据点画，不改刻度 ── */}
+        {markers.map((m) => {
+          const v = series[0]?.values[m.index]
+          if (!isNum(v) || !syLeft) return null
+          const x = round2(sx(m.index))
+          const y = round2(syLeft(v))
+          const above = (m.place ?? 'above') === 'above'
+          // 靠近左右边缘时改锚点，避免文字被裁切
+          const anchor = m.index <= 1 ? 'start' : m.index >= labels.length - 2 ? 'end' : 'middle'
+          const tx = anchor === 'start' ? x - 2 : anchor === 'end' ? x + 2 : x
+          return (
+            <g key={`mk-${m.index}-${m.label}`}>
+              <circle cx={x} cy={y} r={2.8} fill={toneVar(m.tone ?? 'sub')} stroke="var(--color-card)" strokeWidth={1.2} />
+              <text
+                x={round2(tx)}
+                y={round2(above ? y - 7 : y + 13)}
+                textAnchor={anchor}
+                fontSize={9.5}
+                fontWeight={600}
+                fill={toneVar(m.tone ?? 'sub')}
+              >
+                {m.label}
+              </text>
             </g>
           )
         })}

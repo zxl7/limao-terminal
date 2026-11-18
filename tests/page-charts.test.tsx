@@ -135,6 +135,8 @@ describe('EmotionPage —— 情绪轨迹/接力质量/涨停家数', () => {
 })
 
 describe('TradePage —— 全部交易走势 / 逐日收益', () => {
+  // ⏱ 2026-11-18：整页渲染 + 三张图，全量套件并发下会顶到默认 5s 上限（单跑 2.7s）。
+  //    这里只放宽超时，不删任何断言。
   it('按全部结算交易画一条净值折线，不单列回撤，逐日收益柱仍保留', async () => {
     const container = await renderPage(await import('@/pages/trade/TradePage'))
 
@@ -151,7 +153,7 @@ describe('TradePage —— 全部交易走势 / 逐日收益', () => {
 
     // 逐日收益柱：空仓日以中性色呈现，但仍应是实心柱而非透明热区
     expect(dataRects(container).length, '逐日收益柱未生成 rect').toBeGreaterThan(0)
-  })
+  }, 15_000)
 
   it('不含尾盘潜伏页签 —— 该板块已独立为 AI尾盘潜伏页', async () => {
     await renderPage(await import('@/pages/trade/TradePage'))

@@ -1,8 +1,17 @@
-import type { ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { CycleTemperatureResult, CyclePhase, HeatSignal, HeatLevel } from '../lib/cycle-temperature'
 import { CYCLE_PHASE_LABEL, CYCLE_PHASE_TONE, HEAT_LABEL } from '../lib/cycle-temperature'
-import { BarChart, Card, CardBadge, EmptyState, LineChart } from '@/shared/ui'
+import { BarChart, Card, CardBadge, EmptyState, LineChart, type ChartMarker } from '@/shared/ui'
+import { SegTabs } from './Table'
 import { n1 } from '../lib/format'
+
+/** 观察窗口档位（2026-11-18）：只切展示区间，⛔ 不重算指标 */
+const CYCLE_RANGES = [
+  { key: '20', label: '20日' },
+  { key: '60', label: '60日' },
+  { key: '120', label: '120日' },
+  { key: '0', label: '全部' },
+] as const
 
 function pct(value: number | null): string {
   return value == null ? '—' : `${n1(value)}%`
@@ -165,6 +174,49 @@ export function CycleTemperaturePanel({
   const latestSentiment = result.latest.cycle?.sentiment == null ? '—' : n1(result.latest.cycle.sentiment)
   const latestFundTemperature = result.latest.fund?.temperature == null ? '—' : n1(result.latest.fund.temperature)
   const latestZtCount = result.latest.feedback?.ztCount == null ? '—' : `${Math.round(result.latest.feedback.ztCount)}`
+  /**
+   * 周期相位的**观察窗口**（2026-11-18 借鉴外部情绪图）：
+   * 全窗口 60 日上下时折线过密，极点和相位带都看不清；给 20/60/120/全部四档，
+   * 默认 60 日。⛔ 只切展示窗口，不重算任何指标（极值仍在完整序列上判定）。
+   */
+  const [range, setRange] = useState<number>(60)
+  const windowed = range > 0 ? cycle.slice(-range) : cycle
+  const offset = cycle.length - windowed.length
+  /** 极点在**完整序列**上找（切片只影响展示），再把下标平移进窗口 */
+  const { peaks, troughs, markers } = useMemo(() => {
+    const peakIdx: number[] = []
+    const troughIdx: number[] = []
+    const at = (i: number) => cycle[i]?.sentiment
+    for (let i = 1; i < cycle.length - 1; i += 1) {
+      const v = at(i)
+      if (typeof v !== 'number') continue
+      let hi = true
+      let lo = true
+      for (let k = Math.max(0, i - 2); k <= Math.min(cycle.length - 1, i + 2); k += 1) {
+        const w = at(k)
+        if (typeof w !== 'number' || k === i) continue
+        if (w > v) hi = false
+        if (w < v) lo = false
+      }
+      if (hi && v >= 8) peakIdx.push(i)
+      if (lo && v <= 2.5) troughIdx.push(i)
+    }
+    // 标注间隔 ≥3 日，避免密集段刷屏
+    const thin = (idx: number[]) => idx.filter((i, n) => n === 0 || i - idx[n - 1] >= 3)
+    const keepPeaks = thin(peakIdx)
+    const keepTroughs = thin(troughIdx)
+    const m: ChartMarker[] = []
+    for (const i of keepPeaks) {
+      if (i < offset) continue
+      m.push({ index: i - offset, label: `高潮 ${cycle[i].date.slice(5)}`, tone: 'rec' })
+    }
+    for (const i of keepTroughs) {
+      if (i < offset) continue
+      m.push({ index: i - offset, label: `冰点 ${cycle[i].date.slice(5)}`, tone: 'down', place: 'below' })
+    }
+    return { peaks: keepPeaks, troughs: keepTroughs, markers: m }
+  }, [cycle, offset])
+  const viewCycle = windowed
 
   return (
     <Card
@@ -226,12 +278,22 @@ export function CycleTemperaturePanel({
         >
           {hasCycle ? (
             <>
-              <PhaseBands rows={cycle} />
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <SegTabs
+                  items={CYCLE_RANGES}
+                  value={String(range)}
+                  onChange={(k) => setRange(Number(k))}
+                />
+                <span className="text-10 text-sub">
+                  极点自动标注：{peaks.length} 次高潮 · {troughs.length} 次冰点（{viewCycle.length} 日样本）
+                </span>
+              </div>
+              <PhaseBands rows={viewCycle} />
               <LineChart
-                labels={cycle.map((row) => row.date.slice(5))}
+                labels={viewCycle.map((row) => row.date.slice(5))}
                 series={[
-                  { name: '情绪分', values: cycle.map((row) => row.sentiment), tone: 'up', area: true },
-                  { name: 'MA3', values: cycle.map((row) => row.sentimentMa3), tone: 'sub', dashed: true },
+                  { name: '情绪分', values: viewCycle.map((row) => row.sentiment), tone: 'up', area: true },
+                  { name: 'MA3', values: viewCycle.map((row) => row.sentimentMa3), tone: 'sub', dashed: true },
                 ]}
                 height={chartH}
                 yMin={0}
@@ -241,8 +303,14 @@ export function CycleTemperaturePanel({
                   { value: 5, label: '中轴', tone: 'sub' },
                   { value: 8, label: '高潮', tone: 'rec' },
                 ]}
+                markers={markers}
                 format={(value) => n1(value)}
               />
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-10 text-sub">
+                <span><b className="text-rec">●</b> 高潮：情绪分 ≥ 8 的局部高点</span>
+                <span><b className="text-down">●</b> 冰点：情绪分 ≤ 2.5 的局部低点</span>
+                <span>⛔ 标注只描述事实，不预测拐点</span>
+              </div>
             </>
           ) : (
             <EmptyState text="无情绪周期数据" />
