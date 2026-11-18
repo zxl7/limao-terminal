@@ -42,8 +42,8 @@ import { stanceText } from '@/shared/lib'
  *
  * ## ⚠️ 三条不可误读的口径
  *
- * 1. **AI 轨与脚本轨是两本独立账**，起点都是 1.0，不可把两者净值放到同一
- *    坐标直接比大小 —— 它们各自的候选集合与成交口径不同。本页只展示 AI 轨，
+ * 1. **量化交易与脚本轨是两本独立账**，起点都是 1.0，不可把两者净值放到同一
+ *    坐标直接比大小 —— 它们各自的候选集合与成交口径不同。本页只展示量化交易，
  *    脚本轨在「交易战绩」页。
  * 2. `entry_max_gap` 是 AI 自定的高开上限，但**生效值恒取用户纪律 5%**
  *    （`ai_caliber.USER_ENTRY_MAX_GAP_PCT`）。展示 AI 自定值是留痕，不是可执行值。
@@ -509,8 +509,8 @@ export function TomorrowView() {
  * 实盘战绩（2026-11-18 用户：顶部独立 tab，⛔ 不再塞进「今日」的二级 tab）。
  *
  * 这里是**整个财富密码唯一的「交易」出口**（2026-11-18 用户「前面只留预测，交易全放这里」）：
- *   ① AI 轨净值/台账（策略口径 + T+1 口径并列）
- *   ② 脚本轨（接力）账户账本 —— 与 AI 轨两本独立账，⛔ 不比大小
+ *   ① 量化交易净值/台账（原「AI 轨」·策略口径 + T+1 口径并列）
+ *   ② 脚本轨（接力）账户账本 —— 与量化交易两本独立账，⛔ 不比大小
  *   ③ 回测（三套口径，⛔ 不相加）
  *   ④ 执行审计（真的进场了吗、毛收益多少）
  * 「今日/明日/尾盘/竞价」四段只放预案与裁决，⛔ 不再出现结算、净值、回测。
@@ -519,7 +519,7 @@ export function LiveRecordView() {
   const nav = useQuery(analyticsQueries.aiNav())
   const navT1 = useQuery(analyticsQueries.aiNavT1())
   const decisions = useQuery(analyticsQueries.aiDecisions())
-  /** 脚本轨（接力）账户账本 —— 与 AI 轨并列展示，⛔ 两本账不混算 */
+  /** 脚本轨（接力）账户账本 —— 与量化交易并列展示，⛔ 两本账不混算 */
   const accountNav = useQuery(analyticsQueries.accountNav())
   /** 回测快照（三套口径） */
   const backtest = useQuery(analyticsQueries.researchBacktest())
@@ -551,7 +551,7 @@ export function LiveRecordView() {
     <div className="flex flex-col gap-3">
       <SegTabs
         items={[
-          { key: 'ai', label: `AI 轨 · ${tradedDays} 成交日` },
+          { key: 'ai', label: `量化交易 · ${tradedDays} 成交日` },
           { key: 'relay', label: '脚本轨 · 接力' },
           { key: 'backtest', label: '回测' },
           { key: 'audit', label: '执行审计' },

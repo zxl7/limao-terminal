@@ -5,7 +5,8 @@ import { cn } from '@/shared/lib'
 import { navRowsDesc } from '../lib/nav'
 
 /**
- * 实盘战绩 —— AI 轨的**交易记录 + 净值曲线 + 逐日结算**（2026-11-18 用户）。
+ * 实盘战绩 —— **量化交易**（原「AI 轨」）的交易记录 + 净值曲线 + 逐日结算。
+ * 2026-11-18 用户：「AI 轨 改为量化交易」—— 统一改叫量化交易，数据源与口径不变。
  *
  * ## 为什么单独成一个顶层面板
  *
@@ -15,7 +16,7 @@ import { navRowsDesc } from '../lib/nav'
  *
  * ## 口径（⛔ 三条都不能混）
  *
- * 1. **AI 轨与脚本轨是两本独立账**，起点都是 1.0；本面板只放 AI 轨，
+ * 1. **量化交易与脚本轨是两本独立账**，起点都是 1.0；本面板只放量化交易，
  *    脚本轨在「交易战绩」页（`/trade`）。⛔ 不把两条曲线放同一坐标比大小。
  * 2. **策略口径（当日收盘卖）与 T+1 口径（次日收盘卖）并列**，差额来自 T+1 制度，
  *    ⛔ 不相加、不换算。T+1 缺日时前向填充（净值是阶梯序列），⛔ 不插值、不补 0。
@@ -85,7 +86,7 @@ export function LiveRecordBoard({ navRows, navT1Rows, decRows, loading }: LiveRe
   return (
     <div className="flex flex-col gap-3">
       <Card
-        title="AI 轨净值"
+        title="量化交易净值"
         extra={
           <CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>
             {lastNav ? n2(lastNav.nav) : '—'}
@@ -169,7 +170,7 @@ export function LiveRecordBoard({ navRows, navT1Rows, decRows, loading }: LiveRe
         />
       </Card>
 
-      <Card title="AI 交易台账" extra={<CardBadge>{decRows.length} 条</CardBadge>}>
+      <Card title="量化交易台账" extra={<CardBadge>{decRows.length} 条</CardBadge>}>
         <DataTable<AiDecisionEntry>
           rows={decRows}
           rowKey={(r, i) => `${r.decision_date}-${r.code}-${i}`}

@@ -58,7 +58,7 @@ describe('LiveRecordBoard', () => {
     const { getByText, getAllByText, container } = render(
       <LiveRecordBoard navRows={NAV} navT1Rows={NAV} decRows={DEC} />,
     )
-    expect(getByText('AI 轨净值')).toBeTruthy()
+    expect(getByText('量化交易净值')).toBeTruthy()
     // 图例两条口径
     expect(getAllByText(/策略口径/).length).toBeGreaterThan(0)
     expect(getAllByText(/T\+1 口径/).length).toBeGreaterThan(0)
