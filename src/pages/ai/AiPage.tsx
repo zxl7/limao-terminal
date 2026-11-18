@@ -5,6 +5,7 @@ import { SectorGapView } from '@/pages/sector-gap/SectorGapPage'
 import { ExecutionAuditView } from '@/pages/execution-audit/ExecutionAuditPage'
 import { AmbushView } from '@/pages/ambush/AmbushPage'
 import type {
+  AiNavEntry,
   AiViewFile,
   DecisionDossier,
   DossierStock,
@@ -523,14 +524,21 @@ export function LiveRecordView() {
   /** 回测快照（三套口径） */
   const backtest = useQuery(analyticsQueries.researchBacktest())
 
-  const navRows = useMemo(
-    () => [...(nav.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
-    [nav.data],
-  )
-  const navT1Rows = useMemo(
-    () => [...(navT1.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
-    [navT1.data],
-  )
+  /**
+   * ⛔ 按 trade_date 去重（同日只留最后一行）—— 2026-11-18 事故的**前端兜底**：
+   * 后端一轮重放把 T+1 账本写成 339 行 / nav 复利到 461，折线被压成贴地直线。
+   * 后端已加幂等闸 + 回归锁；这里再挡一层，避免账本一坏整张图就不可读。
+   */
+  const navRows = useMemo(() => {
+    const m = new Map<string, AiNavEntry>()
+    for (const r of nav.data ?? []) m.set(r.trade_date, r)
+    return [...m.values()].sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+  }, [nav.data])
+  const navT1Rows = useMemo(() => {
+    const m = new Map<string, AiNavEntry>()
+    for (const r of navT1.data ?? []) m.set(r.trade_date, r)
+    return [...m.values()].sort((a, b) => a.trade_date.localeCompare(b.trade_date))
+  }, [navT1.data])
   const decRows = useMemo(
     () => [...(decisions.data ?? [])].sort((a, b) => b.decision_date.localeCompare(a.decision_date)),
     [decisions.data],
