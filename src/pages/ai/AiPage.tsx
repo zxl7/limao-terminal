@@ -535,13 +535,31 @@ export function LiveRecordView() {
     () => [...(decisions.data ?? [])].sort((a, b) => b.decision_date.localeCompare(a.decision_date)),
     [decisions.data],
   )
+  /** 二级切面（2026-11-18 用户「可以加」）：四块交易账互不混算，按账本切而不是按时间切 */
+  const [tab, setTab] = useState<LiveTab>('ai')
+  const tradedDays = navRows.filter((r) => r.stock_count > 0).length
 
   return (
     <div className="flex flex-col gap-3">
-      <LiveRecordBoard navRows={navRows} navT1Rows={navT1Rows} decRows={decRows} loading={nav.isLoading} />
-      <RelayPerformanceBoard rows={accountNav.data ?? []} loading={accountNav.isLoading} />
-      <BacktestCard data={backtest.data} />
-      <ExecutionAuditView />
+      <SegTabs
+        items={[
+          { key: 'ai', label: `AI 轨 · ${tradedDays} 成交日` },
+          { key: 'relay', label: '脚本轨 · 接力' },
+          { key: 'backtest', label: '回测' },
+          { key: 'audit', label: '执行审计' },
+        ]}
+        value={tab}
+        onChange={(k) => setTab(k as LiveTab)}
+      />
+      {tab === 'ai' && (
+        <LiveRecordBoard navRows={navRows} navT1Rows={navT1Rows} decRows={decRows} loading={nav.isLoading} />
+      )}
+      {tab === 'relay' && <RelayPerformanceBoard rows={accountNav.data ?? []} loading={accountNav.isLoading} />}
+      {tab === 'backtest' && <BacktestCard data={backtest.data} />}
+      {tab === 'audit' && <ExecutionAuditView />}
     </div>
   )
 }
+
+/** 实盘战绩的四个账本切面 —— ⛔ 不是四个页面，共用同一次数据加载 */
+type LiveTab = 'ai' | 'relay' | 'backtest' | 'audit'
