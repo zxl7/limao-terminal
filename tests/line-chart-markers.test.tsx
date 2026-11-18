@@ -27,6 +27,27 @@ describe('LineChart markers', () => {
     expect(getByText('冰点 11-12')).toBeTruthy()
   })
 
+  it('极点落在图表上下限时，标注文字仍在 viewBox 内（不被裁）', () => {
+    const { getByText } = render(
+      <LineChart
+        labels={['a', 'b', 'c']}
+        series={[{ name: '情绪分', values: [10, 5, 0], tone: 'mid' }]}
+        yMin={0}
+        yMax={10}
+        height={236}
+        markers={[
+          { index: 0, label: '高潮 顶', tone: 'up' },
+          { index: 2, label: '冰点 底', tone: 'mid', place: 'below' },
+        ]}
+      />,
+    )
+    for (const label of ['高潮 顶', '冰点 底']) {
+      const y = Number(getByText(label).getAttribute('y'))
+      expect(y).toBeGreaterThan(0)
+      expect(y).toBeLessThan(236)
+    }
+  })
+
   it('没有标注时不渲染任何 marker 文本', () => {
     const { container } = render(
       <LineChart labels={labels} series={[{ name: '情绪分', values, tone: 'up' }]} yMin={0} yMax={10} />,

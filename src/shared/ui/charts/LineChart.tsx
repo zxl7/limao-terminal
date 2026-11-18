@@ -12,7 +12,7 @@ import {
   scaleLinear,
   type MaybeNum,
 } from '@/shared/lib'
-import { plotBox, sampleTicks, toneSoftVar, toneVar, type Tone } from './util'
+import { AXIS, plotBox, sampleTicks, toneSoftVar, toneVar, type Tone } from './util'
 import { ChartTooltip, viewToPx, type TipAnchor } from './Tooltip'
 import { useChartWidth } from './useChartWidth'
 
@@ -49,6 +49,8 @@ export interface ChartMarker {
   tone?: Tone
   /** 画在点上方还是下方（默认 above） */
   place?: 'above' | 'below'
+  /** 额外纵向位移（px）：密集标注错车道用，避免两行文字压在一起 */
+  dy?: number
 }
 
 /** 横向参考线（如情绪分 7 分「偏强」阈值、2 分「退潮」阈值） */
@@ -130,7 +132,12 @@ export function LineChart({
   const rightSeries = useMemo(() => series.filter((s) => s.axis === 'right'), [series])
 
   // 副轴存在时右侧留出刻度区，避免右轴标签被裁切（左轴行为不变）
-  const box = plotBox(width, height, rightSeries.length ? { padRight: 46 } : {})
+  const pad = {
+    ...(rightSeries.length ? { padRight: 46 } : {}),
+    // 有极点标注时多留上下呼吸位：文字画在点外 7/13px，不留白会被 viewBox 裁掉
+    ...(markers.length ? { padTop: AXIS.padTop + 14, padBottom: AXIS.padBottom + 12 } : {}),
+  }
+  const box = plotBox(width, height, pad)
 
   const scaleInfo = useMemo(() => {
     const ext = extentOfMany(leftSeries.map((s) => s.values))
@@ -411,7 +418,7 @@ export function LineChart({
               <circle cx={x} cy={y} r={2.8} fill={toneVar(m.tone ?? 'sub')} stroke="var(--color-card)" strokeWidth={1.2} />
               <text
                 x={round2(tx)}
-                y={round2(above ? y - 7 : y + 13)}
+                y={round2(above ? y - 7 - (m.dy ?? 0) : y + 13 + (m.dy ?? 0))}
                 textAnchor={anchor}
                 fontSize={9.5}
                 fontWeight={600}

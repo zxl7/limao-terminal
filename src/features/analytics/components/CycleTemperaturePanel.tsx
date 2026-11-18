@@ -163,7 +163,8 @@ export function CycleTemperaturePanel({
 }) {
   const phase = phaseOf(result)
   // 2026-11-17：复盘页把三张图搬过去后，高度要收（用户：「图表缩小高度」）
-  const chartH = chartsOnly ? 120 : 190
+  // 2026-11-18：极点标注要在曲线外占 7~13px，高度必须抬 —— 不然文字被裁
+  const chartH = chartsOnly ? 160 : 236
   const fundH = chartsOnly ? 110 : 180
   const cycle = result.cycle
   const feedback = result.feedback
@@ -183,38 +184,93 @@ export function CycleTemperaturePanel({
   const windowed = range > 0 ? cycle.slice(-range) : cycle
   const offset = cycle.length - windowed.length
   /** 极点在**完整序列**上找（切片只影响展示），再把下标平移进窗口 */
+  /**
+   * 极点识别（2026-11-18 对齐外部情绪图的四级标注）：
+   *   · **高潮**：情绪分 ≥ 8 的局部高点（红）
+   *   · **冰点**：情绪分 ≤ 2.5、且只冷 1 天（蓝）
+   *   · **双冰**：连续 2~4 天 ≤ 2.5（紫）
+   *   · **五冰**：连续 ≥5 天 ≤ 2.5（橙）—— 冷得越久，退潮越实
+   * 冰点按「连续段」判，不再逐日判 —— 否则一段 5 天冰点会被写成 5 个冰点标。
+   */
   const { peaks, troughs, markers } = useMemo(() => {
-    const peakIdx: number[] = []
-    const troughIdx: number[] = []
     const at = (i: number) => cycle[i]?.sentiment
+    const peakIdx: number[] = []
     for (let i = 1; i < cycle.length - 1; i += 1) {
       const v = at(i)
-      if (typeof v !== 'number') continue
+      if (typeof v !== 'number' || v < 8) continue
       let hi = true
-      let lo = true
       for (let k = Math.max(0, i - 2); k <= Math.min(cycle.length - 1, i + 2); k += 1) {
         const w = at(k)
-        if (typeof w !== 'number' || k === i) continue
-        if (w > v) hi = false
-        if (w < v) lo = false
+        if (typeof w === 'number' && k !== i && w > v) hi = false
       }
-      if (hi && v >= 8) peakIdx.push(i)
-      if (lo && v <= 2.5) troughIdx.push(i)
+      if (hi) peakIdx.push(i)
     }
-    // 标注间隔 ≥3 日，避免密集段刷屏
-    const thin = (idx: number[]) => idx.filter((i, n) => n === 0 || i - idx[n - 1] >= 3)
-    const keepPeaks = thin(peakIdx)
-    const keepTroughs = thin(troughIdx)
+    // 极值日之间隔 ≥3 天，避免密集段刷屏（保留先出现的那次）
+    const keepPeaks = peakIdx.filter((i, n) => n === 0 || i - peakIdx[n - 1] >= 3)
+
+    /** 连续 ≤2.5 的「冷段」：取段内最低点做标注 */
+    const runs: Array<{ start: number; end: number; low: number }> = []
+    let cur: { start: number; end: number; low: number } | null = null
+    for (let i = 0; i < cycle.length; i += 1) {
+      const v = at(i)
+      const cold = typeof v === 'number' && v <= 2.5
+      if (cold) {
+        if (!cur) cur = { start: i, end: i, low: i }
+        else {
+          cur.end = i
+          if ((at(i) as number) <= (at(cur.low) as number)) cur.low = i
+        }
+      } else if (cur) {
+        runs.push(cur)
+        cur = null
+      }
+    }
+    if (cur) runs.push(cur)
+
+    // 冷段之间也做 ≥3 天抽稀：挨太近的两个标签必然叠字；保留更长（更实）的那段
+    const keptRuns: typeof runs = []
+    for (const r of runs) {
+      const prev = keptRuns.at(-1)
+      if (prev && r.low - prev.low < 3) {
+        const lenR = r.end - r.start + 1
+        const lenP = prev.end - prev.start + 1
+        if (lenR > lenP) keptRuns[keptRuns.length - 1] = r
+        continue
+      }
+      keptRuns.push(r)
+    }
+    const troughIdx = keptRuns.map((r) => r.low)
     const m: ChartMarker[] = []
     for (const i of keepPeaks) {
       if (i < offset) continue
-      m.push({ index: i - offset, label: `高潮 ${cycle[i].date.slice(5)}`, tone: 'rec' })
+      m.push({ index: i - offset, label: `高潮 ${cycle[i].date.slice(5)}`, tone: 'up' })
     }
-    for (const i of keepTroughs) {
+    for (const r of keptRuns) {
+      const i = r.low
       if (i < offset) continue
-      m.push({ index: i - offset, label: `冰点 ${cycle[i].date.slice(5)}`, tone: 'down', place: 'below' })
+      const len = r.end - r.start + 1
+      const meta =
+        len >= 5
+          ? { name: '五冰', tone: 'lead' as const }
+          : len >= 2
+            ? { name: '双冰', tone: 'rec' as const }
+            : { name: '冰点', tone: 'mid' as const }
+      m.push({ index: i - offset, label: `${meta.name} ${cycle[i].date.slice(5)}`, tone: meta.tone, place: 'below' })
     }
-    return { peaks: keepPeaks, troughs: keepTroughs, markers: m }
+    // 错车道：相邻标注（<6 个交易日）交替抬高 11px，两行文字才不会压在一起
+    m.sort((a, b) => a.index - b.index)
+    let lastIdx = -99
+    let lane = 0
+    for (const item of m) {
+      if (item.index - lastIdx < 6) {
+        lane = lane === 0 ? 1 : 0
+      } else {
+        lane = 0
+      }
+      if (lane === 1) item.dy = 11
+      lastIdx = item.index
+    }
+    return { peaks: keepPeaks, troughs: troughIdx, markers: m }
   }, [cycle, offset])
   const viewCycle = windowed
 
@@ -285,14 +341,14 @@ export function CycleTemperaturePanel({
                   onChange={(k) => setRange(Number(k))}
                 />
                 <span className="text-10 text-sub">
-                  极点自动标注：{peaks.length} 次高潮 · {troughs.length} 次冰点（{viewCycle.length} 日样本）
+                  极点自动标注：{peaks.length} 次高潮 · {troughs.length} 段冰点（{viewCycle.length} 日样本）
                 </span>
               </div>
               <PhaseBands rows={viewCycle} />
               <LineChart
                 labels={viewCycle.map((row) => row.date.slice(5))}
                 series={[
-                  { name: '情绪分', values: viewCycle.map((row) => row.sentiment), tone: 'up', area: true },
+                  { name: '情绪分', values: viewCycle.map((row) => row.sentiment), tone: 'mid', area: true },
                   { name: 'MA3', values: viewCycle.map((row) => row.sentimentMa3), tone: 'sub', dashed: true },
                 ]}
                 height={chartH}
@@ -307,8 +363,10 @@ export function CycleTemperaturePanel({
                 format={(value) => n1(value)}
               />
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-10 text-sub">
-                <span><b className="text-rec">●</b> 高潮：情绪分 ≥ 8 的局部高点</span>
-                <span><b className="text-down">●</b> 冰点：情绪分 ≤ 2.5 的局部低点</span>
+                <span><b className="text-up">●</b> 高潮（≥8）</span>
+                <span><b className="text-mid">●</b> 冰点（≤2.5 · 1 天）</span>
+                <span><b className="text-rec">●</b> 双冰（连续 2~4 天）</span>
+                <span><b className="text-lead">●</b> 五冰（连续 ≥5 天）</span>
                 <span>⛔ 标注只描述事实，不预测拐点</span>
               </div>
             </>
