@@ -20,7 +20,7 @@ import {
   SegTabs,
   type JudgeRow,
 } from '@/features/analytics'
-import { BacktestCard, DecisionBoard, ExecutionPanel, LiveRecordBoard, ScreenFunnel, TomorrowBoard } from '@/features/wealth'
+import { BacktestCard, DecisionBoard, ExecutionPanel, LiveRecordBoard, RelayPerformanceBoard, ScreenFunnel, TomorrowBoard } from '@/features/wealth'
 import { Card, CardBadge, EmptyState } from '@/shared/ui'
 import { stanceText } from '@/shared/lib'
 
@@ -81,8 +81,6 @@ export function AiWealthView() {
   const poolLedgers = useQuery(analyticsQueries.decisionPoolLedger())
   /** 全量涨停逐票过筛（近 5 期）—— 回答「48 只涨停为什么只剩这几只」 */
   const screens = useQuery(analyticsQueries.decisionScreen())
-  /** 回测战绩快照（研究产物，手工刷新；三口径并列，⛔ 不轮询） */
-  const backtest = useQuery(analyticsQueries.researchBacktest())
   const [tab, setTab] = useState<'board' | 'judge' | 'analysis'>('board')
   const [viewDate, setViewDate] = useState<string>('')
 
@@ -343,7 +341,7 @@ export function AiWealthView() {
               key: 'judge',
               label: `判断 · ${callFile ? Object.keys(callFile.views ?? {}).length : 0} 已判 / ${viewRows.length} 预案`,
             },
-            { key: 'analysis', label: '分析' },
+            { key: 'analysis', label: '过筛' },
           ]}
           value={tab}
           onChange={(k) => setTab(k as typeof tab)}
@@ -376,8 +374,6 @@ export function AiWealthView() {
             两页曾是同一份档案的两个副本（环境/接力/观察三块重复），现已合并到一处。 */}
       {tab === 'analysis' && (
         <div className="flex flex-col gap-3">
-          {/* 回测：三套收益口径并列（⛔ 不混账） */}
-          <BacktestCard data={backtest.data} />
           {/* 全量过筛：调参用，不是下单依据 */}
           <Card
             title="全量过筛"
@@ -458,13 +454,16 @@ export function AiWealthView() {
  * 现在收成一个入口 + 四个切面；⛔ 旧 URL 全部保留（各自仍是独立路由），只是不再占侧栏。
  */
 // 2026-11-16 用户定的顺序：今日 → 明日 → 尾盘 → 竞价 → 执行（文案不变）
+// 2026-11-18 用户「前面只留预测，交易全放实盘战绩」：
+//   · 「执行」不再是独立顶部段 —— 执行审计并入实盘战绩
+//   · 回测从「分析」移入实盘战绩；「分析」只剩全量过筛，改名「过筛」
+//   ⇒ 顶部四段纯预测/推测（今日/明日/尾盘/竞价）+ 一段纯交易（实盘战绩）
 // 2026-11-18 用户：新增「实盘战绩」——AI 交易/净值曲线不进二级细分，顶部单列。
 const WEALTH_SECTIONS = [
   { key: 'today', label: '今日' },
   { key: 'tomorrow', label: '明日' },
   { key: 'ambush', label: '尾盘' },
   { key: 'gap', label: '竞价' },
-  { key: 'audit', label: '执行' },
   { key: 'live', label: '实盘战绩' },
 ] as const
 
@@ -486,7 +485,6 @@ export function Component() {
       {section === 'tomorrow' && <TomorrowView />}
       {section === 'ambush' && <AmbushView />}
       {section === 'gap' && <SectorGapView />}
-      {section === 'audit' && <ExecutionAuditView />}
       {section === 'live' && <LiveRecordView />}
     </div>
   )
@@ -509,13 +507,21 @@ export function TomorrowView() {
 /**
  * 实盘战绩（2026-11-18 用户：顶部独立 tab，⛔ 不再塞进「今日」的二级 tab）。
  *
- * 只做三件事：AI 轨净值曲线（策略口径 + T+1 口径并列）、逐日结算表、AI 逐票台账。
- * 口径与 `LiveRecordBoard` 注释一致：两本账不混、两套口径不相加、指标不前端重算。
+ * 这里是**整个财富密码唯一的「交易」出口**（2026-11-18 用户「前面只留预测，交易全放这里」）：
+ *   ① AI 轨净值/台账（策略口径 + T+1 口径并列）
+ *   ② 脚本轨（接力）账户账本 —— 与 AI 轨两本独立账，⛔ 不比大小
+ *   ③ 回测（三套口径，⛔ 不相加）
+ *   ④ 执行审计（真的进场了吗、毛收益多少）
+ * 「今日/明日/尾盘/竞价」四段只放预案与裁决，⛔ 不再出现结算、净值、回测。
  */
 export function LiveRecordView() {
   const nav = useQuery(analyticsQueries.aiNav())
   const navT1 = useQuery(analyticsQueries.aiNavT1())
   const decisions = useQuery(analyticsQueries.aiDecisions())
+  /** 脚本轨（接力）账户账本 —— 与 AI 轨并列展示，⛔ 两本账不混算 */
+  const accountNav = useQuery(analyticsQueries.accountNav())
+  /** 回测快照（三套口径） */
+  const backtest = useQuery(analyticsQueries.researchBacktest())
 
   const navRows = useMemo(
     () => [...(nav.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
@@ -530,5 +536,12 @@ export function LiveRecordView() {
     [decisions.data],
   )
 
-  return <LiveRecordBoard navRows={navRows} navT1Rows={navT1Rows} decRows={decRows} loading={nav.isLoading} />
+  return (
+    <div className="flex flex-col gap-3">
+      <LiveRecordBoard navRows={navRows} navT1Rows={navT1Rows} decRows={decRows} loading={nav.isLoading} />
+      <RelayPerformanceBoard rows={accountNav.data ?? []} loading={accountNav.isLoading} />
+      <BacktestCard data={backtest.data} />
+      <ExecutionAuditView />
+    </div>
+  )
 }

@@ -10,6 +10,7 @@ export { ScreenFunnel } from './components/ScreenFunnel'
 export { BuyPlan } from './components/BuyPlan'
 export { BacktestCard } from './components/BacktestCard'
 export { LiveRecordBoard } from './components/LiveRecordBoard'
+export { RelayPerformanceBoard } from './components/RelayPerformanceBoard'
 export {
   boardsText,
   fbtText,

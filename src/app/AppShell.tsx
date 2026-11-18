@@ -93,7 +93,10 @@ export const TABS: readonly TabDef[] = [
   { to: '/dragon-gene', label: '龙头基因', group: '盘面' },
 
   // ── 段3 · 决策与战绩（日频）──
-  { to: '/trade', label: '交易战绩', group: '决策' },
+  // ⛔ 2026-11-18 用户「交易相关的都放进实盘战绩」：/trade 已并入
+  //    「财富密码 → 实盘战绩」（/ai 的 live 段）。路由保留可直达（旧链接不失效），
+  //    不再占侧栏 —— 与 /auction 同处理方式。
+
   { to: '/backtest', label: '回测', group: '决策' },
   { to: '/institution', label: '机构投研', group: '决策' },
   // ⛔ 2026-11-04 合并：原「竞价决策」(`/auction`) 已并入「财富密码」(`/ai`) 的
