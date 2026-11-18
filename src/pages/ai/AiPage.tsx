@@ -5,7 +5,6 @@ import { SectorGapView } from '@/pages/sector-gap/SectorGapPage'
 import { ExecutionAuditView } from '@/pages/execution-audit/ExecutionAuditPage'
 import { AmbushView } from '@/pages/ambush/AmbushPage'
 import type {
-  AiDecisionEntry,
   AiViewFile,
   DecisionDossier,
   DossierStock,
@@ -18,18 +17,12 @@ import {
   AiJudgeDetail,
   isMarketOnlyBlock,
   analyticsQueries,
-  DataTable,
   SegTabs,
-  StatPair,
-  Tag,
   type JudgeRow,
-  n1,
-  n2,
-  pct,
 } from '@/features/analytics'
-import { BacktestCard, DecisionBoard, ExecutionPanel, ScreenFunnel, TomorrowBoard, navRowsDesc } from '@/features/wealth'
-import { Card, CardBadge, EmptyState, LineChart, StockLink } from '@/shared/ui'
-import { cn, stanceText } from '@/shared/lib'
+import { BacktestCard, DecisionBoard, ExecutionPanel, LiveRecordBoard, ScreenFunnel, TomorrowBoard } from '@/features/wealth'
+import { Card, CardBadge, EmptyState } from '@/shared/ui'
+import { stanceText } from '@/shared/lib'
 
 /**
  * AI 台账 —— 数据源 `wealth_code/cache/ai_view/` + `ai_decisions.jsonl` + `ai_nav_history.jsonl`。
@@ -61,6 +54,7 @@ export async function loader() {
   await queryClient.ensureQueryData(analyticsQueries.aiView())
   await queryClient.ensureQueryData(analyticsQueries.aiDecisions())
   await queryClient.ensureQueryData(analyticsQueries.aiNav())
+  await queryClient.ensureQueryData(analyticsQueries.aiNavT1())
   // 判断明细要关联「尾盘财富密码接力卡」的真实项（区间/量能/指标/标签）
   await queryClient.ensureQueryData(analyticsQueries.decisionCandidates())
   // 「判断」一栏取**今晨 09:25 裁决终态**（实际怎么做），而非昨日盘后预案
@@ -72,18 +66,6 @@ export async function loader() {
   return null
 }
 
-/** 判断语义 —— 只做三值映射，不给参与/观望加奖惩式措辞 */
-const VIEW_META: Record<string, { label: string; tone: 'up' | 'rec' | 'sub' }> = {
-  participate: { label: '参与', tone: 'up' },
-  watch: { label: '观察', tone: 'rec' },
-  skip: { label: '放弃', tone: 'sub' },
-}
-
-/** 净值盈亏分界（起点 1.0）—— 模块级稳定引用，避免每次渲染新建数组触发折线图无谓重算 */
-const NAV_BASELINE: { value: number; label: string; tone: 'sub'; dashed: boolean }[] = [
-  { value: 1, label: '盈亏分界 1.0', tone: 'sub', dashed: true },
-]
-
 export function AiWealthView() {
   const [today] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()))
   const quotes = useQuery({ queryKey: ['participation-quotes'], queryFn: () => fetchRoute('/api/decision/participation-quotes'), staleTime: 0, refetchInterval: 30_000 })
@@ -91,7 +73,6 @@ export function AiWealthView() {
   const decisions = useQuery(analyticsQueries.aiDecisions())
   const nav = useQuery(analyticsQueries.aiNav())
   /** T+1 口径（竞价买→次日收盘卖）：独立序列，只用于并列对照 */
-  const navT1 = useQuery(analyticsQueries.aiNavT1())
   /** 尾盘财富密码接力卡存档（近 3 期）—— 判断明细的「真实项」来源 */
   const dossiers = useQuery(analyticsQueries.decisionCandidates())
   /** 09:25 池内裁决终态（近 3 期）—— 判断明细的「实际怎么做」来源 */
@@ -102,9 +83,7 @@ export function AiWealthView() {
   const screens = useQuery(analyticsQueries.decisionScreen())
   /** 回测战绩快照（研究产物，手工刷新；三口径并列，⛔ 不轮询） */
   const backtest = useQuery(analyticsQueries.researchBacktest())
-  const [tab, setTab] = useState<'board' | 'judge' | 'record' | 'analysis'>('board')
-  /** 战绩：曲线 / 明细（2026-11-11 合并 台账+净值） */
-  const [recordView, setRecordView] = useState<'chart' | 'detail'>('chart')
+  const [tab, setTab] = useState<'board' | 'judge' | 'analysis'>('board')
   const [viewDate, setViewDate] = useState<string>('')
 
   /** 判断记录：按日期倒序，默认取最新 */
@@ -317,59 +296,6 @@ export function AiWealthView() {
     () => [...(nav.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
     [nav.data],
   )
-  /**
-   * 净值**表格**用逆序（最新一行在最上面，2026-11-09 用户要求）。
-   *
-   * ⛔ 只给表格用：`navRows` 本身必须保持**正序** ——
-   *    折线图时间轴只能从左到右；`lastNav` / 最大回撤都是按正序逐点递推算的。
-   * 规则与理由集中在 `features/wealth/lib/nav.ts`（那里有完整的四消费者对照表）。
-   */
-  const navTableRows = useMemo(() => navRowsDesc(navRows), [navRows])
-  /**
-   * 两套口径并列（2026-11-11 用户「不混账」）：策略口径＝竞价买→当日收盘；
-   * T+1 口径＝竞价买→**次日**收盘。日期集合不同 → 取并集，各自**前向填充**
-   * （净值是阶梯序列，缺日沿用上一值），⛔ 不做插值）。
-   */
-  const navT1Rows = useMemo(
-    () => [...(navT1.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
-    [navT1.data],
-  )
-  const navAxis = useMemo(() => {
-    const ds = new Set<string>()
-    for (const r of navRows) ds.add(r.trade_date)
-    for (const r of navT1Rows) ds.add(r.trade_date)
-    return [...ds].sort()
-  }, [navRows, navT1Rows])
-  const fillNav = (rows: { trade_date: string; nav: number }[], d: string) => {
-    let v = 1
-    for (const r of rows) {
-      if (r.trade_date <= d) v = r.nav
-      else break
-    }
-    return v
-  }
-  const navSeries = useMemo(() => {
-    const out: Array<{ name: string; values: number[]; tone: 'up' | 'rec'; area?: boolean }> = [
-      { name: '策略口径（当日收盘）', values: navAxis.map((d) => fillNav(navRows, d)), tone: 'up', area: true },
-    ]
-    if (navT1Rows.length) {
-      out.push({ name: 'T+1 口径（次日收盘）', values: navAxis.map((d) => fillNav(navT1Rows, d)), tone: 'rec' })
-    }
-    return out
-  }, [navAxis, navRows, navT1Rows])
-  const lastNav = navRows.at(-1)
-
-  /** 累计收益 = 末值 - 1；最大回撤按净值序列逐点计算 */
-  const maxDrawdown = useMemo(() => {
-    let peak = -Infinity
-    let mdd = 0
-    for (const r of navRows) {
-      peak = Math.max(peak, r.nav)
-      mdd = Math.min(mdd, r.nav / peak - 1)
-    }
-    return mdd
-  }, [navRows])
-
   /** 预案档（AI 昨日盘后写）判参与的只数 */
   const planCount = viewRows.filter((r) => r.view === 'participate').length
   /** 今晨 09:25 实际买入只数（名额内成交） */
@@ -417,7 +343,6 @@ export function AiWealthView() {
               key: 'judge',
               label: `判断 · ${callFile ? Object.keys(callFile.views ?? {}).length : 0} 已判 / ${viewRows.length} 预案`,
             },
-            { key: 'record', label: '战绩' },
             { key: 'analysis', label: '分析' },
           ]}
           value={tab}
@@ -513,153 +438,6 @@ export function AiWealthView() {
         </div>
       )}
 
-      {tab === 'record' && (
-        <div className="flex flex-col gap-3">
-          <SegTabs
-            items={[
-              // 2026-11-11：台账 + 净值 合并为「战绩」；两套口径⛔ 不混成一条线
-              { key: 'chart', label: '净值曲线' },
-              { key: 'detail', label: `台账明细 (${decRows.length})` },
-            ]}
-            value={recordView}
-            onChange={(k) => setRecordView(k as 'chart' | 'detail')}
-          />
-          {recordView === 'detail' && (
-        <Card title="AI 台账" extra={<CardBadge>{decRows.length} 条</CardBadge>}>
-          <DataTable<AiDecisionEntry>
-            rows={decRows}
-            rowKey={(r, i) => `${r.decision_date}-${r.code}-${i}`}
-            empty="台账为空"
-            columns={[
-              { label: '决策日', cell: (r) => <span className="num">{r.decision_date}</span> },
-              {
-                label: '标的',
-                cell: (r) => (
-                  <span>
-                    <StockLink code={r.code} className="text-txt">
-                      {r.name || r.code}
-                    </StockLink>
-                  </span>
-                ),
-              },
-              {
-                label: '排序评分',
-                num: true,
-                cell: (r) => (
-                  <span className={cn('num font-semibold', (r.ranking_score ?? 0) >= 80 ? 'text-up' : 'text-txt')}>
-                    {r.ranking_score == null ? '—' : `${n1(r.ranking_score)} / 100`}
-                  </span>
-                ),
-              },
-              {
-                label: '判断',
-                cell: (r) => {
-                  const m = VIEW_META[r.view] ?? { label: r.view, tone: 'sub' as const }
-                  return (
-                    <span className={m.tone === 'up' ? 'text-up' : m.tone === 'rec' ? 'text-rec' : 'text-sub'}>
-                      {m.label}
-                    </span>
-                  )
-                },
-              },
-              { label: '仓位', num: true, cell: (r) => (r.position ? r.position : '—') },
-              {
-                label: '结算',
-                cell: (r) => <Tag tone={r.settled ? 'up' : 'neutral'}>{r.settled ? '已结算' : '未结算'}</Tag>,
-              },
-              { label: '来源', cell: (r) => <span className="text-sub text-12">{r.source || '—'}</span> },
-              {
-                label: '理由',
-                className: 'whitespace-normal min-w-[300px]',
-                cell: (r) => <span className="text-12 leading-relaxed">{r.reason || '—'}</span>,
-              },
-            ]}
-          />
-        </Card>
-          )}
-          {recordView === 'chart' && (
-        <div className="flex flex-col gap-3">
-          <Card title="AI 轨净值" extra={<CardBadge tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'}>{lastNav ? n2(lastNav.nav) : '—'}</CardBadge>}>
-          {/* 概览指标：原「台账总览」侧栏合并进来的，别在精简时丢掉 */}
-          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-2">
-            <StatPair label="累计收益" value={lastNav ? pct((lastNav.nav - 1) * 100) : '—'}
-                      tone={lastNav && lastNav.nav >= 1 ? 'up' : 'down'} />
-            <StatPair label="最大回撤" value={navRows.length ? pct(maxDrawdown * 100) : '—'} tone="down" />
-            <StatPair label="结算日数" value={navRows.length} />
-            <StatPair label="最新结算日" value={lastNav?.trade_date ?? '—'} />
-            <StatPair label="判断日数" value={viewFiles.length} />
-          </div>
-          <div className="border border-line rounded-sm p-2.5 mb-3">
-            <LineChart
-              series={navSeries}
-              labels={navAxis}
-              height={220}
-              format={(v) => n2(v)}
-              refLines={NAV_BASELINE}
-            />
-          </div>
-          <DataTable
-            rows={navTableRows}
-            rowKey={(r) => r.trade_date}
-            empty="尚无结算记录（15:30 后生成）"
-            columns={[
-              {
-                label: '结算日',
-                cell: (r, i) => (
-                  <span className="num">
-                    {r.trade_date}
-                    {i === 0 && <span className="ml-1.5 text-10 text-sub">最新</span>}
-                  </span>
-                ),
-              },
-              { label: '决策日', cell: (r) => <span className="num text-sub">{r.recommendation_date}</span> },
-              { label: '口径', cell: (r) => <Tag>{CALIBER_LABEL[r.strategy] ?? (r.strategy || '—')}</Tag> },
-              {
-                label: '成交数',
-                num: true,
-                cell: (r) => <span className={r.stock_count === 0 ? 'text-sub' : 'text-txt'}>{r.stock_count}</span>,
-              },
-              {
-                label: '当日均收益',
-                num: true,
-                cell: (r) => (
-                  <span className={r.avg_return_pct >= 0 ? 'text-up' : 'text-down'}>{pct(r.avg_return_pct)}</span>
-                ),
-              },
-              {
-                label: '净值',
-                num: true,
-                cell: (r) => (
-                  <span className={cn('font-semibold num', r.nav >= 1 ? 'text-up' : 'text-down')}>{n2(r.nav)}</span>
-                ),
-              },
-              { label: 'AI 已决策', num: true, cell: (r) => r.decided },
-              {
-                label: '成交标的',
-                className: 'whitespace-normal min-w-[240px]',
-                cell: (r) =>
-                  r.stocks.length ? (
-                    <span className="flex flex-wrap gap-1">
-                      {r.stocks.map((s) => (
-                        <Tag key={s.code} tone={s.return_pct >= 0 ? 'up' : 'down'}>
-                          <StockLink code={s.code}>
-                            {s.name || s.code} {pct(s.return_pct, 1)}
-                          </StockLink>
-                        </Tag>
-                      ))}
-                    </span>
-                  ) : (
-                    <span className="text-sub">空仓</span>
-                  ),
-              },
-            ]}
-          />
-          </Card>
-        </div>
-          )}
-        </div>
-      )}
-
       {!view.isLoading && !dossier && !viewRows.length && !decRows.length && !navRows.length && (
         <EmptyState
           text="财富密码尚无数据"
@@ -679,18 +457,15 @@ export function AiWealthView() {
  *
  * 现在收成一个入口 + 四个切面；⛔ 旧 URL 全部保留（各自仍是独立路由），只是不再占侧栏。
  */
-const CALIBER_LABEL: Record<string, string> = {
-  ai_judgement_next_day_close: '策略口径（竞价→当日收盘）',
-  ai_judgement_t1_close: 'T+1 口径（竞价→次日收盘）',
-}
-
 // 2026-11-16 用户定的顺序：今日 → 明日 → 尾盘 → 竞价 → 执行（文案不变）
+// 2026-11-18 用户：新增「实盘战绩」——AI 交易/净值曲线不进二级细分，顶部单列。
 const WEALTH_SECTIONS = [
   { key: 'today', label: '今日' },
   { key: 'tomorrow', label: '明日' },
   { key: 'ambush', label: '尾盘' },
   { key: 'gap', label: '竞价' },
   { key: 'audit', label: '执行' },
+  { key: 'live', label: '实盘战绩' },
 ] as const
 
 type WealthSection = (typeof WEALTH_SECTIONS)[number]['key']
@@ -712,6 +487,7 @@ export function Component() {
       {section === 'ambush' && <AmbushView />}
       {section === 'gap' && <SectorGapView />}
       {section === 'audit' && <ExecutionAuditView />}
+      {section === 'live' && <LiveRecordView />}
     </div>
   )
 }
@@ -730,3 +506,29 @@ export function TomorrowView() {
   return <TomorrowBoard dossier={latest} />
 }
 
+/**
+ * 实盘战绩（2026-11-18 用户：顶部独立 tab，⛔ 不再塞进「今日」的二级 tab）。
+ *
+ * 只做三件事：AI 轨净值曲线（策略口径 + T+1 口径并列）、逐日结算表、AI 逐票台账。
+ * 口径与 `LiveRecordBoard` 注释一致：两本账不混、两套口径不相加、指标不前端重算。
+ */
+export function LiveRecordView() {
+  const nav = useQuery(analyticsQueries.aiNav())
+  const navT1 = useQuery(analyticsQueries.aiNavT1())
+  const decisions = useQuery(analyticsQueries.aiDecisions())
+
+  const navRows = useMemo(
+    () => [...(nav.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
+    [nav.data],
+  )
+  const navT1Rows = useMemo(
+    () => [...(navT1.data ?? [])].sort((a, b) => a.trade_date.localeCompare(b.trade_date)),
+    [navT1.data],
+  )
+  const decRows = useMemo(
+    () => [...(decisions.data ?? [])].sort((a, b) => b.decision_date.localeCompare(a.decision_date)),
+    [decisions.data],
+  )
+
+  return <LiveRecordBoard navRows={navRows} navT1Rows={navT1Rows} decRows={decRows} loading={nav.isLoading} />
+}

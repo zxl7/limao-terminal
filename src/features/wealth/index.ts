@@ -9,6 +9,7 @@ export { PickCard } from './components/PickCard'
 export { ScreenFunnel } from './components/ScreenFunnel'
 export { BuyPlan } from './components/BuyPlan'
 export { BacktestCard } from './components/BacktestCard'
+export { LiveRecordBoard } from './components/LiveRecordBoard'
 export {
   boardsText,
   fbtText,
