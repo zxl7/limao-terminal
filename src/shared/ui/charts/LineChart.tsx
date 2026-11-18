@@ -44,8 +44,8 @@ export interface LineSeries {
 export interface ChartMarker {
   /** 数据点下标（与 labels 对齐） */
   index: number
-  /** 标注文字（建议短：极点名 + 日期，如「高潮 11-10」） */
-  label: string
+  /** 标注文字（建议短：极点名 + 日期，如「高潮 11-10」）；留空则只画点不写字 */
+  label?: string
   tone?: Tone
   /** 画在点上方还是下方（默认 above） */
   place?: 'above' | 'below'
@@ -416,6 +416,7 @@ export function LineChart({
           return (
             <g key={`mk-${m.index}-${m.label}`}>
               <circle cx={x} cy={y} r={2.8} fill={toneVar(m.tone ?? 'sub')} stroke="var(--color-card)" strokeWidth={1.2} />
+              {m.label && (
               <text
                 x={round2(tx)}
                 y={round2(above ? y - 7 - (m.dy ?? 0) : y + 13 + (m.dy ?? 0))}
@@ -426,6 +427,7 @@ export function LineChart({
               >
                 {m.label}
               </text>
+              )}
             </g>
           )
         })}

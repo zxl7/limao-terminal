@@ -180,7 +180,7 @@ export function CycleTemperaturePanel({
    * 全窗口 60 日上下时折线过密，极点和相位带都看不清；给 20/60/120/全部四档，
    * 默认 60 日。⛔ 只切展示窗口，不重算任何指标（极值仍在完整序列上判定）。
    */
-  const [range, setRange] = useState<number>(60)
+  const [range, setRange] = useState<number>(40)
   const windowed = range > 0 ? cycle.slice(-range) : cycle
   const offset = cycle.length - windowed.length
   /** 极点在**完整序列**上找（切片只影响展示），再把下标平移进窗口 */
@@ -249,13 +249,20 @@ export function CycleTemperaturePanel({
       const i = r.low
       if (i < offset) continue
       const len = r.end - r.start + 1
+      // 单日冰点只留一个蓝点、不写字（2026-11-18 用户「可以」）：
+      // 它出现频率最高（14 段里 6 段），写字反而把双冰/五冰挤没了
       const meta =
         len >= 5
-          ? { name: '五冰', tone: 'lead' as const }
+          ? { name: '五冰', tone: 'lead' as const, text: true }
           : len >= 2
-            ? { name: '双冰', tone: 'rec' as const }
-            : { name: '冰点', tone: 'mid' as const }
-      m.push({ index: i - offset, label: `${meta.name} ${cycle[i].date.slice(5)}`, tone: meta.tone, place: 'below' })
+            ? { name: '双冰', tone: 'rec' as const, text: true }
+            : { name: '冰点', tone: 'mid' as const, text: false }
+      m.push({
+        index: i - offset,
+        label: meta.text ? `${meta.name} ${cycle[i].date.slice(5)}` : '',
+        tone: meta.tone,
+        place: 'below',
+      })
     }
     // 错车道：相邻标注（<6 个交易日）交替抬高 11px，两行文字才不会压在一起
     m.sort((a, b) => a.index - b.index)
@@ -341,7 +348,7 @@ export function CycleTemperaturePanel({
                   onChange={(k) => setRange(Number(k))}
                 />
                 <span className="text-10 text-sub">
-                  极点自动标注：{peaks.length} 次高潮 · {troughs.length} 段冰点（{viewCycle.length} 日样本）
+                  极点自动标注：{peaks.length} 次高潮 · {troughs.length} 段寒冷（{viewCycle.length} 日样本）
                 </span>
               </div>
               <PhaseBands rows={viewCycle} />
@@ -364,7 +371,7 @@ export function CycleTemperaturePanel({
               />
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-10 text-sub">
                 <span><b className="text-up">●</b> 高潮（≥8）</span>
-                <span><b className="text-mid">●</b> 冰点（≤2.5 · 1 天）</span>
+                <span><b className="text-mid">●</b> 单日冰点（只标点）</span>
                 <span><b className="text-rec">●</b> 双冰（连续 2~4 天）</span>
                 <span><b className="text-lead">●</b> 五冰（连续 ≥5 天）</span>
                 <span>⛔ 标注只描述事实，不预测拐点</span>
